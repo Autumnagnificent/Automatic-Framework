@@ -153,8 +153,8 @@ function ToPad(pad)
 	end
 end
 
-function AutoUI.Push()
-	
+function AutoUI.Exit()
+	table.insert(AutoUIStack, {type = 'Exit'})
 end
 
 ---Set the Automatic Alignment for Auto.Ui- functions. Used like UiAlign(). UiPush() and UiPop() have no effect.
@@ -172,7 +172,7 @@ end
 ---UiTranslate() but for using padding values
 ---@param padding table Uses values from the PresetPadding, default is {"heavy", "heavy"}
 ---@param multiplyer number A multiplyer to the padding, default is 1
-function AutoUI.UiPad(padding, multiplyer)
+function AutoUI.Pad(padding, multiplyer)
 	padding = padding or { 'thick', 'thick' }
 	padding = { w = ToPad(padding[1]), h = ToPad(padding[2]) }
     multiplyer = multiplyer or 1
@@ -189,7 +189,7 @@ end
 ---@param style string Can choose from 'solid' or 'border', default is 'solid'
 ---@param animation number An optional value used to animate the window, simply increment the value from 0 to 1.
 ---@return data table
-function AutoUI.UiContainer(width, height, alignment, color, name, style, animation)
+function AutoUI.Container(width, height, alignment, color, name, style, animation)
     width = width or 300
 	height = (height or 400)
     alignment = alignment or 'left top'
@@ -243,6 +243,8 @@ function AutoUI.UiContainer(width, height, alignment, color, name, style, animat
 		UiAlign('right middle')
 		UiTranslate(width - Spacing, height / 2)
 	end
+
+	
 
     return {rect = {w = width, h = height}, hover = hover}
 end

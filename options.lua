@@ -37,12 +37,9 @@ function draw(dt)
 		UiTranslate(UiCenter(), UiMiddle())
 
 		AutoUI.Container(610, 800, 'center middle', pad)
-		AutoUI.SpreadHorizontal(5)
-			AutoUI.Button("Test A")
-			AutoUI.Button("Test B")
-			AutoUI.Button("Test C")
-			AutoUI.Button("Test D")
-			AutoUI.Button("Test E")
+		AutoUI.SpreadDown(space)
+			
+
 		AutoUI.SpreadEnd()
 	UiPop()
 end

@@ -322,7 +322,7 @@ function AutoUI.SpreadVerticle(count)
 end
 
 function AutoUI.SpreadHorizontal(count)
-	table.insert(Stack, {type = 'spread', direction = 'horizontal', length = UiWidth(), count = count})
+	table.insert(Stack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 	UiPush()
 end
 
@@ -351,6 +351,20 @@ function AutoUI.SpreadEnd()
 	end
 end
 
+
+function HandleSpread(gs, data)
+	if gs ~= nil then
+		if gs.direction == 'down' then
+			UiTranslate(0, data.rect.h + gs.padding)
+		elseif gs.direction == 'right' then
+			UiTranslate(data.rect.w + gs.padding, 0)
+		elseif gs.direction == 'verticle' then
+			UiTranslate(0, gs.length / gs.count * 1.5 + gs.length / gs.count)
+		elseif gs.direction == 'horizontal' then
+			UiTranslate(gs.length / gs.count, 0)
+		end
+	end
+end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -383,7 +397,7 @@ function AutoUI.Container(width, height, alignment, padding, draw)
 
 	UiTranslate(offset.x, offset.y)
 	
-	return { rect = { w = width, h = height }, hover = hover }
+	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
 function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
@@ -413,19 +427,7 @@ function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
 	table.insert(Stack, {type = 'button', data = data})
 
-	local gs = GetSpread()
-
-	if gs ~= nil then
-		if gs.direction == 'down' then
-			UiTranslate(0, data.rect.h + gs.padding)
-		elseif gs.direction == 'right' then
-			UiTranslate(data.rect.w + gs.padding, 0)
-		elseif gs.direction == 'verticle' then
-			UiTranslate(0, gs.length / gs.count * 1)
-		elseif gs.direction == 'horizontal' then
-			UiTranslate(gs.length / gs.count * 1, 0)
-		end
-	end
+	HandleSpread(GetSpread(), data)
 
 	return pressed, data
 end
@@ -465,19 +467,7 @@ function AutoUI.Slider(set, min, max, lockincrement, paddingwidth, paddingheight
 
 	local data = { value = set, released = released, rect = {w = width, h = paddingheight * 2} }
 
-	local gs = GetSpread()
-
-	if gs ~= nil then
-		if gs.direction == 'down' then
-			UiTranslate(0, data.rect.h + gs.padding)
-		elseif gs.direction == 'right' then
-			UiTranslate(data.rect.w + gs.padding, 0)
-		elseif gs.direction == 'verticle' then
-			UiTranslate(0, gs.length / gs.count * 1)
-		elseif gs.direction == 'horizontal' then
-			UiTranslate(gs.length / gs.count * 1, 0)
-		end
-	end
+	HandleSpread(GetSpread(), data)
 
 	return set, data
 	-- return { value = value, hover = hover, slider = hoverslider, rect = { w = rw, h = elapsedheight } }

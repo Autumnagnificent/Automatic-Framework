@@ -17,11 +17,16 @@ function Auto.Logistic(v, max, steep, offset)
 end
 
 ---'n' is the number you want rounded, 'd' is the decimal, so something like 0.1, 0.01, 1, 2, 100, 2.5
----Challenge by @TallTim and @1ssnl to make the smallest rounding function.
+---This was a Challenge by @TallTim and @1ssnl to make the smallest rounding function, but I expanded it to make it easier to read and a little more efficent
 ---@param n number
 ---@param d number
 ---@return number
-function Auto.Round(n,d)x=1/d return math.floor(n*x+.5)/x end
+function Auto.Round(n,d)
+	d = Auto.Default(d, 0.1)
+	if d == 0 then return n end
+	x = 1 / d
+	return math.floor(n * x + 0.5) / x
+end
 
 ---Limits a value from going below the min and above the max
 ---@param val number
@@ -29,6 +34,8 @@ function Auto.Round(n,d)x=1/d return math.floor(n*x+.5)/x end
 ---@param max number
 ---@return number
 function Auto.Clamp(val, min, max)
+	min = Auto.Default(min, 0)
+	max = Auto.Default(max, 1)
 	if val < min then
 		return min
 	elseif val > max then
@@ -59,7 +66,7 @@ end
 ---@param precision any
 ---@return table
 function Auto.RndVec(length, precision)
-	precision = precision or 0.01
+	precision = Auto.Default(precision, 0.01)
 	local m = 1/precision
 	local v = VecNormalize(Vec(math.random(-m,m), math.random(-m,m), math.random(-m,m)))
 	return VecScale(v, length)	
@@ -94,8 +101,8 @@ function Auto.Move(a, b, t)
 	return output
 end
 
-function Auto.Map(x, rangemin, rangemax, newrangemin, newrangemax)
-	return newrangemin + ((newrangemax - rangemin) / (rangemax - rangemin)) * (x - rangemin)
+function Auto.Map(x, a1, a2, b1, b2)
+	return b1 + ((x - a1) * (b2 - b1)) / (a2 - a1)
 end
 
 ---Return the Distance between Two Vectors
@@ -141,6 +148,10 @@ function Auto.Pack(...)
 	return t
 end
 
+function Auto.Default(val, default)
+	if val == nil then return default else return val end
+end
+
 ---A workaround to making a table readonly
 ---@param tbl table
 ---@return table
@@ -148,8 +159,7 @@ function Auto.SetReadOnly(tbl)
 	return setmetatable({}, {
 		__index = tbl,
 		__newindex = function(t, key, value)
-			error("attempting to change constant " ..
-				tostring(key) .. " to " .. tostring(value), 2)
+			error("attempting to change constant " .. tostring(key) .. " to " .. tostring(value), 2)
 		end
 	})
 end
@@ -183,17 +193,31 @@ function Auto.Print(...)
 	DebugPrint(Auto.ToString(unpack(arg)))
 end
 
+function Auto.RetrievePath(precision)
+	precision = Auto.Default(precision, 0.2)
+	
+	local path = {}
+	local length = GetPathLength()
+	local l = 0
+	while l < length do
+		path[#path + 1] = GetPathPoint(l)
+		l = l + precision
+	end
+
+	return path, path[#path]
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Game-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function Auto.DrawOutlineBlink(entity, speed, time, red, green, blue, alphamulti)
-	speed = speed or 1
-	time = time or GetTime()
-	red = red or 1
-	green = green or 1
-	blue = blue or 1
-	alphamulti = alphamulti or 1
+	speed = Auto.Default(speed, 1)
+	time = Auto.Default(time, GetTime)()
+	red = Auto.Default(red, 1)
+	green = Auto.Default(green, 1)
+	blue = Auto.Default(blue, 1)
+	alphamulti = Auto.Default(alphamulti, 1)
 
 	local t = (time * speed) % 2
 	local alpha = Auto.Logistic(t, 1, -15, 0.4) * Auto.Logistic(t, 1, 15, 1.4)
@@ -210,7 +234,12 @@ end
 ----------------User Interface-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-AutoUI.Pad = Auto.SetReadOnly({none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 120})
+AutoUI.Pad = {none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 120}
+AutoUI.PrimaryColor = {0.95, 0.95, 0.95, 1}
+AutoUI.SpecialColor = {1, 1, 0.55, 1}
+AutoUI.SecondaryColor = {0, 0, 0, 0.55}
+local Stack = {}
+
 
 function AutoUI.AlignmentToPos(alignment)
 	x, y = 0, 0
@@ -228,91 +257,23 @@ function AutoUI.Center()
 	UiAlign('center middle')
 end
 
--- function AutoUI.PushDynamicContainer(callback, alignment, padding, spacing, draw)
--- 	table.insert(Stack, {
--- 		params = {
--- 			alignment = alignment,
--- 			padding = padding or AutoUI.Pad.thick,
--- 			spacing = spacing or AutoUI.Pad.thick,
--- 			draw = draw or true,
--- 		},
--- 		contains = {},
--- 		callback = callback or nil
--- 	})
-
--- 	UiPush()
--- end
-
--- function AutoUI.Button(callback, text, fontsize, paddingwidth, paddingheight)
--- 	if Auto.Count(Stack) ~= 0 then
--- 		table.insert(Auto.Last(Stack).contains, {
--- 			func = AutoUI.Create.Button,
--- 			params = { text, fontsize, paddingwidth, paddingheight },
--- 			callback = callback or nil
--- 		})
--- 	else
--- 		AutoUI.Create.Button(true, text, fontsize, paddingwidth, paddingheight)
--- 	end
--- end
-
--- function AutoUI.PopDynamicContainer()
--- 	if Auto.Count(Stack) == 0 then error("No Container to Pop") end
--- 	local container = Auto.Last(Stack)
--- 	local count = Auto.Count(container.contains)
--- 	local space = {w = 0, h = 0}
-
--- 	local fakecallbacks = {} 
--- 	local callbacks = {}
-	
--- 	UiPush()
--- 		local largest = {w = 0, h = 0}
--- 		for i, v in ipairs(container.contains) do
--- 			fake = v.func(false, unpack(v.params))
--- 			fakecallbacks[i] = fake
--- 			if fake.rect.w > largest.w then largest.w = fake.rect.w end
--- 			if fake.rect.h > largest.h then largest.h = fake.rect.h end
--- 			space.h = space.h + fake.rect.h
--- 		end
-
--- 		space.h = space.h + (count - 1) * container.params.spacing
--- 	UiPop()
-
--- 	UiPush()
--- 		container.size = { w = largest.w, h = space.h }
--- 		container.out = AutoUI.Create.Container(container.size.w, container.size.h, container.params.alignment, container.params.padding, container.params.draw)
-
--- 		UiAlign('center middle')
-		
--- 		for i, v in ipairs(container.contains) do
--- 			UiPush()
--- 				local pos = {
--- 					x = UiCenter(),
--- 					y = Auto.Map(i, 1, count, fakecallbacks[1].rect.h / 2 + container.params.padding / 2, space.h - fakecallbacks[1].rect.h)
--- 				}
--- 				UiTranslate(pos.x, pos.y)
--- 				real = v.func(true, unpack(v.params))
-
--- 				if v.callback ~= nil then
--- 					callbacks[v.callback] = real
--- 				end
--- 			UiPop()
--- 		end
--- 	UiPop()
-
--- 	UiPop()
-
--- 	return { hover = container.out.hover, rect = {w = container.size.w, h = container.size.h}, callbacks = callbacks }
--- end
-
-local Stack = {}
-
 function AutoUI.SpreadDown(padding)
-	table.insert(Stack, {type = 'spread', direction = 'down', padding = padding or AutoUI.Pad.thin})
+	table.insert(Stack, {type = 'spread', direction = 'down', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+	UiPush()
+end
+
+function AutoUI.SpreadUp(padding)
+	table.insert(Stack, {type = 'spread', direction = 'up', padding = Auto.Default(padding, AutoUI.Pad.thin)})
 	UiPush()
 end
 
 function AutoUI.SpreadRight(padding)
-	table.insert(Stack, {type = 'spread', direction = 'right', padding = padding or AutoUI.Pad.thin})
+	table.insert(Stack, {type = 'spread', direction = 'right', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+	UiPush()
+end
+
+function AutoUI.SpreadLeft(padding)
+	table.insert(Stack, {type = 'spread', direction = 'left', padding = Auto.Default(padding, AutoUI.Pad.thin)})
 	UiPush()
 end
 
@@ -326,15 +287,25 @@ function AutoUI.SpreadHorizontal(count)
 	UiPush()
 end
 
-function GetSpread()
+function AutoUI.GetSpread()
 	local count = Auto.Count(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
 			return Stack[i]
 		end
 	end
-	error('No Previous Spread Found')
 	return nil
+end
+
+function AutoUI.SetSpread(Spread)
+	local count = Auto.Count(Stack)
+	for i = count, 1, -1 do
+		if Stack[i].type == 'spread' then
+			x = Stack[i]
+		end
+	end
+
+	x = Spread
 end
 
 function AutoUI.SpreadEnd()
@@ -352,29 +323,36 @@ function AutoUI.SpreadEnd()
 end
 
 
-function HandleSpread(gs, data)
+function HandleSpread(gs, data, type)
 	if gs ~= nil then
 		if gs.direction == 'down' then
 			UiTranslate(0, data.rect.h + gs.padding)
+		elseif gs.direction == 'up' then
+			UiTranslate(0, -(data.rect.h + gs.padding))
 		elseif gs.direction == 'right' then
 			UiTranslate(data.rect.w + gs.padding, 0)
+		elseif gs.direction == 'left' then
+			UiTranslate(-(data.rect.w + gs.padding), 0)
 		elseif gs.direction == 'verticle' then
 			UiTranslate(0, gs.length / gs.count * 1.5 + gs.length / gs.count)
 		elseif gs.direction == 'horizontal' then
 			UiTranslate(gs.length / gs.count, 0)
 		end
 	end
+
+	table.insert(Stack, { type = type, data = data })
 end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function AutoUI.Container(width, height, alignment, padding, draw)
-	width = width or 300
-	height = height or 400
-	alignment = alignment or 'left top'
-	padding = math.max(padding or AutoUI.Pad.micro, 0)
-	draw = draw or true
+function AutoUI.Container(width, height, alignment, padding, clip, draw)
+	width = Auto.Default(width, 300)
+	height = Auto.Default(height, 400)
+	alignment = Auto.Default(alignment, 'left top')
+	padding = math.max(Auto.Default(padding, AutoUI.Pad.micro), 0)
+	clip = Auto.Default(clip, false)
+	draw = Auto.Default(draw, true)
 
 	local paddingwidth = width + padding * 2
 	local paddingheight = height + padding * 2
@@ -384,14 +362,16 @@ function AutoUI.Container(width, height, alignment, padding, draw)
 
 	UiAlign('left top')
 	if draw then
-		UiColor(0, 0, 0, 0.55)
-		UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
+		UiPush()
+			UiColor(unpack(AutoUI.SecondaryColor))
+			UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
+		UiPop()
 	end
 
 	hover = UiIsMouseInRect(UiWidth(), UiHeight())
 	
 	UiTranslate(padding, padding)
-	UiWindow(width, height, false)
+	UiWindow(width, height, clip)
 
 	local offset = {x = 0, y = 0}
 
@@ -401,10 +381,42 @@ function AutoUI.Container(width, height, alignment, padding, draw)
 end
 
 function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
-	fontsize = fontsize or 28
-	paddingwidth = paddingwidth or AutoUI.Pad.heavy
-	paddingheight = paddingheight or AutoUI.Pad.thin
-	draw = draw or true
+	fontsize = Auto.Default(fontsize, 28)
+	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.thick)
+	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.thin)
+	draw = Auto.Default(draw, true)
+
+	UiPush()
+		UiWordWrap(UiWidth() - AutoUI.Pad.thick)
+		UiFont("regular.ttf", fontsize)
+		UiButtonHoverColor(unpack(AutoUI.SpecialColor))
+		UiButtonPressColor(0.75, 0.75, 0.75, 1)
+		UiButtonPressDist(0.25)
+
+		UiColor(0, 0, 0, 0)
+		local rw, rh = UiText(name)
+		local padrw, padrh = rw + paddingwidth * 2, rh + paddingheight * 2
+		
+		if draw then
+			hover = UiIsMouseInRect(padrw, padrh)
+			UiColor(unpack(AutoUI.PrimaryColor))
+			
+		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoUI.PrimaryColor))
+			pressed = UiTextButton(name, padrw, padrh)
+		end
+	UiPop()
+
+	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
+	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
+
+	return pressed, data
+end
+
+function AutoUI.Text(name, fontsize, paddingwidth, paddingheight, draw)
+	fontsize = Auto.Default(fontsize, 28)
+	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.none)
+	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.none)
+	draw = Auto.Default(draw, true)
 
 	UiPush()
 		UiWordWrap(UiWidth() - AutoUI.Pad.thick)
@@ -413,42 +425,37 @@ function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
 		UiColor(0, 0, 0, 0)
 		local rw, rh = UiText(name)
 		local padrw, padrh = rw + paddingwidth, rh + paddingheight
-		
+
 		if draw then
-			hover = UiIsMouseInRect(padrw, padrh)
-			if hover then UiColorFilter(1, 1, 0.55, 1) end
-			UiColor(1, 1, 1, 1)
-			
-			UiButtonImageBox('ui/common/box-outline-6.png', 6, 6)
-			pressed = UiTextButton(name, padrw, padrh)
+			UiPush()
+				UiColor(unpack(AutoUI.PrimaryColor))
+				UiText(name)
+			UiPop()
 		end
 	UiPop()
 
-	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	table.insert(Stack, {type = 'button', data = data})
+	local data = { rect = { w = padrw, h = padrh } }
+	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
 
-	HandleSpread(GetSpread(), data)
-
-	return pressed, data
+	return data
 end
 
 function AutoUI.Slider(set, min, max, lockincrement, paddingwidth, paddingheight)
-	min = min or 0
-	max = max or 1
-	set = set or (min + max / 2)
-	lockincrement = lockincrement or 0
-	paddingwidth = paddingwidth or AutoUI.Pad.thick
-	paddingheight = paddingheight or AutoUI.Pad.thin
+	min = Auto.Default(min, 0)
+	max = Auto.Default(max, 1)
+	set = Auto.Default(set, min)
+	lockincrement = Auto.Default(lockincrement, 0)
+	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.thick)
+	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.thin)
 
 	local width = UiWidth() - paddingwidth * 2
 	local dotwidth, dotheight = UiGetImageSize("ui/common/dot.png")
 
-	set = Auto.Map(set, min, max, 0, width)
-
+	local screen = Auto.Map(set, min, max, 0, width)
 
 	UiPush()
 		UiTranslate(paddingwidth, paddingheight)
-		UiColor(1, 1, 0.5, 1)
+		UiColor(unpack(AutoUI.SpecialColor))
 	
 		UiPush()
 			UiTranslate(0, dotheight / 2)
@@ -457,54 +464,71 @@ function AutoUI.Slider(set, min, max, lockincrement, paddingwidth, paddingheight
 			
 		UiTranslate(-dotwidth / 2, 0)
 
-		-- UiTranslate(-UiGetSliderDot().rect.w / 2, -UiGetSliderDot().rect.h / 2)
-		-- elapsedheight = elapsedheight + UiGetSliderDot().rect.h / 2
-
-		set, released = UiSlider('ui/common/dot.png', "x", set, 0, width)
-		set = Auto.Map(set, 0, width, min, max)
-		set = Auto.Round(set, lockincrement)
+		screen, released = UiSlider('ui/common/dot.png', "x", screen, 0, width)
+		screen = Auto.Map(screen, 0, width, min, max)
+		screen = Auto.Round(screen, lockincrement)
+		screen = Auto.Clamp(screen, min, max)
+		set = screen
 	UiPop()
 
 	local data = { value = set, released = released, rect = {w = width, h = paddingheight * 2} }
-
-	HandleSpread(GetSpread(), data)
+	HandleSpread(AutoUI.GetSpread(), data, 'draw')
 
 	return set, data
-	-- return { value = value, hover = hover, slider = hoverslider, rect = { w = rw, h = elapsedheight } }
+end
+
+function AutoUI.Image(path, width, height, alpha, draw)
+	local w, h = UiGetImageSize(path)
+	width = Auto.Default(width, (height == nil and UiWidth() or (height * (w / h))))
+	height = Auto.Default(height, width * (h / w))
+	alpha = Auto.Default(alpha, 1)
+	draw = Auto.Default(draw, true)
+	
+	if draw then
+		UiPush()
+			UiColor(1, 1, 1, alpha)
+			UiImageBox(path, width, height)
+		UiPop()
+	end
+
+	local hover = UiIsMouseInRect(width, height)
+	
+	local data = {hover = hover, rect = {w = width, h = height}}
+	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
+	
+	return data
 end
 
 function AutoUI.Marker(size)
-	size = (size or 1) / 2
+	size = Auto.Default(size, 1) / 2
 	UiPush()
 		UiAlign('center middle')
 		UiScale(size, size)
-		UiColor(1, 1, 0.55, 1)
+		UiColor(unpack(AutoUI.SpecialColor))
 		UiImage('ui/common/dot.png')
 	UiPop()
 end
 
 function AutoUI.Tooltip(text, position, fontsize, alpha, bold)
-	text = text or "nil"
-	fontsize = fontsize or 24
-	alpha = alpha or 0.75
-	bold = bold or false
+	text = Auto.Default(text or "nil")
+	fontsize = Auto.Default(fontsize or 24)
+	alpha = Auto.Default(alpha or 0.75)
+	bold = Auto.Default(bold or false)
 
 	UiPush()
-	UiAlign('center middle')
-	local x, y = UiWorldToPixel(position)
-	UiTranslate(x, y)
-	UiWordWrap(UiMiddle())
+		UiAlign('center middle')
+		local x, y = UiWorldToPixel(position)
+		UiTranslate(x, y)
+		UiWordWrap(UiMiddle())
 
-	-- UiScale(scale)
+		UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
+		UiColor(0, 0, 0, 0)
+		local rw, rh = UiText(text)
 
-	UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
-	UiColor(0, 0, 0, 0)
-	local rw, rh = UiText(text)
+		UiColor(0, 0, 0, alpha)
+		UiRect(rw, rh)
 
-	UiColor(0, 0, 0, alpha)
-	UiRect(rw, rh)
-
-	UiColor(1, 1, 1, alpha)
-	UiText(text)
+		UiColor(unpack(AutoUI.PrimaryColor))
+		UiText(text)
 	UiPop()
 end

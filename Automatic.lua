@@ -12,8 +12,16 @@ AutoUI = {}
 ---@param steep number
 ---@param offset number
 ---@return number
-function Auto.Logistic(v, max, steep, offset)
+function AutoLogistic(v, max, steep, offset)
+	v = AutoDefault(v, math.random(0, 10000) / 10000)
 	return max / (1 + math.exp((v - offset) * steep))
+end
+
+function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
+	v = AutoLogistic(v, max, steep, offset)
+	local a = AutoLogistic(rangemin, max, steep, offset)
+	local b = AutoLogistic(rangemax, max, steep, offset)
+	return AutoMap(v, a, b, 0, 1)
 end
 
 ---'n' is the number you want rounded, 'd' is the decimal, so something like 0.1, 0.01, 1, 2, 100, 2.5
@@ -21,11 +29,11 @@ end
 ---@param n number
 ---@param d number
 ---@return number
-function Auto.Round(n,d)
-	d = Auto.Default(d, 0.1)
+function AutoRound(n,d)
+	d = AutoDefault(d, 1)
 	if d == 0 then return n end
-	x = 1 / d
-	return math.floor(n * x + 0.5) / x
+	v = 1 / d
+	return math.floor(n * v + 0.5) / v
 end
 
 ---Limits a value from going below the min and above the max
@@ -33,9 +41,9 @@ end
 ---@param min number
 ---@param max number
 ---@return number
-function Auto.Clamp(val, min, max)
-	min = Auto.Default(min, 0)
-	max = Auto.Default(max, 1)
+function AutoClamp(val, min, max)
+	min = AutoDefault(min, 0)
+	max = AutoDefault(max, 1)
 	if val < min then
 		return min
 	elseif val > max then
@@ -45,7 +53,7 @@ function Auto.Clamp(val, min, max)
 	end
 end
 
-function Auto.Biggest(...)
+function AutoBiggest(...)
 	local best = -math.huge
 	for i in pairs(arg) do
 		if i > best then best = i end
@@ -53,7 +61,7 @@ function Auto.Biggest(...)
 	return best
 end
 
-function Auto.Smallest(...)
+function AutoSmallest(...)
 	local best = math.huge
 	for i in pairs(arg) do
 		if i < best then best = i end
@@ -65,8 +73,8 @@ end
 ---@param length any
 ---@param precision any
 ---@return table
-function Auto.RndVec(length, precision)
-	precision = Auto.Default(precision, 0.01)
+function AutoRndVec(length, precision)
+	precision = AutoDefault(precision, 0.01)
 	local m = 1/precision
 	local v = VecNormalize(Vec(math.random(-m,m), math.random(-m,m), math.random(-m,m)))
 	return VecScale(v, length)	
@@ -77,7 +85,7 @@ end
 ---@param b number
 ---@param t number
 ---@return number
-function Auto.LerpUnclamped(a, b, t)
+function AutoLerpUnclamped(a, b, t)
 	return (1-t)*a + t*b
 end
 
@@ -86,7 +94,7 @@ end
 ---@param b number
 ---@param t number
 ---@return number
-function Auto.Move(a, b, t)
+function AutoMove(a, b, t)
 	output = a
     if a == b then
 		return a
@@ -101,7 +109,8 @@ function Auto.Move(a, b, t)
 	return output
 end
 
-function Auto.Map(x, a1, a2, b1, b2)
+function AutoMap(x, a1, a2, b1, b2)
+	if a1 == a2 then return b2 end
 	return b1 + ((x - a1) * (b2 - b1)) / (a2 - a1)
 end
 
@@ -109,15 +118,34 @@ end
 ---@param a Vec
 ---@param b Vec
 ---@return number
-function Auto.VecDist(a, b)
+function AutoVecDist(a, b)
 	return math.sqrt( (a[1] - b[1])^2 + (a[2] - b[2])^2 + (a[3] - b[3])^2 )
+end
+
+function AutoVecRescale(a, b)
+	return VecScale(VecNormalize(a), b)
+end
+
+function AutoVecClamp(v, min, max)
+	local l = VecLength(v)
+	if l > max then
+		return AutoVecRescale(v, max)
+	elseif l < min then
+		return AutoVecRescale(v, min)
+	else
+		return v
+	end
+end
+
+function AutoVecSubsituteY(v, y)
+	return Vec(v[1], y, v[3])
 end
 
 ---Return the Distance between the numbers a and b
 ---@param a number
 ---@param b number
 ---@return number
-function Auto.Dist(a, b)
+function AutoDist(a, b)
 	return math.abs(a - b)
 end
 
@@ -128,7 +156,7 @@ end
 ---Counts the amount of elements in a list
 ---@param t table
 ---@return integer
-function Auto.Count(t)
+function AutoCount(t)
 	local c = 0
 	for i in pairs(t) do
 		c = c + 1
@@ -137,25 +165,25 @@ function Auto.Count(t)
 	return c
 end
 
-function Auto.Last(t)
-	return t[Auto.Count(t)]
+function AutoLast(t)
+	return t[AutoCount(t)]
 end
 
-function Auto.Pack(...)
+function AutoPack(...)
 	-- Returns a new table with parameters stored into an array, with field "n" being the total number of parameters
 	local t = { ... }
 	t.n = #t
 	return t
 end
 
-function Auto.Default(val, default)
+function AutoDefault(val, default)
 	if val == nil then return default else return val end
 end
 
 ---A workaround to making a table readonly
 ---@param tbl table
 ---@return table
-function Auto.SetReadOnly(tbl)
+function AutoSetReadOnly(tbl)
 	return setmetatable({}, {
 		__index = tbl,
 		__newindex = function(t, key, value)
@@ -164,38 +192,75 @@ function Auto.SetReadOnly(tbl)
 	})
 end
 
-function Auto.ToString(...)
-	local output = ""
-	local count = Auto.Count(arg)
-
-	local iterator = 1
-	for index in pairs(arg) do
-		local value = arg[index]
-		if output ~= "" then output = output .. " : " end
-		
-		local t = type(value)
-		if t == 'nil' then
-			output = output .. "nil"
-		elseif t ~= 'table' then
-			output = output .. tostring(value)
-		else
-			output = output .. Auto.ToString(unpack(value))
-		end
-		
-		iterator = iterator + 1
-		if iterator == count then break end
+-- Code donatated from @Dr. HypnoTox - Thankyou!
+function AutoToString(object)
+	if object == nil then
+		return 'nil'
 	end
 
-	return output
+	if (type(object) == 'number') or (type(object) == 'string') or (type(object) == 'boolean') then
+		return tostring(object)
+	end
+
+	local toDump = '{'
+
+	for k, v in pairs(object) do
+		if (type(k) == 'number') then
+			toDump = toDump .. '[' .. k .. '] = '
+		elseif (type(k) == 'string') then
+			toDump = toDump .. k .. '= '
+		end
+
+		if (type(v) == 'number') then
+			toDump = toDump .. v .. ','
+		elseif (type(v) == 'string') then
+			toDump = toDump .. '\'' .. v .. '\', '
+		else
+			toDump = toDump .. AutoToString(v) .. ', '
+		end
+	end
+
+	toDump = toDump .. '}'
+
+	return toDump
 end
 
-function Auto.Print(...)
-	DebugPrint(Auto.ToString(unpack(arg)))
+function AutoPrint(...)
+	arg.n = nil
+	DebugPrint(AutoToString(arg))
+	return unpack(arg)
 end
 
-function Auto.RetrievePath(precision)
-	precision = Auto.Default(precision, 0.2)
-	
+function AutoClearConsole()
+	for i = 1, 24 do DebugPrint('') end
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Game-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoDrawOutlineBlink(entity, speed, time, red, green, blue, alphamulti)
+	speed = AutoDefault(speed, 1)
+	time = AutoDefault(time, GetTime)()
+	red = AutoDefault(red, 1)
+	green = AutoDefault(green, 1)
+	blue = AutoDefault(blue, 1)
+	alphamulti = AutoDefault(alphamulti, 1)
+
+	local t = (time * speed) % 2
+	local alpha = AutoLogistic(t, 1, -15, 0.4) * AutoLogistic(t, 1, 15, 1.4)
+
+	local type = GetEntityType(entity)
+	if type == 'body' then
+		DrawBodyOutline(entity, red, green, blue, alpha * alphamulti)
+	elseif type == 'shape' then
+		DrawShapeOutline(entity, red, green, blue, alpha * alphamulti)
+	end
+end
+
+function AutoRetrievePath(precision)
+	precision = AutoDefault(precision, 0.2)
+
 	local path = {}
 	local length = GetPathLength()
 	local l = 0
@@ -207,26 +272,83 @@ function Auto.RetrievePath(precision)
 	return path, path[#path]
 end
 
+function AutoQueryRejectBodies(bodies)
+	for i in pairs(bodies) do
+		QueryRejectBody(bodies[i])
+	end
+end
+
+function AutoSetBodyCollisionFilter(body, layer, masknummber)
+	local shapes = GetBodyShapes(body)
+	for i in pairs(shapes) do
+		SetShapeCollisionFilter(shapes[i], layer, masknummber)
+	end
+end
+
+function AutoWorldCenterOfMass(body)
+	local trans = GetBodyTransform(body)
+	local pos = TransformToParentPoint(trans, GetBodyCenterOfMass(body))
+	return pos
+end
+
+function AutoSpeed(body)
+	return VecLength(GetBodyVelocity(body))
+end
+
+function AutoPredictPosition(body, time)
+	local pos = AutoWorldCenterOfMass(body)
+	local vel = GetBodyVelocity(body)
+	local newpos = VecCopy(pos)
+
+	for steps = 0, time, GetTimeStep() do
+		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
+		newpos = VecAdd(newpos, VecScale(vel, GetTimeStep()))
+		-- newpos = VecAdd(newpos, VecScale(Vec(0, -10, 0), GetTimeStep()))
+	end
+
+	local dir = VecNormalize(VecSub(newpos, pos))
+
+	return newpos, vel, dir
+end
+
+function AutoDrawPath(lines)
+	for i = 1, #lines - 1 do
+		local color = (lines[i].color + lines[i + 1].color) / 2
+		DebugLine(lines[i].pos, lines[i + 1].pos, color, 1 - color, 0.5 - color)
+	end
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Game-------------------------------------------------------------------------------------------------------------------------
+----------------Registry-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function Auto.DrawOutlineBlink(entity, speed, time, red, green, blue, alphamulti)
-	speed = Auto.Default(speed, 1)
-	time = Auto.Default(time, GetTime)()
-	red = Auto.Default(red, 1)
-	green = Auto.Default(green, 1)
-	blue = Auto.Default(blue, 1)
-	alphamulti = Auto.Default(alphamulti, 1)
+function AutoKeyDefaultInt(path, default)
+	if path == nil then error("path nil") end
+	if HasKey(path) then
+		return GetInt(path)
+	else
+		SetInt(path, default)
+		return default
+	end
+end
 
-	local t = (time * speed) % 2
-	local alpha = Auto.Logistic(t, 1, -15, 0.4) * Auto.Logistic(t, 1, 15, 1.4)
+function AutoKeyDefaultFloat(path, default)
+	if path == nil then error("path nil") end
+	if HasKey(path) then
+		return GetFloat(path)
+	else
+		SetFloat(path, default)
+		return default
+	end
+end
 
-	local type = GetEntityType(entity)
-	if type == 'body' then
-		DrawBodyOutline(entity, red, green, blue, alpha * alphamulti)
-	elseif type == 'shape' then
-		DrawShapeOutline(entity, red, green, blue, alpha * alphamulti)
+function AutoKeyDefaultString(path, default)
+	if path == nil then error("path nil") end
+	if HasKey(path) then
+		return GetString(path)
+	else
+		SetString(path, default)
+		return default
 	end
 end
 
@@ -234,105 +356,127 @@ end
 ----------------User Interface-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-AutoUI.Pad = {none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 120}
-AutoUI.PrimaryColor = {0.95, 0.95, 0.95, 1}
-AutoUI.SpecialColor = {1, 1, 0.55, 1}
-AutoUI.SecondaryColor = {0, 0, 0, 0.55}
+AutoUIPad = {none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128}
+setmetatable(AutoUIPad, { __call = function (t, padding) UiTranslate(padding, padding) end})
+
+AutoUIPrimaryColor = {0.95, 0.95, 0.95, 1}
+AutoUISpecialColor = {1, 1, 0.55, 1}
+AutoUISecondaryColor = {0, 0, 0, 0.55}
 local Stack = {}
 
 
-function AutoUI.AlignmentToPos(alignment)
-	x, y = 0, 0
-	if string.find(alignment, 'left') then x = -1 end
-	if string.find(alignment, 'center') then x = 0 end
-	if string.find(alignment, 'right') then x = 1 end
+function AutoUIAlignmentToPos(alignment)
+	v, y = 0, 0
+	if string.find(alignment, 'left') then v = -1 end
+	if string.find(alignment, 'center') then v = 0 end
+	if string.find(alignment, 'right') then v = 1 end
 	if string.find(alignment, 'bottom') then y = -1 end
 	if string.find(alignment, 'middle') then y = 0 end
 	if string.find(alignment, 'top') then y = 1 end
-	return {x = x, y = y}
+	return {x = v, y = y}
 end
 
-function AutoUI.Center()
+function AutoUICenter()
 	UiTranslate(UiCenter(), UiMiddle())
 	UiAlign('center middle')
 end
 
-function AutoUI.SpreadDown(padding)
-	table.insert(Stack, {type = 'spread', direction = 'down', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+function AutoUISpreadDown(padding)
+	table.insert(Stack, {type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoUIPad.thin)})
 	UiPush()
 end
 
-function AutoUI.SpreadUp(padding)
-	table.insert(Stack, {type = 'spread', direction = 'up', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+function AutoUISpreadUp(padding)
+	table.insert(Stack, {type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoUIPad.thin)})
 	UiPush()
 end
 
-function AutoUI.SpreadRight(padding)
-	table.insert(Stack, {type = 'spread', direction = 'right', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+function AutoUISpreadRight(padding)
+	table.insert(Stack, {type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoUIPad.thin)})
 	UiPush()
 end
 
-function AutoUI.SpreadLeft(padding)
-	table.insert(Stack, {type = 'spread', direction = 'left', padding = Auto.Default(padding, AutoUI.Pad.thin)})
+function AutoUISpreadLeft(padding)
+	table.insert(Stack, {type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoUIPad.thin)})
 	UiPush()
 end
 
-function AutoUI.SpreadVerticle(count)
+function AutoUISpreadVerticle(count)
 	table.insert(Stack, {type = 'spread', direction = 'verticle', length = UiHeight(), count = count})
 	UiPush()
 end
 
-function AutoUI.SpreadHorizontal(count)
+function AutoUISpreadHorizontal(count)
 	table.insert(Stack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 	UiPush()
 end
 
-function AutoUI.GetSpread()
-	local count = Auto.Count(Stack)
+function AutoUIGetSpread(l)
+	l = AutoDefault(l, 1)
+	_l = 0
+	local count = AutoCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
-			return Stack[i]
+			_l = _l + 1
+			if _l >= 1 then
+				return Stack[i]
+			end
 		end
 	end
 	return nil
 end
 
-function AutoUI.SetSpread(Spread)
-	local count = Auto.Count(Stack)
+function AutoUISetSpread(Spread)
+	local count = AutoCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
-			x = Stack[i]
+			v = Stack[i]
 		end
 	end
 
-	x = Spread
+	v = Spread
 end
 
-function AutoUI.SpreadEnd()
+function AutoUISpreadEnd()
+	local unitdata = {comb = { w = 0, h = 0 }, max = { w = 0, h = 0 }}
+	local Spread = AutoUIGetSpread()
+	local LastSpread = AutoUIGetSpread(2)
+	
 	while true do
-		local count = Auto.Count(Stack)
+		local count = AutoCount(Stack)
+		
 		if Stack[count].type ~= 'spread' then
+			if Stack[count].data.rect then
+				local rect = Stack[count].data.rect
+				unitdata.comb.w, unitdata.comb.h = unitdata.comb.w + rect.w, unitdata.comb.h + rect.h
+				unitdata.max.w, unitdata.max.h = math.max(unitdata.max.w, rect.w), math.max(unitdata.max.h, rect.h)
+			end
+
 			table.remove(Stack, count)
 		else
-			table.remove(Stack, count)
 			UiPop()
-			return
+			table.remove(Stack, count)
+
+			return unitdata
 		end
-		if count <= 1 then return end
+		if count <= 1 then return unitdata end
 	end
 end
 
 
-function HandleSpread(gs, data, type)
+function HandleSpread(gs, data, type, spreadpad)
+	spreadpad = AutoDefault(spreadpad, false)
+
 	if gs ~= nil then
+		if not spreadpad then pad = 0 else pad = gs.padding end
 		if gs.direction == 'down' then
-			UiTranslate(0, data.rect.h + gs.padding)
+			UiTranslate(0, data.rect.h + pad)
 		elseif gs.direction == 'up' then
-			UiTranslate(0, -(data.rect.h + gs.padding))
+			UiTranslate(0, -(data.rect.h + pad))
 		elseif gs.direction == 'right' then
-			UiTranslate(data.rect.w + gs.padding, 0)
+			UiTranslate(data.rect.w + pad, 0)
 		elseif gs.direction == 'left' then
-			UiTranslate(-(data.rect.w + gs.padding), 0)
+			UiTranslate(-(data.rect.w + pad), 0)
 		elseif gs.direction == 'verticle' then
 			UiTranslate(0, gs.length / gs.count * 1.5 + gs.length / gs.count)
 		elseif gs.direction == 'horizontal' then
@@ -340,30 +484,33 @@ function HandleSpread(gs, data, type)
 		end
 	end
 
-	table.insert(Stack, { type = type, data = data })
+	if type ~= nil then
+		table.insert(Stack, { type = type, data = data })
+	end
 end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function AutoUI.Container(width, height, alignment, padding, clip, draw)
-	width = Auto.Default(width, 300)
-	height = Auto.Default(height, 400)
-	alignment = Auto.Default(alignment, 'left top')
-	padding = math.max(Auto.Default(padding, AutoUI.Pad.micro), 0)
-	clip = Auto.Default(clip, false)
-	draw = Auto.Default(draw, true)
+function AutoUIContainer(width, height, alignment, padding, clip, draw, spreadpad)
+	width = AutoDefault(width, 300)
+	height = AutoDefault(height, 400)
+	alignment = AutoDefault(alignment, 'left top')
+	padding = math.max(AutoDefault(padding, AutoUIPad.micro), 0)
+	clip = AutoDefault(clip, false)
+	draw = AutoDefault(draw, true)
+	spreadpad = AutoDefault(spreadpad, true)
 
-	local paddingwidth = width + padding * 2
-	local paddingheight = height + padding * 2
+	local paddingwidth = math.max(width - padding * 2, padding * 2)
+	local paddingheight = math.max(height - padding * 2, padding * 2)
 	
 	UiAlign(alignment)
-	UiWindow(paddingwidth, paddingheight, false)
+	UiWindow(width, height, false)
 
 	UiAlign('left top')
 	if draw then
 		UiPush()
-			UiColor(unpack(AutoUI.SecondaryColor))
+			UiColor(unpack(AutoUISecondaryColor))
 			UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
 		UiPop()
 	end
@@ -371,7 +518,7 @@ function AutoUI.Container(width, height, alignment, padding, clip, draw)
 	hover = UiIsMouseInRect(UiWidth(), UiHeight())
 	
 	UiTranslate(padding, padding)
-	UiWindow(width, height, clip)
+	UiWindow(paddingwidth, paddingheight, clip)
 
 	local offset = {x = 0, y = 0}
 
@@ -380,16 +527,17 @@ function AutoUI.Container(width, height, alignment, padding, clip, draw)
 	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
-function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
-	fontsize = Auto.Default(fontsize, 28)
-	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.thick)
-	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.thin)
-	draw = Auto.Default(draw, true)
+function AutoUIButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad)
+	fontsize = AutoDefault(fontsize, 28)
+	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.thick)
+	paddingheight = AutoDefault(paddingheight, AutoUIPad.thin)
+	draw = AutoDefault(draw, true)
+	spreadpad = AutoDefault(spreadpad, true)
 
 	UiPush()
-		UiWordWrap(UiWidth() - AutoUI.Pad.thick)
+		UiWordWrap(UiWidth() - AutoUIPad.thick)
 		UiFont("regular.ttf", fontsize)
-		UiButtonHoverColor(unpack(AutoUI.SpecialColor))
+		UiButtonHoverColor(unpack(AutoUISpecialColor))
 		UiButtonPressColor(0.75, 0.75, 0.75, 1)
 		UiButtonPressDist(0.25)
 
@@ -399,63 +547,67 @@ function AutoUI.Button(name, fontsize, paddingwidth, paddingheight, draw)
 		
 		if draw then
 			hover = UiIsMouseInRect(padrw, padrh)
-			UiColor(unpack(AutoUI.PrimaryColor))
+			UiColor(unpack(AutoUIPrimaryColor))
 			
-		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoUI.PrimaryColor))
+		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoUIPrimaryColor))
 			pressed = UiTextButton(name, padrw, padrh)
 		end
 	UiPop()
 
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
+	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
 
 	return pressed, data
 end
 
-function AutoUI.Text(name, fontsize, paddingwidth, paddingheight, draw)
-	fontsize = Auto.Default(fontsize, 28)
-	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.none)
-	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.none)
-	draw = Auto.Default(draw, true)
+function AutoUIText(name, fontsize, draw, spreadpad)
+	fontsize = AutoDefault(fontsize, 28)
+	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.none)
+	paddingheight = AutoDefault(paddingheight, AutoUIPad.none)
+	draw = AutoDefault(draw, true)
+	spreadpad = AutoDefault(spreadpad, true)
 
 	UiPush()
-		UiWordWrap(UiWidth() - AutoUI.Pad.thick)
+		UiWordWrap(UiWidth() - AutoUIPad.thick)
 		UiFont("regular.ttf", fontsize)
 
 		UiColor(0, 0, 0, 0)
 		local rw, rh = UiText(name)
-		local padrw, padrh = rw + paddingwidth, rh + paddingheight
 
 		if draw then
 			UiPush()
-				UiColor(unpack(AutoUI.PrimaryColor))
+				UiWindow(rw + paddingwidth * 2, rh + paddingheight * 2)
+				AutoUICenter()
+				
+				UiColor(unpack(AutoUIPrimaryColor))
 				UiText(name)
 			UiPop()
 		end
 	UiPop()
 
-	local data = { rect = { w = padrw, h = padrh } }
-	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
+	local data = { rect = { w = rw + paddingwidth * 2, h = rh + paddingheight * 2} }
+	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
 
 	return data
 end
 
-function AutoUI.Slider(set, min, max, lockincrement, paddingwidth, paddingheight)
-	min = Auto.Default(min, 0)
-	max = Auto.Default(max, 1)
-	set = Auto.Default(set, min)
-	lockincrement = Auto.Default(lockincrement, 0)
-	paddingwidth = Auto.Default(paddingwidth, AutoUI.Pad.thick)
-	paddingheight = Auto.Default(paddingheight, AutoUI.Pad.thin)
+function AutoUISlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
+	min = AutoDefault(min, 0)
+	max = AutoDefault(max, 1)
+	set = AutoDefault(set, min)
+	lockincrement = AutoDefault(lockincrement, 0)
+	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.thick)
+	paddingheight = AutoDefault(paddingheight, AutoUIPad.micro)
+	spreadpad = AutoDefault(spreadpad, true)
 
 	local width = UiWidth() - paddingwidth * 2
 	local dotwidth, dotheight = UiGetImageSize("ui/common/dot.png")
 
-	local screen = Auto.Map(set, min, max, 0, width)
+	local screen = AutoMap(set, min, max, 0, width)
 
 	UiPush()
 		UiTranslate(paddingwidth, paddingheight)
-		UiColor(unpack(AutoUI.SpecialColor))
+		UiColor(unpack(AutoUISpecialColor))
 	
 		UiPush()
 			UiTranslate(0, dotheight / 2)
@@ -465,24 +617,25 @@ function AutoUI.Slider(set, min, max, lockincrement, paddingwidth, paddingheight
 		UiTranslate(-dotwidth / 2, 0)
 
 		screen, released = UiSlider('ui/common/dot.png', "x", screen, 0, width)
-		screen = Auto.Map(screen, 0, width, min, max)
-		screen = Auto.Round(screen, lockincrement)
-		screen = Auto.Clamp(screen, min, max)
+		screen = AutoMap(screen, 0, width, min, max)
+		screen = AutoRound(screen, lockincrement)
+		screen = AutoClamp(screen, min, max)
 		set = screen
 	UiPop()
 
-	local data = { value = set, released = released, rect = {w = width, h = paddingheight * 2} }
-	HandleSpread(AutoUI.GetSpread(), data, 'draw')
-
+	local data = { value = set, released = released, rect = {w = width, h = paddingheight * 2 + dotheight} }
+	HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad)
+	
 	return set, data
 end
 
-function AutoUI.Image(path, width, height, alpha, draw)
+function AutoUIImage(path, width, height, alpha, draw, spreadpad)
 	local w, h = UiGetImageSize(path)
-	width = Auto.Default(width, (height == nil and UiWidth() or (height * (w / h))))
-	height = Auto.Default(height, width * (h / w))
-	alpha = Auto.Default(alpha, 1)
-	draw = Auto.Default(draw, true)
+	width = AutoDefault(width, (height == nil and UiWidth() or (height * (w / h))))
+	height = AutoDefault(height, width * (h / w))
+	alpha = AutoDefault(alpha, 1)
+	draw = AutoDefault(draw, true)
+	spreadpad = AutoDefault(spreadpad, true)
 	
 	if draw then
 		UiPush()
@@ -494,26 +647,26 @@ function AutoUI.Image(path, width, height, alpha, draw)
 	local hover = UiIsMouseInRect(width, height)
 	
 	local data = {hover = hover, rect = {w = width, h = height}}
-	if draw then HandleSpread(AutoUI.GetSpread(), data, 'draw') end
+	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
 	
 	return data
 end
 
-function AutoUI.Marker(size)
-	size = Auto.Default(size, 1) / 2
+function AutoUIMarker(size)
+	size = AutoDefault(size, 1) / 2
 	UiPush()
 		UiAlign('center middle')
 		UiScale(size, size)
-		UiColor(unpack(AutoUI.SpecialColor))
+		UiColor(unpack(AutoUISpecialColor))
 		UiImage('ui/common/dot.png')
 	UiPop()
 end
 
-function AutoUI.Tooltip(text, position, fontsize, alpha, bold)
-	text = Auto.Default(text or "nil")
-	fontsize = Auto.Default(fontsize or 24)
-	alpha = Auto.Default(alpha or 0.75)
-	bold = Auto.Default(bold or false)
+function AutoUITooltip(text, position, fontsize, alpha, bold)
+	text = AutoDefault(text or "nil")
+	fontsize = AutoDefault(fontsize or 24)
+	alpha = AutoDefault(alpha or 0.75)
+	bold = AutoDefault(bold or false)
 
 	UiPush()
 		UiAlign('center middle')
@@ -528,7 +681,7 @@ function AutoUI.Tooltip(text, position, fontsize, alpha, bold)
 		UiColor(0, 0, 0, alpha)
 		UiRect(rw, rh)
 
-		UiColor(unpack(AutoUI.PrimaryColor))
+		UiColor(unpack(AutoUIPrimaryColor))
 		UiText(text)
 	UiPop()
 end

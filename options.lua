@@ -5,8 +5,8 @@
 #include Automatic.lua
 
 function init()
-	pad = AutoUI.Pad.heavy
-	space = AutoUI.Pad.thin
+	pad = AutoUIPad.heavy
+	space = AutoUIPad.thin
 	-- pad = 0
 	-- space = 0
 end
@@ -23,23 +23,24 @@ function draw(dt)
 	UiPop()
 	
 	UiPush()
-		UiTranslate(AutoUI.Pad.heavy, AutoUI.Pad.heavy)
+		UiTranslate(AutoUIPad.heavy, AutoUIPad.heavy)
 		
-		AutoUI.Container(320, 120, 'left top')
-		AutoUI.SpreadDown(AutoUI.Pad.thin)
-			pad = AutoUI.Slider(pad, 0, 128, 128/(128/6))
-			space = AutoUI.Slider(space, 0, AutoUI.Pad.heavy, 2)
-		AutoUI.SpreadEnd()
+		AutoUIContainer(320, 120, 'left top')
+		AutoUISpreadDown(AutoUIPad.thin)
+			pad = AutoUISlider(pad, 0, 128, 128/(128/6))
+			space = AutoUISlider(space, 0, AutoUIPad.heavy, 2)
+		AutoUISpreadEnd()
 	UiPop()
 	
 	
 	UiPush()
 		UiTranslate(UiCenter(), UiMiddle())
 
-		AutoUI.Container(610, 800, 'center middle', pad)
-		AutoUI.SpreadDown(space)
+		AutoUIContainer(610, 800, 'center middle', pad)
+		AutoUIMarker()
+		AutoUISpreadDown(space)
 			
 
-		AutoUI.SpreadEnd()
+		AutoUISpreadEnd()
 	UiPop()
 end

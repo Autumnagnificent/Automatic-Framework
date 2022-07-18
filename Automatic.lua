@@ -1,6 +1,3 @@
-Auto = {}
-AutoUI = {}
-
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Arithmetic-----------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -149,6 +146,25 @@ function AutoDist(a, b)
 	return math.abs(a - b)
 end
 
+function AutoBoundsCorrection(aa, bb)
+	local min, max = VecCopy(aa), VecCopy(bb)
+
+	if bb[1] < aa[1] then
+		min[1] = bb[1]
+		max[1] = aa[1]
+	end
+	if bb[2] < aa[2] then
+		min[2] = bb[2]
+		max[2] = aa[2]
+	end
+	if bb[3] < aa[3] then
+		min[3] = bb[3]
+		max[3] = aa[3]
+	end
+
+	return min, max
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Utility-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -225,16 +241,6 @@ function AutoToString(object)
 	return toDump
 end
 
-function AutoPrint(...)
-	arg.n = nil
-	DebugPrint(AutoToString(arg))
-	return unpack(arg)
-end
-
-function AutoClearConsole()
-	for i = 1, 24 do DebugPrint('') end
-end
-
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Game-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -295,20 +301,65 @@ function AutoSpeed(body)
 	return VecLength(GetBodyVelocity(body))
 end
 
-function AutoPredictPosition(body, time)
+function AutoPredictPosition(body, time, raycast)
+	raycast = AutoDefault(raycast, false)
 	local pos = AutoWorldCenterOfMass(body)
 	local vel = GetBodyVelocity(body)
-	local newpos = VecCopy(pos)
+	local log = { VecCopy(pos) }
+	local normal = Vec(0, 1, 0)
 
 	for steps = 0, time, GetTimeStep() do
 		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
-		newpos = VecAdd(newpos, VecScale(vel, GetTimeStep()))
-		-- newpos = VecAdd(newpos, VecScale(Vec(0, -10, 0), GetTimeStep()))
+		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
+
+		if raycast then
+			local last = log[#log - 1]
+			local cur = log[#log]
+			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
+			if hit then normal = norm break end
+		end
 	end
 
-	local dir = VecNormalize(VecSub(newpos, pos))
+	return log, vel, normal
+end
 
-	return newpos, vel, dir
+function AutoPredictPlayerPosition(time, raycast)
+	raycast = AutoDefault(raycast, false)
+	local player = GetPlayerTransform(true)
+	local pos = player.pos
+	local vel = GetPlayerVelocity()
+	local log = { VecCopy(pos) }
+	local normal = Vec(0, 1, 0)
+
+	for steps = 0, time, GetTimeStep() do
+		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
+		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
+
+		if raycast then
+			local last = log[#log - 1]
+			local cur = log[#log]
+			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
+			normal = norm
+			
+			if hit then break end
+		end
+	end
+
+	return log, vel, normal
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Showing Debug-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoPrint(...)
+	arg.n = nil
+	DebugPrint(AutoToString(arg))
+	return unpack(arg)
+end
+
+function AutoClearConsole()
+	for i = 1, 24 do DebugPrint('') end
 end
 
 function AutoDrawPath(lines)
@@ -316,6 +367,61 @@ function AutoDrawPath(lines)
 		local color = (lines[i].color + lines[i + 1].color) / 2
 		DebugLine(lines[i].pos, lines[i + 1].pos, color, 1 - color, 0.5 - color)
 	end
+end
+
+function AutoDrawTransform(transform, size)
+	size = AutoDefault(size, 0.5)
+
+	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
+	local up = TransformToParentPoint(transform, Vec(0, size, 0))
+	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
+	DebugLine(transform.pos, right, 1, 0, 0, 1)
+	DebugLine(transform.pos, up, 0, 1, 0, 1)
+	DebugLine(transform.pos, forward, 0, 0, 1, 1)
+end
+
+function AutoDrawBodyDebug(body, size)
+	local trans = GetBodyTransform(body)
+	AutoDrawTransform(trans, size)
+
+	local vel = GetBodyVelocity(body)
+	local worldvel = VecAdd(vel, trans.pos)
+	DebugLine(trans.pos, worldvel)
+	AutoTooltip(AutoRound(AutoSpeed(body), 0.001), trans.pos, 16, 0.35)
+end
+
+function AutoDrawBounds(aa, bb, brightness, rgbcolors)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	brightness = AutoDefault(brightness, 1)
+	rgbcolors = AutoDefault(rgbcolors, false)
+
+	min, max = {
+		[1] = Vec(aa[1], aa[2], aa[3]),
+		[2] = Vec(bb[1], aa[2], aa[3]),
+		[3] = Vec(bb[1], aa[2], bb[3]),
+		[4] = Vec(aa[1], aa[2], bb[3]),
+	}, {
+		[1] = Vec(aa[1], bb[2], aa[3]),
+		[2] = Vec(bb[1], bb[2], aa[3]),
+		[3] = Vec(bb[1], bb[2], bb[3]),
+		[4] = Vec(aa[1], bb[2], bb[3]),
+	}
+
+	-- This code made me want to give up
+	DebugLine(min[2], min[3], brightness, brightness, brightness, 1)
+	DebugLine(min[3], min[4], brightness, brightness, brightness, 1)
+	DebugLine(max[1], max[2], brightness, brightness, brightness, 1)
+	DebugLine(max[4], max[1], brightness, brightness, brightness, 1)
+	DebugLine(min[2], max[2], brightness, brightness, brightness, 1)
+	DebugLine(min[4], max[4], brightness, brightness, brightness, 1)
+
+	DebugLine(min[1], min[2], rgbcolors and 1 or brightness, brightness, brightness, 1)
+	DebugLine(max[2], max[3], brightness, rgbcolors and 1 or brightness, brightness, 1)
+	DebugLine(max[3], max[4], rgbcolors and 1 or brightness, brightness, brightness, 1)
+	DebugLine(min[1], max[1], brightness, brightness, rgbcolors and 1 or brightness, 1)
+	DebugLine(min[3], max[3], brightness, brightness, rgbcolors and 1 or brightness, 1)
+	DebugLine(min[4], min[1], brightness, rgbcolors and 1 or brightness, brightness, 1)
+
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -356,16 +462,16 @@ end
 ----------------User Interface-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-AutoUIPad = {none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128}
-setmetatable(AutoUIPad, { __call = function (t, padding) UiTranslate(padding, padding) end})
+AutoPad = {none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128}
+setmetatable(AutoPad, { __call = function (t, padding) UiTranslate(padding, padding) end})
 
-AutoUIPrimaryColor = {0.95, 0.95, 0.95, 1}
-AutoUISpecialColor = {1, 1, 0.55, 1}
-AutoUISecondaryColor = {0, 0, 0, 0.55}
+AutoPrimaryColor = {0.95, 0.95, 0.95, 1}
+AutoSpecialColor = {1, 1, 0.55, 1}
+AutoSecondaryColor = {0, 0, 0, 0.55}
 local Stack = {}
 
 
-function AutoUIAlignmentToPos(alignment)
+function AutoAlignmentToPos(alignment)
 	v, y = 0, 0
 	if string.find(alignment, 'left') then v = -1 end
 	if string.find(alignment, 'center') then v = 0 end
@@ -376,42 +482,42 @@ function AutoUIAlignmentToPos(alignment)
 	return {x = v, y = y}
 end
 
-function AutoUICenter()
+function AutoCenter()
 	UiTranslate(UiCenter(), UiMiddle())
 	UiAlign('center middle')
 end
 
-function AutoUISpreadDown(padding)
-	table.insert(Stack, {type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoUIPad.thin)})
+function AutoSpreadDown(padding)
+	table.insert(Stack, {type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
-function AutoUISpreadUp(padding)
-	table.insert(Stack, {type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoUIPad.thin)})
+function AutoSpreadUp(padding)
+	table.insert(Stack, {type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
-function AutoUISpreadRight(padding)
-	table.insert(Stack, {type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoUIPad.thin)})
+function AutoSpreadRight(padding)
+	table.insert(Stack, {type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
-function AutoUISpreadLeft(padding)
-	table.insert(Stack, {type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoUIPad.thin)})
+function AutoSpreadLeft(padding)
+	table.insert(Stack, {type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
-function AutoUISpreadVerticle(count)
+function AutoSpreadVerticle(count)
 	table.insert(Stack, {type = 'spread', direction = 'verticle', length = UiHeight(), count = count})
 	UiPush()
 end
 
-function AutoUISpreadHorizontal(count)
+function AutoSpreadHorizontal(count)
 	table.insert(Stack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 	UiPush()
 end
 
-function AutoUIGetSpread(l)
+function AutoGetSpread(l)
 	l = AutoDefault(l, 1)
 	_l = 0
 	local count = AutoCount(Stack)
@@ -426,7 +532,7 @@ function AutoUIGetSpread(l)
 	return nil
 end
 
-function AutoUISetSpread(Spread)
+function AutoSetSpread(Spread)
 	local count = AutoCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
@@ -437,10 +543,10 @@ function AutoUISetSpread(Spread)
 	v = Spread
 end
 
-function AutoUISpreadEnd()
+function AutoSpreadEnd()
 	local unitdata = {comb = { w = 0, h = 0 }, max = { w = 0, h = 0 }}
-	local Spread = AutoUIGetSpread()
-	local LastSpread = AutoUIGetSpread(2)
+	local Spread = AutoGetSpread()
+	local LastSpread = AutoGetSpread(2)
 	
 	while true do
 		local count = AutoCount(Stack)
@@ -492,11 +598,11 @@ end
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function AutoUIContainer(width, height, alignment, padding, clip, draw, spreadpad)
+function AutoContainer(width, height, alignment, padding, clip, draw, spreadpad)
 	width = AutoDefault(width, 300)
 	height = AutoDefault(height, 400)
 	alignment = AutoDefault(alignment, 'left top')
-	padding = math.max(AutoDefault(padding, AutoUIPad.micro), 0)
+	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
 	clip = AutoDefault(clip, false)
 	draw = AutoDefault(draw, true)
 	spreadpad = AutoDefault(spreadpad, true)
@@ -510,7 +616,7 @@ function AutoUIContainer(width, height, alignment, padding, clip, draw, spreadpa
 	UiAlign('left top')
 	if draw then
 		UiPush()
-			UiColor(unpack(AutoUISecondaryColor))
+			UiColor(unpack(AutoSecondaryColor))
 			UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
 		UiPop()
 	end
@@ -527,17 +633,17 @@ function AutoUIContainer(width, height, alignment, padding, clip, draw, spreadpa
 	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
-function AutoUIButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad)
+function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad)
 	fontsize = AutoDefault(fontsize, 28)
-	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.thick)
-	paddingheight = AutoDefault(paddingheight, AutoUIPad.thin)
+	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
+	paddingheight = AutoDefault(paddingheight, AutoPad.thin)
 	draw = AutoDefault(draw, true)
 	spreadpad = AutoDefault(spreadpad, true)
 
 	UiPush()
-		UiWordWrap(UiWidth() - AutoUIPad.thick)
+		UiWordWrap(UiWidth() - AutoPad.thick)
 		UiFont("regular.ttf", fontsize)
-		UiButtonHoverColor(unpack(AutoUISpecialColor))
+		UiButtonHoverColor(unpack(AutoSpecialColor))
 		UiButtonPressColor(0.75, 0.75, 0.75, 1)
 		UiButtonPressDist(0.25)
 
@@ -547,28 +653,28 @@ function AutoUIButton(name, fontsize, paddingwidth, paddingheight, draw, spreadp
 		
 		if draw then
 			hover = UiIsMouseInRect(padrw, padrh)
-			UiColor(unpack(AutoUIPrimaryColor))
+			UiColor(unpack(AutoPrimaryColor))
 			
-		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoUIPrimaryColor))
+		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoPrimaryColor))
 			pressed = UiTextButton(name, padrw, padrh)
 		end
 	UiPop()
 
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
+	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return pressed, data
 end
 
-function AutoUIText(name, fontsize, draw, spreadpad)
+function AutoText(name, fontsize, draw, spreadpad)
 	fontsize = AutoDefault(fontsize, 28)
-	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.none)
-	paddingheight = AutoDefault(paddingheight, AutoUIPad.none)
+	paddingwidth = AutoDefault(paddingwidth, AutoPad.none)
+	paddingheight = AutoDefault(paddingheight, AutoPad.none)
 	draw = AutoDefault(draw, true)
 	spreadpad = AutoDefault(spreadpad, true)
 
 	UiPush()
-		UiWordWrap(UiWidth() - AutoUIPad.thick)
+		UiWordWrap(UiWidth() - AutoPad.thick)
 		UiFont("regular.ttf", fontsize)
 
 		UiColor(0, 0, 0, 0)
@@ -577,27 +683,27 @@ function AutoUIText(name, fontsize, draw, spreadpad)
 		if draw then
 			UiPush()
 				UiWindow(rw + paddingwidth * 2, rh + paddingheight * 2)
-				AutoUICenter()
+				AutoCenter()
 				
-				UiColor(unpack(AutoUIPrimaryColor))
+				UiColor(unpack(AutoPrimaryColor))
 				UiText(name)
 			UiPop()
 		end
 	UiPop()
 
 	local data = { rect = { w = rw + paddingwidth * 2, h = rh + paddingheight * 2} }
-	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
+	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return data
 end
 
-function AutoUISlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
+function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
 	set = AutoDefault(set, min)
 	lockincrement = AutoDefault(lockincrement, 0)
-	paddingwidth = AutoDefault(paddingwidth, AutoUIPad.thick)
-	paddingheight = AutoDefault(paddingheight, AutoUIPad.micro)
+	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
+	paddingheight = AutoDefault(paddingheight, AutoPad.micro)
 	spreadpad = AutoDefault(spreadpad, true)
 
 	local width = UiWidth() - paddingwidth * 2
@@ -607,7 +713,7 @@ function AutoUISlider(set, min, max, lockincrement, paddingwidth, paddingheight,
 
 	UiPush()
 		UiTranslate(paddingwidth, paddingheight)
-		UiColor(unpack(AutoUISpecialColor))
+		UiColor(unpack(AutoSpecialColor))
 	
 		UiPush()
 			UiTranslate(0, dotheight / 2)
@@ -624,12 +730,12 @@ function AutoUISlider(set, min, max, lockincrement, paddingwidth, paddingheight,
 	UiPop()
 
 	local data = { value = set, released = released, rect = {w = width, h = paddingheight * 2 + dotheight} }
-	HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad)
+	HandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
 	
 	return set, data
 end
 
-function AutoUIImage(path, width, height, alpha, draw, spreadpad)
+function AutoImage(path, width, height, alpha, draw, spreadpad)
 	local w, h = UiGetImageSize(path)
 	width = AutoDefault(width, (height == nil and UiWidth() or (height * (w / h))))
 	height = AutoDefault(height, width * (h / w))
@@ -647,22 +753,22 @@ function AutoUIImage(path, width, height, alpha, draw, spreadpad)
 	local hover = UiIsMouseInRect(width, height)
 	
 	local data = {hover = hover, rect = {w = width, h = height}}
-	if draw then HandleSpread(AutoUIGetSpread(), data, 'draw', spreadpad) end
+	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 	
 	return data
 end
 
-function AutoUIMarker(size)
+function AutoMarker(size)
 	size = AutoDefault(size, 1) / 2
 	UiPush()
 		UiAlign('center middle')
 		UiScale(size, size)
-		UiColor(unpack(AutoUISpecialColor))
+		UiColor(unpack(AutoSpecialColor))
 		UiImage('ui/common/dot.png')
 	UiPop()
 end
 
-function AutoUITooltip(text, position, fontsize, alpha, bold)
+function AutoTooltip(text, position, fontsize, alpha, bold)
 	text = AutoDefault(text or "nil")
 	fontsize = AutoDefault(fontsize or 24)
 	alpha = AutoDefault(alpha or 0.75)
@@ -681,7 +787,7 @@ function AutoUITooltip(text, position, fontsize, alpha, bold)
 		UiColor(0, 0, 0, alpha)
 		UiRect(rw, rh)
 
-		UiColor(unpack(AutoUIPrimaryColor))
+		UiColor(unpack(AutoPrimaryColor))
 		UiText(text)
 	UiPop()
 end

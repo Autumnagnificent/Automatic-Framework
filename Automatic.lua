@@ -123,6 +123,16 @@ function AutoVecRescale(a, b)
 	return VecScale(VecNormalize(a), b)
 end
 
+function AutoVecMap(vec, a1, a2, b1, b2)
+	if a1 == a2 then return b2 end
+	local out = {
+		AutoMap(vec[1], a1, a2, b1, b2),
+		AutoMap(vec[2], a1, a2, b1, b2),
+		AutoMap(vec[3], a1, a2, b1, b2),
+	}
+	return out
+end
+
 function AutoVecClamp(v, min, max)
 	local l = VecLength(v)
 	if l > max then
@@ -132,6 +142,18 @@ function AutoVecClamp(v, min, max)
 	else
 		return v
 	end
+end
+
+function AutoVecOne(length)
+	return VecScale(Vec(1,1,1), length)
+end
+
+function AutoVecMulti(a, b)
+	return {
+		a[1] * b[1],
+		a[2] * b[2],
+		a[3] * b[3],
+	}
 end
 
 function AutoVecSubsituteY(v, y)
@@ -165,6 +187,51 @@ function AutoBoundsCorrection(aa, bb)
 	return min, max
 end
 
+function AutoBoundsGetPos(aa, bb, vec)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	vec = AutoVecMap(vec, -1, 1, 0, 1)
+	local sizevec = VecSub(bb, aa)
+
+	local size = VecLength(sizevec)
+	local scaled = AutoVecMulti(vec, sizevec)
+	return VecAdd(scaled, aa)
+end
+
+function AutoBoundsGetFaceCenters(aa, bb)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	return {
+		AutoBoundsGetPos(aa, bb, Vec(0, -1, 0)),
+		AutoBoundsGetPos(aa, bb, Vec(0, 1, 0)),
+		AutoBoundsGetPos(aa, bb, Vec(-1, 0, 0)),
+		AutoBoundsGetPos(aa, bb, Vec(1, 0, 0)),
+		AutoBoundsGetPos(aa, bb, Vec(0, 0, -1)),
+		AutoBoundsGetPos(aa, bb, Vec(0, 0, 1)),
+	}
+end
+
+function AutoBoundsGetCorners(aa, bb)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	return {
+		AutoBoundsGetPos(aa, bb, Vec(-1, -1, -1)),
+		AutoBoundsGetPos(aa, bb, Vec(1, -1, -1)),
+		AutoBoundsGetPos(aa, bb, Vec(-1, 1, -1)),
+		AutoBoundsGetPos(aa, bb, Vec(-1, -1, 1)),
+		AutoBoundsGetPos(aa, bb, Vec(-1, 1, 1)),
+		AutoBoundsGetPos(aa, bb, Vec(1, -1, 1)),
+		AutoBoundsGetPos(aa, bb, Vec(1, 1, -1)),
+		AutoBoundsGetPos(aa, bb, Vec(1, 1, 1)),
+	}
+end
+
+function AutoBoundsSize(aa, bb)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	local size = VecSub(bb, aa)
+	local minval = math.max(unpack(size))
+	local maxval = math.min(unpack(size))
+
+	return size, minval, maxval
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Utility-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -194,6 +261,10 @@ end
 
 function AutoDefault(val, default)
 	if val == nil then return default else return val end
+end
+
+function AutoVecToXML(vec)
+	return vec[1] .. ' ' .. vec[2] .. ' ' .. vec[3]
 end
 
 ---A workaround to making a table readonly
@@ -370,6 +441,7 @@ function AutoDrawPath(lines)
 end
 
 function AutoDrawTransform(transform, size)
+	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
 
 	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
@@ -378,6 +450,12 @@ function AutoDrawTransform(transform, size)
 	DebugLine(transform.pos, right, 1, 0, 0, 1)
 	DebugLine(transform.pos, up, 0, 1, 0, 1)
 	DebugLine(transform.pos, forward, 0, 0, 1, 1)
+end
+
+function AutoDrawTransforms(...)
+	for i = 1, #arg do
+		AutoDrawTransform(arg[i])
+	end
 end
 
 function AutoDrawBodyDebug(body, size)

@@ -1,19 +1,27 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Arithmetic-----------------------------------------------------------------------------------------------------------------------------
+----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
----Logistic function, Can be used for juicy UI among other things.
+---Logistic function, Can be used for juicy UI and smooth easing among other things.
 ---https://www.desmos.com/calculator/cmmwrjtyit?invertedColors
----@param v number
----@param max number
----@param steep number
----@param offset number
+---@param v number|nil Input number, if nil then it will be a Random number between 0 and 1
+---@param max number The Maximum value
+---@param steep number How steep the curve is
+---@param offset number The horizontal offset of the middle of the curve
 ---@return number
 function AutoLogistic(v, max, steep, offset)
 	v = AutoDefault(v, math.random(0, 10000) / 10000)
 	return max / (1 + math.exp((v - offset) * steep))
 end
 
+---Logistic function followed by a mapping function, guarantees that the return value will be between 0 and 1
+---@param v number|nil Random number between 0 and 1
+---@param max number The Maximum value
+---@param steep number How steep the curve is
+---@param offset number The horizontal offset of the middle of the curve
+---@param rangemin number Maps this number to 0
+---@param rangemax number Maps this numver to 1
+---@return number
 function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
 	v = AutoLogistic(v, max, steep, offset)
 	local a = AutoLogistic(rangemin, max, steep, offset)
@@ -21,79 +29,63 @@ function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
 	return AutoMap(v, a, b, 0, 1)
 end
 
----'n' is the number you want rounded, 'd' is the decimal, so something like 0.1, 0.01, 1, 2, 100, 2.5
 ---This was a Challenge by @TallTim and @1ssnl to make the smallest rounding function, but I expanded it to make it easier to read and a little more efficent
----@param n number
----@param d number
+---@param v number Input number
+---@param increment number|nil The lowest increment. A Step of 1 will round the number to 1, A step of 5 will round it to the closest increment of 5, A step of 0.1 will round to the tenth. Default is 1
 ---@return number
-function AutoRound(n,d)
-	d = AutoDefault(d, 1)
-	if d == 0 then return n end
-	v = 1 / d
-	return math.floor(n * v + 0.5) / v
+function AutoRound(v,increment)
+	increment = AutoDefault(increment, 1)
+	if increment == 0 then return v end
+	v = 1 / increment
+	return math.floor(v * v + 0.5) / v
+end
+
+---Maps a value from range a1-a2 to range b1-b2
+---@param v number Input number
+---@param a1 number Goes from the range of number a1
+---@param a2 number To number a2
+---@param b1 number To the range of b1
+---@param b2 number To number b2
+---@return number
+function AutoMap(v, a1, a2, b1, b2)
+	if a1 == a2 then return b2 end
+	return b1 + ((v - a1) * (b2 - b1)) / (a2 - a1)
 end
 
 ---Limits a value from going below the min and above the max
----@param val number
----@param min number
----@param max number
+---@param v number The number to clamp
+---@param min number|nil The minimum the number can be, Default is 0
+---@param max number|nil The maximum the number can be, Default is 1
 ---@return number
-function AutoClamp(val, min, max)
+function AutoClamp(v, min, max)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
-	if val < min then
+	if v < min then
 		return min
-	elseif val > max then
+	elseif v > max then
 		return max
 	else
-		return val
+		return v
 	end
-end
-
-function AutoBiggest(...)
-	local best = -math.huge
-	for i in pairs(arg) do
-		if i > best then best = i end
-	end
-	return best
-end
-
-function AutoSmallest(...)
-	local best = math.huge
-	for i in pairs(arg) do
-		if i < best then best = i end
-	end
-	return best
-end
-
----Return a Random Vector
----@param length any
----@param precision any
----@return table
-function AutoRndVec(length, precision)
-	precision = AutoDefault(precision, 0.01)
-	local m = 1/precision
-	local v = VecNormalize(Vec(math.random(-m,m), math.random(-m,m), math.random(-m,m)))
-	return VecScale(v, length)	
 end
 
 ---Lerp function, Is not clamped meaning it if t is above 1 then it will 'overshoot'
----@param a number
----@param b number
----@param t number
+---@param a number Goes from number A
+---@param b number To number B
+---@param t number Interpolated by T
 ---@return number
 function AutoLerpUnclamped(a, b, t)
-	return (1-t)*a + t*b
+	return (1 - t) * a + t * b
 end
 
---- Moves a towards b by t
----@param a number
----@param b number
----@param t number
+---Moves a towards b by t
+---@param a number Goes from number A
+---@param b number To number B
+---@param t number Moved by T
 ---@return number
 function AutoMove(a, b, t)
 	output = a
-    if a == b then
+	if a == b then
 		return a
 	end
 
@@ -106,9 +98,27 @@ function AutoMove(a, b, t)
 	return output
 end
 
-function AutoMap(x, a1, a2, b1, b2)
-	if a1 == a2 then return b2 end
-	return b1 + ((x - a1) * (b2 - b1)) / (a2 - a1)
+---Return the Distance between the numbers a and b
+---@param a number
+---@param b number
+---@return number
+function AutoDist(a, b)
+	return math.abs(a - b)
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Vector Functions-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---Return a Random Vector
+---@param length number
+---@param precision number 0.001 by default
+---@return table
+function AutoRndVec(length, precision)
+	precision = AutoDefault(precision, 0.001)
+	local m = 1/precision
+	local v = VecNormalize(Vec(math.random(-m,m), math.random(-m,m), math.random(-m,m)))
+	return VecScale(v, length)
 end
 
 ---Return the Distance between Two Vectors
@@ -116,24 +126,41 @@ end
 ---@param b Vec
 ---@return number
 function AutoVecDist(a, b)
-	return math.sqrt( (a[1] - b[1])^2 + (a[2] - b[2])^2 + (a[3] - b[3])^2 )
+	return VecLength(VecSub(a, b))
 end
 
+---Return a vector that has the magnitude of b, but with the direction of a
+---@param a Vec
+---@param b number
+---@return Vec
 function AutoVecRescale(a, b)
 	return VecScale(VecNormalize(a), b)
 end
 
-function AutoVecMap(vec, a1, a2, b1, b2)
-	if a1 == a2 then return b2 end
+---Maps a Vector from range a1-a2 to range b1-b2
+---@param v Vec Input Vector
+---@param a1 number Goes from the range of number a1
+---@param a2 number To number a2
+---@param b1 number To the range of b1
+---@param b2 number To number b2
+---@return Vec
+function AutoVecMap(v, a1, a2, b1, b2)
+	if a1 == a2 then return v end
 	local out = {
-		AutoMap(vec[1], a1, a2, b1, b2),
-		AutoMap(vec[2], a1, a2, b1, b2),
-		AutoMap(vec[3], a1, a2, b1, b2),
+		AutoMap(v[1], a1, a2, b1, b2),
+		AutoMap(v[2], a1, a2, b1, b2),
+		AutoMap(v[3], a1, a2, b1, b2),
 	}
 	return out
 end
 
+---Limits the magnitude of a vector to be between min and max
+---@param v Vec The Vector to clamp
+---@param min number|nil The minimum the magnitude can be, Default is 0
+---@param max number|nil The maximum the magnitude can be, Default is 1
+---@return Vec
 function AutoVecClamp(v, min, max)
+	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
 	local l = VecLength(v)
 	if l > max then
 		return AutoVecRescale(v, max)
@@ -144,10 +171,18 @@ function AutoVecClamp(v, min, max)
 	end
 end
 
+---Return Vec(1, 1, 1) scaled by length
+---@param length number return the vector of size length, Default is 1
+---@return Vec
 function AutoVecOne(length)
+	length = AutoDefault(length, 1)
 	return VecScale(Vec(1,1,1), length)
 end
 
+---Return Vec a multiplied by Vec b
+---@param a Vec
+---@param b Vec
+---@return Vec
 function AutoVecMulti(a, b)
 	return {
 		a[1] * b[1],
@@ -156,18 +191,36 @@ function AutoVecMulti(a, b)
 	}
 end
 
-function AutoVecSubsituteY(v, y)
-	return Vec(v[1], y, v[3])
+---Return Vec v with it's x value replaced by subx
+---@param v Vec
+---@param subx number
+function AutoVecSubsituteX(v, subx)
+	return Vec(subx, v[2], v[3])
 end
 
----Return the Distance between the numbers a and b
----@param a number
----@param b number
----@return number
-function AutoDist(a, b)
-	return math.abs(a - b)
+---Return Vec v with it's y value replaced by suby
+---@param v Vec
+---@param suby number
+function AutoVecSubsituteY(v, suby)
+	return Vec(v[1], suby, v[3])
 end
 
+---Return Vec v with it's z value replaced by subz
+---@param v Vec
+---@param subz number
+function AutoVecSubsituteY(v, subz)
+	return Vec(v[1], v[2], subz)
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Bounds Functions-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---Takes two vectors and modifys them so they can be used in other bound functions
+---@param aa Vec
+---@param bb Vec
+---@return Vec
+---@return Vec
 function AutoBoundsCorrection(aa, bb)
 	local min, max = VecCopy(aa), VecCopy(bb)
 
@@ -187,6 +240,11 @@ function AutoBoundsCorrection(aa, bb)
 	return min, max
 end
 
+---Get a position inside or on the Input Bounds
+---@param aa Vec Minimum Bound Corner
+---@param bb Vec Maximum Bound Corner
+---@param vec Vec A normalized Vector pointing towards the position that should be retrieved
+---@return Vec
 function AutoBoundsGetPos(aa, bb, vec)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	vec = AutoVecMap(vec, -1, 1, 0, 1)
@@ -197,6 +255,10 @@ function AutoBoundsGetPos(aa, bb, vec)
 	return VecAdd(scaled, aa)
 end
 
+---Get the center of the faces of the given Bounds, as if it was a cube
+---@param aa Vec Minimum Bound Corner
+---@param bb Vec Maximum Bound Corner
+---@return table
 function AutoBoundsGetFaceCenters(aa, bb)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	return {
@@ -209,6 +271,10 @@ function AutoBoundsGetFaceCenters(aa, bb)
 	}
 end
 
+---Get the corners of the given Bounds
+---@param aa Vec Minimum Bound Corner
+---@param bb Vec Maximum Bound Corner
+---@return table
 function AutoBoundsGetCorners(aa, bb)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	return {
@@ -223,6 +289,12 @@ function AutoBoundsGetCorners(aa, bb)
 	}
 end
 
+---Get data about the size of the given Bounds
+---@param aa Vec Minimum Bound Corner
+---@param bb Vec Maximum Bound Corner
+---@return Vector representing the size of the Bounds
+---@return the smallest edge size of the Bounds
+---@return the longest edge size of the Bounds
 function AutoBoundsSize(aa, bb)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	local size = VecSub(bb, aa)
@@ -233,13 +305,13 @@ function AutoBoundsSize(aa, bb)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Utility-------------------------------------------------------------------------------------------------------------------------
+----------------Table Functions------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
----Counts the amount of elements in a list
+---Returns the amount of elements in the given list.
 ---@param t table
 ---@return integer
-function AutoCount(t)
+function AutoTableCount(t)
 	local c = 0
 	for i in pairs(t) do
 		c = c + 1
@@ -248,31 +320,41 @@ function AutoCount(t)
 	return c
 end
 
-function AutoLast(t)
+---Returns the Last item of a given list
+---@param t any
+---@return unknown
+function AutoTableLast(t)
 	return t[AutoCount(t)]
 end
 
-function AutoPack(...)
-	-- Returns a new table with parameters stored into an array, with field "n" being the total number of parameters
-	local t = { ... }
-	t.n = #t
-	return t
+---Packs arguments into a table
+---@param ... any
+---@return table
+function AutoTablePack(...)
+	return arg
 end
 
+---If val is nil, return default instead
+---@param val any
+---@param default any
+---@return any
 function AutoDefault(val, default)
 	if val == nil then return default else return val end
 end
 
+---Returns a Vector for easy use when put into a parameter for xml
+---@param vec any
+---@return string
 function AutoVecToXML(vec)
 	return vec[1] .. ' ' .. vec[2] .. ' ' .. vec[3]
 end
 
----A workaround to making a table readonly
----@param tbl table
+---A workaround to making a table readonly, don't use, it most likely is bugged in someway
+---@param t table
 ---@return table
-function AutoSetReadOnly(tbl)
+function AutoSetReadOnly(t)
 	return setmetatable({}, {
-		__index = tbl,
+		__index = t,
 		__newindex = function(t, key, value)
 			error("attempting to change constant " .. tostring(key) .. " to " .. tostring(value), 2)
 		end
@@ -372,7 +454,28 @@ function AutoSpeed(body)
 	return VecLength(GetBodyVelocity(body))
 end
 
-function AutoPredictPosition(body, time, raycast)
+function AutoPredictPosition(pos, vel, time, raycast)
+	raycast = AutoDefault(raycast, false)
+	local log = { VecCopy(pos) }
+	local normal = Vec(0, 1, 0)
+
+	for steps = 0, time, GetTimeStep() do
+		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
+		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
+
+		if raycast then
+			local last = log[#log - 1]
+			local cur = log[#log]
+			local dir = VecNormalize(VecSub(last,cur))
+			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
+			if hit then break end
+		end
+	end
+
+	return log, vel
+end
+
+function AutoPredictBodyPosition(body, time, raycast)
 	raycast = AutoDefault(raycast, false)
 	local pos = AutoWorldCenterOfMass(body)
 	local vel = GetBodyVelocity(body)
@@ -386,12 +489,13 @@ function AutoPredictPosition(body, time, raycast)
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
-			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
-			if hit then normal = norm break end
+			local dir = VecNormalize(VecSub(last,cur))
+			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
+			if hit then break end
 		end
 	end
 
-	return log, vel, normal
+	return log, vel
 end
 
 function AutoPredictPlayerPosition(time, raycast)
@@ -400,7 +504,6 @@ function AutoPredictPlayerPosition(time, raycast)
 	local pos = player.pos
 	local vel = GetPlayerVelocity()
 	local log = { VecCopy(pos) }
-	local normal = Vec(0, 1, 0)
 
 	for steps = 0, time, GetTimeStep() do
 		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
@@ -409,14 +512,14 @@ function AutoPredictPlayerPosition(time, raycast)
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
-			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
-			normal = norm
+			local dir = VecNormalize(VecSub(last,cur))
+			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
 			
 			if hit then break end
 		end
 	end
 
-	return log, vel, normal
+	return log, vel
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------

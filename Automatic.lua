@@ -87,9 +87,7 @@ function AutoMove(a, b, t)
 	output = a
 	if a == b then
 		return a
-	end
-
-	if a > b then
+	elseif a > b then
 		output = math.max(a - t, b)
 	else
 		output = math.min(a + t, b)
@@ -112,13 +110,13 @@ end
 
 ---Return a Random Vector
 ---@param length number
----@param precision number 0.001 by default
+---@param precision number|nil 0.001 by default
 ---@return table
 function AutoRndVec(length, precision)
-	precision = AutoDefault(precision, 0.001)
+	precision = AutoDefault(precision, 0.01)
 	local m = 1/precision
 	local v = VecNormalize(Vec(math.random(-m,m), math.random(-m,m), math.random(-m,m)))
-	return VecScale(v, length)
+	return VecScale(v, length)	
 end
 
 ---Return the Distance between Two Vectors
@@ -126,7 +124,7 @@ end
 ---@param b Vec
 ---@return number
 function AutoVecDist(a, b)
-	return VecLength(VecSub(a, b))
+	return math.sqrt( (a[1] - b[1])^2 + (a[2] - b[2])^2 + (a[3] - b[3])^2 )
 end
 
 ---Return a vector that has the magnitude of b, but with the direction of a
@@ -145,7 +143,7 @@ end
 ---@param b2 number To number b2
 ---@return Vec
 function AutoVecMap(v, a1, a2, b1, b2)
-	if a1 == a2 then return v end
+	if a1 == a2 then return AutoVecRescale(v, b2) end
 	local out = {
 		AutoMap(v[1], a1, a2, b1, b2),
 		AutoMap(v[2], a1, a2, b1, b2),
@@ -175,7 +173,6 @@ end
 ---@param length number return the vector of size length, Default is 1
 ---@return Vec
 function AutoVecOne(length)
-	length = AutoDefault(length, 1)
 	return VecScale(Vec(1,1,1), length)
 end
 
@@ -189,6 +186,10 @@ function AutoVecMulti(a, b)
 		a[2] * b[2],
 		a[3] * b[3],
 	}
+end
+
+function AutoVecSubsituteY(v, y)
+	return Vec(v[1], y, v[3])
 end
 
 ---Return Vec v with it's x value replaced by subx
@@ -320,26 +321,54 @@ function AutoTableCount(t)
 	return c
 end
 
+---Returns true and the index if the v is in t, otherwise returns false and nil
+---@param t table
+---@param v any
+---@return boolean, unknown
+function AutoTableContains(t, v)
+	for i, v2 in ipairs(t) do
+		if v == v2 then
+			return true, i
+		end
+	end
+	return false, nil
+end
+
 ---Returns the Last item of a given list
 ---@param t any
 ---@return unknown
 function AutoTableLast(t)
-	return t[AutoCount(t)]
+	return t[AutoTableCount(t)]
 end
 
----Packs arguments into a table
----@param ... any
+---Copy a Table Recursivly Stolen from http://lua-users.org/wiki/CopyTable
+---@param orig table
 ---@return table
-function AutoTablePack(...)
-	return arg
+function AutoTableDeepCopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[AutoTableDeepCopy(orig_key)] = AutoTableDeepCopy(orig_value)
+        end
+        setmetatable(copy, AutoTableDeepCopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
 end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Utility Functions------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---If val is nil, return default instead
----@param val any
+---@param v any
 ---@param default any
 ---@return any
-function AutoDefault(val, default)
-	if val == nil then return default else return val end
+function AutoDefault(v, default)
+	if v == nil then return default else return v end
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -454,28 +483,7 @@ function AutoSpeed(body)
 	return VecLength(GetBodyVelocity(body))
 end
 
-function AutoPredictPosition(pos, vel, time, raycast)
-	raycast = AutoDefault(raycast, false)
-	local log = { VecCopy(pos) }
-	local normal = Vec(0, 1, 0)
-
-	for steps = 0, time, GetTimeStep() do
-		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
-		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
-
-		if raycast then
-			local last = log[#log - 1]
-			local cur = log[#log]
-			local dir = VecNormalize(VecSub(last,cur))
-			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
-			if hit then break end
-		end
-	end
-
-	return log, vel
-end
-
-function AutoPredictBodyPosition(body, time, raycast)
+function AutoPredictPosition(body, time, raycast)
 	raycast = AutoDefault(raycast, false)
 	local pos = AutoWorldCenterOfMass(body)
 	local vel = GetBodyVelocity(body)
@@ -489,13 +497,12 @@ function AutoPredictBodyPosition(body, time, raycast)
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
-			local dir = VecNormalize(VecSub(last,cur))
-			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
-			if hit then break end
+			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
+			if hit then normal = norm break end
 		end
 	end
 
-	return log, vel
+	return log, vel, normal
 end
 
 function AutoPredictPlayerPosition(time, raycast)
@@ -504,6 +511,7 @@ function AutoPredictPlayerPosition(time, raycast)
 	local pos = player.pos
 	local vel = GetPlayerVelocity()
 	local log = { VecCopy(pos) }
+	local normal = Vec(0, 1, 0)
 
 	for steps = 0, time, GetTimeStep() do
 		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
@@ -512,14 +520,14 @@ function AutoPredictPlayerPosition(time, raycast)
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
-			local dir = VecNormalize(VecSub(last,cur))
-			local hit, dist, norm = QueryRaycast(last, dir, VecLength(VecSub(cur, last)))
+			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
+			normal = norm
 			
 			if hit then break end
 		end
 	end
 
-	return log, vel
+	return log, vel, normal
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -555,12 +563,6 @@ function AutoDrawTransform(transform, size)
 	DebugLine(transform.pos, forward, 0, 0, 1, 1)
 end
 
-function AutoDrawTransforms(...)
-	for i = 1, #arg do
-		AutoDrawTransform(arg[i])
-	end
-end
-
 function AutoDrawBodyDebug(body, size)
 	local trans = GetBodyTransform(body)
 	AutoDrawTransform(trans, size)
@@ -571,9 +573,10 @@ function AutoDrawBodyDebug(body, size)
 	AutoTooltip(AutoRound(AutoSpeed(body), 0.001), trans.pos, 16, 0.35)
 end
 
-function AutoDrawBounds(aa, bb, brightness, rgbcolors)
+function AutoDrawBounds(aa, bb, rgbcolors, brightness, alpha)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	brightness = AutoDefault(brightness, 1)
+	alpha = AutoDefault(alpha, 1)
 	rgbcolors = AutoDefault(rgbcolors, false)
 
 	min, max = {
@@ -589,20 +592,44 @@ function AutoDrawBounds(aa, bb, brightness, rgbcolors)
 	}
 
 	-- This code made me want to give up
-	DebugLine(min[2], min[3], brightness, brightness, brightness, 1)
-	DebugLine(min[3], min[4], brightness, brightness, brightness, 1)
-	DebugLine(max[1], max[2], brightness, brightness, brightness, 1)
-	DebugLine(max[4], max[1], brightness, brightness, brightness, 1)
-	DebugLine(min[2], max[2], brightness, brightness, brightness, 1)
-	DebugLine(min[4], max[4], brightness, brightness, brightness, 1)
+	DebugLine(min[2], min[3], brightness, brightness, brightness, alpha)
+	DebugLine(min[3], min[4], brightness, brightness, brightness, alpha)
+	DebugLine(max[1], max[2], brightness, brightness, brightness, alpha)
+	DebugLine(max[4], max[1], brightness, brightness, brightness, alpha)
+	DebugLine(min[2], max[2], brightness, brightness, brightness, alpha)
+	DebugLine(min[4], max[4], brightness, brightness, brightness, alpha)
 
-	DebugLine(min[1], min[2], rgbcolors and 1 or brightness, brightness, brightness, 1)
-	DebugLine(max[2], max[3], brightness, rgbcolors and 1 or brightness, brightness, 1)
-	DebugLine(max[3], max[4], rgbcolors and 1 or brightness, brightness, brightness, 1)
-	DebugLine(min[1], max[1], brightness, brightness, rgbcolors and 1 or brightness, 1)
-	DebugLine(min[3], max[3], brightness, brightness, rgbcolors and 1 or brightness, 1)
-	DebugLine(min[4], min[1], brightness, rgbcolors and 1 or brightness, brightness, 1)
+	DebugLine(min[1], min[2], rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, alpha)
+	DebugLine(max[2], max[3], rgbcolors and 0 or brightness, rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, alpha)
+	DebugLine(max[3], max[4], rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, alpha)
+	DebugLine(min[1], max[1], rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, rgbcolors and 1 or rgbcolors and 0 or brightness, alpha)
+	DebugLine(min[3], max[3], rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, rgbcolors and 1 or rgbcolors and 0 or brightness, alpha)
+	DebugLine(min[4], min[1], rgbcolors and 0 or brightness, rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, alpha)
 
+end
+
+function AutoTooltip(text, position, fontsize, alpha, bold)
+	text = AutoDefault(text or "nil")
+	fontsize = AutoDefault(fontsize or 24)
+	alpha = AutoDefault(alpha or 0.75)
+	bold = AutoDefault(bold or false)
+
+	UiPush()
+	UiAlign('center middle')
+	local x, y = UiWorldToPixel(position)
+	UiTranslate(x, y)
+	UiWordWrap(UiMiddle())
+
+	UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
+	UiColor(0, 0, 0, 0)
+	local rw, rh = UiText(text)
+
+	UiColor(0, 0, 0, alpha)
+	UiRect(rw, rh)
+
+	UiColor(unpack(AutoPrimaryColor))
+	UiText(text)
+	UiPop()
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -701,7 +728,7 @@ end
 function AutoGetSpread(l)
 	l = AutoDefault(l, 1)
 	_l = 0
-	local count = AutoCount(Stack)
+	local count = AutoTableCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
 			_l = _l + 1
@@ -714,7 +741,7 @@ function AutoGetSpread(l)
 end
 
 function AutoSetSpread(Spread)
-	local count = AutoCount(Stack)
+	local count = AutoTableCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
 			v = Stack[i]
@@ -730,7 +757,7 @@ function AutoSpreadEnd()
 	local LastSpread = AutoGetSpread(2)
 	
 	while true do
-		local count = AutoCount(Stack)
+		local count = AutoTableCount(Stack)
 		
 		if Stack[count].type ~= 'spread' then
 			if Stack[count].data.rect then
@@ -946,29 +973,5 @@ function AutoMarker(size)
 		UiScale(size, size)
 		UiColor(unpack(AutoSpecialColor))
 		UiImage('ui/common/dot.png')
-	UiPop()
-end
-
-function AutoTooltip(text, position, fontsize, alpha, bold)
-	text = AutoDefault(text or "nil")
-	fontsize = AutoDefault(fontsize or 24)
-	alpha = AutoDefault(alpha or 0.75)
-	bold = AutoDefault(bold or false)
-
-	UiPush()
-		UiAlign('center middle')
-		local x, y = UiWorldToPixel(position)
-		UiTranslate(x, y)
-		UiWordWrap(UiMiddle())
-
-		UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
-		UiColor(0, 0, 0, 0)
-		local rw, rh = UiText(text)
-
-		UiColor(0, 0, 0, alpha)
-		UiRect(rw, rh)
-
-		UiColor(unpack(AutoPrimaryColor))
-		UiText(text)
 	UiPop()
 end

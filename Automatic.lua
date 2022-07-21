@@ -480,7 +480,7 @@ function AutoWorldCenterOfMass(body)
 end
 
 function AutoSpeed(body)
-	return VecLength(GetBodyVelocity(body))
+	return VecLength(GetBodyVelocity(body)) + VecLength(GetBodyAngularVelocity(body))
 end
 
 function AutoPredictPosition(body, time, raycast)
@@ -551,16 +551,17 @@ function AutoDrawPath(lines)
 	end
 end
 
-function AutoDrawTransform(transform, size)
+function AutoDrawTransform(transform, size, alpha)
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
+	alpha = AutoDefault(alpha, 1)
 
 	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
 	local up = TransformToParentPoint(transform, Vec(0, size, 0))
 	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
-	DebugLine(transform.pos, right, 1, 0, 0, 1)
-	DebugLine(transform.pos, up, 0, 1, 0, 1)
-	DebugLine(transform.pos, forward, 0, 0, 1, 1)
+	DebugLine(transform.pos, right, 1, 0, 0, alpha)
+	DebugLine(transform.pos, up, 0, 1, 0, alpha)
+	DebugLine(transform.pos, forward, 0, 0, 1, alpha)
 end
 
 function AutoDrawBodyDebug(body, size)
@@ -832,7 +833,7 @@ function AutoContainer(width, height, padding, clip, draw, spreadpad)
 	UiTranslate(padding, padding)
 	UiWindow(paddingwidth, paddingheight, clip)
 
-	local offset = {x = 0, y = 0}
+	local offset = { x = 0, y = 0 }
 
 	UiTranslate(offset.x, offset.y)
 	

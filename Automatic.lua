@@ -806,10 +806,9 @@ end
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function AutoContainer(width, height, alignment, padding, clip, draw, spreadpad)
+function AutoContainer(width, height, padding, clip, draw, spreadpad)
 	width = AutoDefault(width, 300)
 	height = AutoDefault(height, 400)
-	alignment = AutoDefault(alignment, 'left top')
 	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
 	clip = AutoDefault(clip, false)
 	draw = AutoDefault(draw, true)
@@ -818,7 +817,6 @@ function AutoContainer(width, height, alignment, padding, clip, draw, spreadpad)
 	local paddingwidth = math.max(width - padding * 2, padding * 2)
 	local paddingheight = math.max(height - padding * 2, padding * 2)
 	
-	UiAlign(alignment)
 	UiWindow(width, height, false)
 
 	UiAlign('left top')

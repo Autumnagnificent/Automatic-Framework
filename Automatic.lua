@@ -33,11 +33,11 @@ end
 ---@param v number Input number
 ---@param increment number|nil The lowest increment. A Step of 1 will round the number to 1, A step of 5 will round it to the closest increment of 5, A step of 0.1 will round to the tenth. Default is 1
 ---@return number
-function AutoRound(v,increment)
+function AutoRound(v, increment)
 	increment = AutoDefault(increment, 1)
 	if increment == 0 then return v end
-	v = 1 / increment
-	return math.floor(v * v + 0.5) / v
+	s = 1 / increment
+	return math.floor(v * s + 0.5) / s
 end
 
 ---Maps a value from range a1-a2 to range b1-b2

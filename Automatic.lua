@@ -785,6 +785,9 @@ function AutoDrawTransform(transform, size, alpha, draw)
 	end
 end
 
+---Draws some Debug information about a body
+---@param body number
+---@param size number
 function AutoDrawBodyDebug(body, size)
 	local trans = GetBodyTransform(body)
 	AutoDrawTransform(trans, size)
@@ -795,6 +798,12 @@ function AutoDrawBodyDebug(body, size)
 	AutoTooltip(AutoRound(AutoSpeed(body), 0.001), trans.pos, 16, 0.35)
 end
 
+---Draws some text at a world position.
+---@param text string
+---@param position Vec
+---@param fontsize number
+---@param alpha number
+---@param bold boolean
 function AutoTooltip(text, position, fontsize, alpha, bold)
 	text = AutoDefault(text or "nil")
 	fontsize = AutoDefault(fontsize or 24)
@@ -869,7 +878,9 @@ AutoSecondaryColor = {0, 0, 0, 0.55}
 AutoFont = 'regular.ttf'
 local Stack = {}
 
-
+---Takes an alignment and returns a Vector representation.
+---@param alignment string
+---@return table
 function AutoAlignmentToPos(alignment)
 	v, y = 0, 0
 	if string.find(alignment, 'left') then v = -1 end
@@ -881,36 +892,49 @@ function AutoAlignmentToPos(alignment)
 	return {x = v, y = y}
 end
 
+---UiTranslate and UiAlign to the Center
 function AutoCenter()
 	UiTranslate(UiCenter(), UiMiddle())
 	UiAlign('center middle')
 end
 
+---The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
+---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadDown(padding)
 	table.insert(Stack, {type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
+---The next Auto Ui functions will be spread Up until AutoSpreadEnd() is called
+---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadUp(padding)
 	table.insert(Stack, {type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
+---The next Auto Ui functions will be spread Right until AutoSpreadEnd() is called
+---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadRight(padding)
 	table.insert(Stack, {type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
+---The next Auto Ui functions will be spread Left until AutoSpreadEnd() is called
+---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadLeft(padding)
 	table.insert(Stack, {type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin)})
 	UiPush()
 end
 
+---The next Auto Ui functions will be spread Verticlely across the Height of the Bounds until AutoSpreadEnd() is called
+---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
 function AutoSpreadVerticle(count)
 	table.insert(Stack, {type = 'spread', direction = 'verticle', length = UiHeight(), count = count})
 	UiPush()
 end
 
+---The next Auto Ui functions will be spread Horizontally across the Width of the Bounds until AutoSpreadEnd() is called
+---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
 function AutoSpreadHorizontal(count)
 	table.insert(Stack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 	UiPush()
@@ -942,6 +966,8 @@ function AutoSetSpread(Spread)
 	v = Spread
 end
 
+---Stop the last known Spread
+---@return table a table with information about the transformations used
 function AutoSpreadEnd()
 	local unitdata = {comb = { w = 0, h = 0 }, max = { w = 0, h = 0 }}
 	local Spread = AutoGetSpread()
@@ -967,7 +993,6 @@ function AutoSpreadEnd()
 		if count <= 1 then return unitdata end
 	end
 end
-
 
 function HandleSpread(gs, data, type, spreadpad)
 	spreadpad = AutoDefault(spreadpad, false)
@@ -997,7 +1022,14 @@ end
 ----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function AutoContainer(width, height, padding, clip, draw, spreadpad)
+---Create a Container with new bounds
+---@param width number
+---@param height number
+---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
+---@param clip boolean|nil Weather to clip stuff outside of the container, Default is false
+---@param draw boolean|nil Draws the container's backgorund, otherwise it will be invisible, Defualt is true
+---@return table containerdata
+function AutoContainer(width, height, padding, clip, draw)
 	width = AutoDefault(width, 300)
 	height = AutoDefault(height, 400)
 	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
@@ -1008,7 +1040,7 @@ function AutoContainer(width, height, padding, clip, draw, spreadpad)
 	local paddingwidth = math.max(width - padding * 2, padding * 2)
 	local paddingheight = math.max(height - padding * 2, padding * 2)
 	
-	UiWindow(width, height, false)
+	UiWindow(width, height, clip)
 
 	UiAlign('left top')
 	if draw then
@@ -1021,7 +1053,7 @@ function AutoContainer(width, height, padding, clip, draw, spreadpad)
 	hover = UiIsMouseInRect(UiWidth(), UiHeight())
 	
 	UiTranslate(padding, padding)
-	UiWindow(paddingwidth, paddingheight, clip)
+	UiWindow(paddingwidth, paddingheight, false)
 
 	local offset = { x = 0, y = 0 }
 
@@ -1030,6 +1062,15 @@ function AutoContainer(width, height, padding, clip, draw, spreadpad)
 	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
+---Creates a Button
+---@param name string
+---@param fontsize number
+---@param paddingwidth Amount of padding used Horizontally
+---@param paddingheight Amount of padding used Vertically
+---@param draw boolean Draws the Button
+---@param spreadpad boolean Adds padding when used with AutoSpread...()
+---@return boolean Pressed
+---@return table ButtonData
 function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad)
 	fontsize = AutoDefault(fontsize, 28)
 	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
@@ -1052,7 +1093,7 @@ function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad
 			hover = UiIsMouseInRect(padrw, padrh)
 			UiColor(unpack(AutoPrimaryColor))
 			
-		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoPrimaryColor))
+			UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoPrimaryColor))
 			pressed = UiTextButton(name, padrw, padrh)
 		end
 	UiPop()
@@ -1063,10 +1104,14 @@ function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad
 	return pressed, data
 end
 
+---Draws some Text
+---@param name string
+---@param fontsize number
+---@param draw boolean Draws the Text
+---@param spreadpad boolean Adds padding when used with AutoSpread...()
+---@return table TextData
 function AutoText(name, fontsize, draw, spreadpad)
 	fontsize = AutoDefault(fontsize, 28)
-	paddingwidth = AutoDefault(paddingwidth, AutoPad.none)
-	paddingheight = AutoDefault(paddingheight, AutoPad.none)
 	draw = AutoDefault(draw, true)
 	spreadpad = AutoDefault(spreadpad, true)
 
@@ -1079,7 +1124,7 @@ function AutoText(name, fontsize, draw, spreadpad)
 
 		if draw then
 			UiPush()
-				UiWindow(rw + paddingwidth * 2, rh + paddingheight * 2)
+				UiWindow(rw, rh)
 				AutoCenter()
 				
 				UiColor(unpack(AutoPrimaryColor))
@@ -1088,12 +1133,22 @@ function AutoText(name, fontsize, draw, spreadpad)
 		end
 	UiPop()
 
-	local data = { rect = { w = rw + paddingwidth * 2, h = rh + paddingheight * 2} }
+	local data = { rect = { w = rw, h = rh} }
 	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return data
 end
 
+---Creates a Slider
+---@param set number The Current Value
+---@param min number The Minimum
+---@param max number The Maximum
+---@param lockincrement number The increment
+---@param paddingwidth Amount of padding used Horizontally
+---@param paddingheight Amount of padding used Vertically
+---@param spreadpad boolean Adds padding when used with AutoSpread...()
+---@return number NewValue
+---@return table SliderData
 function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
@@ -1132,6 +1187,14 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 	return set, data
 end
 
+---Draws an Image
+---@param path string
+---@param width number
+---@param height number
+---@param alpha number
+---@param draw boolean Draws the Image
+---@param spreadpad boolean Adds padding when used with AutoSpread...()
+---@return table ImageData
 function AutoImage(path, width, height, alpha, draw, spreadpad)
 	local w, h = UiGetImageSize(path)
 	width = AutoDefault(width, (height == nil and UiWidth() or (height * (w / h))))
@@ -1155,6 +1218,8 @@ function AutoImage(path, width, height, alpha, draw, spreadpad)
 	return data
 end
 
+---Creates a handy little marker, doesnt effect anything, purely visual
+---@param size number, Default is 1
 function AutoMarker(size)
 	size = AutoDefault(size, 1) / 2
 	UiPush()

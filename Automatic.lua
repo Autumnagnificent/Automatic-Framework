@@ -444,20 +444,27 @@ end
 
 ---Copy a Table Recursivly Stolen from http://lua-users.org/wiki/CopyTable
 ---@param orig table
+---@param copies table
 ---@return table
-function AutoTableDeepCopy(orig)
-    local orig_type = type(orig)
-    local copy
-    if orig_type == 'table' then
-        copy = {}
-        for orig_key, orig_value in next, orig, nil do
-            copy[AutoTableDeepCopy(orig_key)] = AutoTableDeepCopy(orig_value)
-        end
-        setmetatable(copy, AutoTableDeepCopy(getmetatable(orig)))
-    else -- number, string, boolean, etc
-        copy = orig
-    end
-    return copy
+function AutoTableDeepCopy(orig, copies)
+	copies = copies or {}
+	local orig_type = type(orig)
+	local copy
+	if orig_type == 'table' then
+		if copies[orig] then
+			copy = copies[orig]
+		else
+			copy = {}
+			copies[orig] = copy
+			for orig_key, orig_value in next, orig, nil do
+				copy[AutoTableDeepCopy(orig_key, copies)] = AutoTableDeepCopy(orig_value, copies)
+			end
+			setmetatable(copy, AutoTableDeepCopy(getmetatable(orig), copies))
+		end
+	else -- number, string, boolean, etc
+		copy = orig
+	end
+	return copy
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -568,7 +575,7 @@ function AutoHSVToRGB(hue, sat, val)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Game-------------------------------------------------------------------------------------------------------------------------
+----------------Game Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Checks if a point is in the view using a transform acting as the "Camera"

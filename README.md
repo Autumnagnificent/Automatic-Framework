@@ -1,6 +1,6 @@
 # Automatic-Framework
 
-This is a Framework made to stop you from wasting your time, It contains more than alot.
+**This is a Framework made to stop you from wasting your time, It contains more than alot.**
 It has every function I have ever used that I deemed worthy enough to be included, its ever growing and will contuine to be added to. 
 Check out the Wiki for Every Single Function.
 

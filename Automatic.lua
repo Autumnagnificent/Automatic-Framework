@@ -346,6 +346,15 @@ function AutoBoundsSize(aa, bb)
 	return size, minval, maxval
 end
 
+---Draws the world space bounds between the given bounds
+---@param aa Vec Minimum Bound Corner
+---@param bb Vec Maximum Bound Corner
+---@param rgbcolors boolean|nil If the Minimum and Maximum corners are colorcoded representing the xyz axis colors, Default is false
+---@param hue number|nil 0 to 1 representing the hue of the lines, Default is 0
+---@param saturation number|nil 0 to 1 representing the saturation of the lines, Default is 0
+---@param value number|nil 0 to 1 representing the value of the lines, Default is 0
+---@param alpha number|nil the alpha of the lines, Default is 1
+---@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	rgbcolors = AutoDefault(rgbcolors, false)
@@ -482,7 +491,9 @@ function AutoSetReadOnly(t)
 	})
 end
 
--- Code donatated from @Dr. HypnoTox - Thankyou!
+---Code donatated from @Dr. HypnoTox - Thankyou! Turns a Table into a string
+---@param object any
+---@return string
 function AutoToString(object)
 	if object == nil then
 		return 'nil'
@@ -515,6 +526,10 @@ function AutoToString(object)
 	return toDump
 end
 
+---Splits a string by a separator
+---@param inputstr string
+---@param sep string
+---@return table
 function AutoSplit(inputstr, sep)
 	if sep == nil then
 		sep = "%s"
@@ -526,7 +541,16 @@ function AutoSplit(inputstr, sep)
 	return t
 end
 
+---Create a Vector in RGB color space from HSV color values
+---@param hue number|nil The hue, Default is 0
+---@param sat number|nil The saturation, Default is 1
+---@param val number|nil The value, Default is 1
+---@return Vec
 function AutoHSVToRGB(hue, sat, val)
+	hue = AutoDefault(hue, 0)
+	sat = AutoDefault(sat, 1)
+	val = AutoDefault(val, 1)
+	
 	local huer = hue + 0
 	local hueg = hue - 1/3
 	local hueb = hue + 1/3
@@ -540,13 +564,20 @@ function AutoHSVToRGB(hue, sat, val)
 	local out = AutoVecMap(vec, 0, AutoVecMax(vec), 0, val)
 	out = VecLerp(out, AutoVecOne(val), 1 - sat)
 	out = AutoVecClamp(out)
-	return AutoPrint(out)
+	return out
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Game-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---Checks if a point is in the view using a transform acting as the "Camera"
+---@param point Vec
+---@param fromtrans Transfrom|nil The Transform acting as the camera, Default is the Player's Camera
+---@param angle number|nil The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
+---@param raycastcheck boolean|nil Check to make sure that the point is not obscured, Default is true
+---@return boolean seen If the point is in View
+---@return number angle The Angle the point is away from the center of the looking direction
 function AutoPointInView(point, fromtrans, angle, raycastcheck)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
@@ -567,25 +598,10 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck)
 	return seen, dotangle
 end
 
-function AutoDrawOutlineBlink(entity, speed, time, red, green, blue, alphamulti)
-	speed = AutoDefault(speed, 1)
-	time = AutoDefault(time, GetTime)()
-	red = AutoDefault(red, 1)
-	green = AutoDefault(green, 1)
-	blue = AutoDefault(blue, 1)
-	alphamulti = AutoDefault(alphamulti, 1)
-
-	local t = (time * speed) % 2
-	local alpha = AutoLogistic(t, 1, -15, 0.4) * AutoLogistic(t, 1, 15, 1.4)
-
-	local type = GetEntityType(entity)
-	if type == 'body' then
-		DrawBodyOutline(entity, red, green, blue, alpha * alphamulti)
-	elseif type == 'shape' then
-		DrawShapeOutline(entity, red, green, blue, alpha * alphamulti)
-	end
-end
-
+---Get the last Path Query as a path of points
+---@param precision number The Accuracy
+---@return table
+---@return Vec "Last Point"
 function AutoRetrievePath(precision)
 	precision = AutoDefault(precision, 0.2)
 
@@ -600,12 +616,18 @@ function AutoRetrievePath(precision)
 	return path, path[#path]
 end
 
+---Reject a table of bodies for the next Query
+---@param bodies table
 function AutoQueryRejectBodies(bodies)
 	for i in pairs(bodies) do
 		QueryRejectBody(bodies[i])
 	end
 end
 
+---Set the collision filter for the shapes owned by a body
+---@param body number
+---@param layer number
+---@param masknummber number bitmask
 function AutoSetBodyCollisionFilter(body, layer, masknummber)
 	local shapes = GetBodyShapes(body)
 	for i in pairs(shapes) do
@@ -613,16 +635,29 @@ function AutoSetBodyCollisionFilter(body, layer, masknummber)
 	end
 end
 
+---Get the Center of Mass of a body in World space
+---@param body any
+---@return table
 function AutoWorldCenterOfMass(body)
 	local trans = GetBodyTransform(body)
 	local pos = TransformToParentPoint(trans, GetBodyCenterOfMass(body))
 	return pos
 end
 
+---Get the Total Speed of a body
+---@param body number
+---@return number
 function AutoSpeed(body)
 	return VecLength(GetBodyVelocity(body)) + VecLength(GetBodyAngularVelocity(body))
 end
 
+---Attempt to predict the position of a body in time
+---@param body number
+---@param time number
+---@param raycast boolean|nil Check and Halt on Collision, Default is false
+---@return table log
+---@return table vel
+---@return table normal
 function AutoPredictPosition(body, time, raycast)
 	raycast = AutoDefault(raycast, false)
 	local pos = AutoWorldCenterOfMass(body)
@@ -645,6 +680,12 @@ function AutoPredictPosition(body, time, raycast)
 	return log, vel, normal
 end
 
+---Attempt to predict the position of the player in time
+---@param time number
+---@param raycast boolean|nil Check and Halt on Collision, Default is false
+---@return table log
+---@return table vel
+---@return table normal
 function AutoPredictPlayerPosition(time, raycast)
 	raycast = AutoDefault(raycast, false)
 	local player = GetPlayerTransform(true)
@@ -674,35 +715,74 @@ end
 ----------------Showing Debug-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---A Alternative to DebugPrint that uses AutoToString(), works with tables. Returns the Input
+---@param ... any
+---@return unknown Arguments
 function AutoPrint(...)
 	arg.n = nil
 	DebugPrint(AutoToString(arg))
 	return unpack(arg)
 end
 
+---Prints 24 blank lines to quote on quote, "clear the console"
 function AutoClearConsole()
 	for i = 1, 24 do DebugPrint('') end
 end
 
-function AutoDrawPath(lines)
-	for i = 1, #lines - 1 do
-		local color = (lines[i].color + lines[i + 1].color) / 2
-		DebugLine(lines[i].pos, lines[i + 1].pos, color, 1 - color, 0.5 - color)
+---Draws a table of 
+---@param points any
+---@param huescale number|nil A multipler to the hue change, Default is 1
+---@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
+function AutoDrawLines(points, huescale, draw)
+	huescale = AutoDefault(huescale, 1)
+	draw = AutoDefault(draw, false)
+	
+	local lines = {}
+	local dist = 0
+	for i = 1, #points - 1 do
+		local color = AutoHSVToRGB(dist / 10 * huescale, 0.5, 1)
+		table.insert(lines, { points[i], points[i + 1], color[1], color[2], color[3], 1 })
+
+		dist = dist + AutoVecDist(points[i], points[i + 1])
+	end
+
+	for i, v in ipairs(lines) do
+		if draw then
+			DrawLine(unpack(v))
+		else
+			DebugLine(unpack(v))
+		end
 	end
 end
 
+---Draws a Transform
+---@param transform Transform
+---@param size number the size in meters, Default is 0.5
+---@param alpha number Default is 1
+---@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawTransform(transform, size, alpha, draw)
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
 	alpha = AutoDefault(alpha, 1)
+	draw = AutoDefault(draw, false)
 
 	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
 	local up = TransformToParentPoint(transform, Vec(0, size, 0))
 	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
-	local lines = {}
-	DebugLine(transform.pos, right, 1, 0, 0, alpha)
-	DebugLine(transform.pos, up, 0, 1, 0, alpha)
-	DebugLine(transform.pos, forward, 0, 0, 1, alpha)
+
+	local lines = {
+		{ transform.pos, right, 1, 0, 0, alpha },
+		{ transform.pos, up, 0, 1, 0, alpha },
+		{ transform.pos, forward, 0, 0, 1, alpha },
+	}
+
+	for i, v in ipairs(lines) do
+		if draw then
+			DrawLine(unpack(v))
+		else
+			DebugLine(unpack(v))
+		end
+	end
 end
 
 function AutoDrawBodyDebug(body, size)

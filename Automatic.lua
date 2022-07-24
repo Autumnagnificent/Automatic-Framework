@@ -26,7 +26,8 @@ function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
 	v = AutoLogistic(v, max, steep, offset)
 	local a = AutoLogistic(rangemin, max, steep, offset)
 	local b = AutoLogistic(rangemax, max, steep, offset)
-	return AutoMap(v, a, b, 0, 1)
+	local mapped = AutoMap(v, a, b, 0, 1)
+	return AutoClamp(mapped, 0, 1)
 end
 
 ---This was a Challenge by @TallTim and @1ssnl to make the smallest rounding function, but I expanded it to make it easier to read and a little more efficent
@@ -67,6 +68,20 @@ function AutoClamp(v, min, max)
 	else
 		return v
 	end
+end
+
+---Wraps a value inbetween a range
+---@param v number The number to wrap
+---@param min number|nil The minimum range
+---@param max number|nil The maximum range
+---@return number
+function AutoWrap(v, min, max)
+	min = AutoDefault(min, 0)
+	max = AutoDefault(max, 1)
+
+	AutoMap(v, min, max, 0, 1)
+	v = v % 1
+	return AutoMap(v, 0, 1, min, max)
 end
 
 ---Lerp function, Is not clamped meaning it if t is above 1 then it will 'overshoot'
@@ -157,7 +172,7 @@ end
 ---@param min number|nil The minimum the magnitude can be, Default is 0
 ---@param max number|nil The maximum the magnitude can be, Default is 1
 ---@return Vec
-function AutoVecClamp(v, min, max)
+function AutoVecClampMagnitude(v, min, max)
 	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
 	local l = VecLength(v)
 	if l > max then
@@ -167,6 +182,20 @@ function AutoVecClamp(v, min, max)
 	else
 		return v
 	end
+end
+
+---Limits a vector to be between min and max
+---@param v Vec The Vector to clamp
+---@param min number|nil The minimum, Default is 0
+---@param max number|nil The maximum, Default is 1
+---@return Vec
+function AutoVecClamp(v, min, max)
+	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
+	return {
+		AutoClamp(v[1], min, max),
+		AutoClamp(v[2], min, max),
+		AutoClamp(v[3], min, max)
+	}
 end
 
 ---Return Vec(1, 1, 1) scaled by length
@@ -188,8 +217,18 @@ function AutoVecMulti(a, b)
 	}
 end
 
-function AutoVecSubsituteY(v, y)
-	return Vec(v[1], y, v[3])
+---Equivalent to math.min(unpack(v))
+---@param v Vec
+---@return number
+function AutoVecMin(v)
+	return math.min(unpack(v))
+end
+
+---Equivalent to math.max(unpack(v))
+---@param v Vec
+---@return number
+function AutoVecMax(v)
+	return math.max(unpack(v))
 end
 
 ---Return Vec v with it's x value replaced by subx
@@ -244,9 +283,11 @@ end
 ---Get a position inside or on the Input Bounds
 ---@param aa Vec Minimum Bound Corner
 ---@param bb Vec Maximum Bound Corner
----@param vec Vec A normalized Vector pointing towards the position that should be retrieved
+---@param vec Vec|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
 ---@return Vec
 function AutoBoundsGetPos(aa, bb, vec)
+	vec = AutoDefault(vec, Vec(0,0,0))
+
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	vec = AutoVecMap(vec, -1, 1, 0, 1)
 	local sizevec = VecSub(bb, aa)
@@ -303,6 +344,57 @@ function AutoBoundsSize(aa, bb)
 	local maxval = math.min(unpack(size))
 
 	return size, minval, maxval
+end
+
+function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
+	aa, bb = AutoBoundsCorrection(aa, bb)
+	rgbcolors = AutoDefault(rgbcolors, false)
+
+	hue = AutoDefault(hue, 0)
+	saturation = AutoDefault(saturation, 0)
+	value = AutoDefault(value, 0)
+	alpha = AutoDefault(alpha, 1)
+	
+	draw = AutoDefault(draw, false)
+
+	local color = AutoHSVToRGB(hue, saturation, value)
+
+	min, max = {
+		[1] = Vec(aa[1], aa[2], aa[3]),
+		[2] = Vec(bb[1], aa[2], aa[3]),
+		[3] = Vec(bb[1], aa[2], bb[3]),
+		[4] = Vec(aa[1], aa[2], bb[3]),
+	}, {
+		[1] = Vec(aa[1], bb[2], aa[3]),
+		[2] = Vec(bb[1], bb[2], aa[3]),
+		[3] = Vec(bb[1], bb[2], bb[3]),
+		[4] = Vec(aa[1], bb[2], bb[3]),
+	}
+
+	-- This code made me want to give up
+	local lines = {
+		{ min[2], min[3], color[1], color[2], color[3], alpha },
+		{ min[3], min[4], color[1], color[2], color[3], alpha },
+		{ max[1], max[2], color[1], color[2], color[3], alpha },
+		{ max[4], max[1], color[1], color[2], color[3], alpha },
+		{ min[2], max[2], color[1], color[2], color[3], alpha },
+		{ min[4], max[4], color[1], color[2], color[3], alpha },
+
+		{ min[1], min[2], rgbcolors and 1 or color[1], rgbcolors and 0 or color[2], rgbcolors and 0 or color[3], alpha },
+		{ max[2], max[3], rgbcolors and 0 or color[1], rgbcolors and 1 or color[2], rgbcolors and 0 or color[3], alpha },
+		{ max[3], max[4], rgbcolors and 1 or color[1], rgbcolors and 0 or color[2], rgbcolors and 0 or color[3], alpha },
+		{ min[1], max[1], rgbcolors and 0 or color[1], rgbcolors and 0 or color[2], rgbcolors and 1 or rgbcolors and 0 or color[3], alpha },
+		{ min[3], max[3], rgbcolors and 0 or color[1], rgbcolors and 0 or color[2], rgbcolors and 1 or rgbcolors and 0 or color[3], alpha },
+		{ min[4], min[1], rgbcolors and 0 or color[1], rgbcolors and 1 or color[2], rgbcolors and 0 or color[3], alpha },
+	}
+
+	for i, v in ipairs(lines) do
+		if draw then
+			DrawLine(unpack(v))
+		else
+			DebugLine(unpack(v))
+		end
+	end
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -404,13 +496,13 @@ function AutoToString(object)
 
 	for k, v in pairs(object) do
 		if (type(k) == 'number') then
-			toDump = toDump .. '[' .. k .. '] = '
+			toDump = toDump .. '[' .. AutoRound(k, 0.00001) .. '] = '
 		elseif (type(k) == 'string') then
 			toDump = toDump .. k .. '= '
 		end
 
 		if (type(v) == 'number') then
-			toDump = toDump .. v .. ','
+			toDump = toDump .. AutoRound(v, 0.00001) .. ','
 		elseif (type(v) == 'string') then
 			toDump = toDump .. '\'' .. v .. '\', '
 		else
@@ -423,9 +515,57 @@ function AutoToString(object)
 	return toDump
 end
 
+function AutoSplit(inputstr, sep)
+	if sep == nil then
+		sep = "%s"
+	end
+	local t = {}
+	for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+		table.insert(t, str)
+	end
+	return t
+end
+
+function AutoHSVToRGB(hue, sat, val)
+	local huer = hue + 0
+	local hueg = hue - 1/3
+	local hueb = hue + 1/3
+	
+	local r = AutoClamp((3 * math.abs(AutoWrap(huer, 0, 2) - 1) - 1))
+	local g = AutoClamp((3 * math.abs(AutoWrap(hueg, 0, 2) - 1) - 1))
+	local b = AutoClamp((3 * math.abs(AutoWrap(hueb, 0, 2) - 1) - 1))
+
+	local vec = Vec(r, g, b)
+	
+	local out = AutoVecMap(vec, 0, AutoVecMax(vec), 0, val)
+	out = VecLerp(out, AutoVecOne(val), 1 - sat)
+	out = AutoVecClamp(out)
+	return AutoPrint(out)
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Game-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoPointInView(point, fromtrans, angle, raycastcheck)
+	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
+	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
+	raycastcheck = AutoDefault(raycastcheck, true)
+
+	local fromtopointdir = VecNormalize(VecSub(point, fromtrans.pos))
+	local fromdir = TransformToParentVec(fromtrans, Vec(0, 0, -1))
+
+	local dot = VecDot(fromtopointdir, fromdir)
+	local dotangle = math.deg(math.acos(dot))
+	local seen = dotangle < angle/2
+
+	if raycastcheck then
+		local hit = QueryRaycast(fromtrans.pos, fromtopointdir, AutoVecDist(fromtrans.pos, point), 0, true)
+		if hit then return false end
+	end
+
+	return seen, dotangle
+end
 
 function AutoDrawOutlineBlink(entity, speed, time, red, green, blue, alphamulti)
 	speed = AutoDefault(speed, 1)
@@ -551,7 +691,7 @@ function AutoDrawPath(lines)
 	end
 end
 
-function AutoDrawTransform(transform, size, alpha)
+function AutoDrawTransform(transform, size, alpha, draw)
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
 	alpha = AutoDefault(alpha, 1)
@@ -559,6 +699,7 @@ function AutoDrawTransform(transform, size, alpha)
 	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
 	local up = TransformToParentPoint(transform, Vec(0, size, 0))
 	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
+	local lines = {}
 	DebugLine(transform.pos, right, 1, 0, 0, alpha)
 	DebugLine(transform.pos, up, 0, 1, 0, alpha)
 	DebugLine(transform.pos, forward, 0, 0, 1, alpha)
@@ -574,62 +715,30 @@ function AutoDrawBodyDebug(body, size)
 	AutoTooltip(AutoRound(AutoSpeed(body), 0.001), trans.pos, 16, 0.35)
 end
 
-function AutoDrawBounds(aa, bb, rgbcolors, brightness, alpha)
-	aa, bb = AutoBoundsCorrection(aa, bb)
-	brightness = AutoDefault(brightness, 1)
-	alpha = AutoDefault(alpha, 1)
-	rgbcolors = AutoDefault(rgbcolors, false)
-
-	min, max = {
-		[1] = Vec(aa[1], aa[2], aa[3]),
-		[2] = Vec(bb[1], aa[2], aa[3]),
-		[3] = Vec(bb[1], aa[2], bb[3]),
-		[4] = Vec(aa[1], aa[2], bb[3]),
-	}, {
-		[1] = Vec(aa[1], bb[2], aa[3]),
-		[2] = Vec(bb[1], bb[2], aa[3]),
-		[3] = Vec(bb[1], bb[2], bb[3]),
-		[4] = Vec(aa[1], bb[2], bb[3]),
-	}
-
-	-- This code made me want to give up
-	DebugLine(min[2], min[3], brightness, brightness, brightness, alpha)
-	DebugLine(min[3], min[4], brightness, brightness, brightness, alpha)
-	DebugLine(max[1], max[2], brightness, brightness, brightness, alpha)
-	DebugLine(max[4], max[1], brightness, brightness, brightness, alpha)
-	DebugLine(min[2], max[2], brightness, brightness, brightness, alpha)
-	DebugLine(min[4], max[4], brightness, brightness, brightness, alpha)
-
-	DebugLine(min[1], min[2], rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, alpha)
-	DebugLine(max[2], max[3], rgbcolors and 0 or brightness, rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, alpha)
-	DebugLine(max[3], max[4], rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, alpha)
-	DebugLine(min[1], max[1], rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, rgbcolors and 1 or rgbcolors and 0 or brightness, alpha)
-	DebugLine(min[3], max[3], rgbcolors and 0 or brightness, rgbcolors and 0 or brightness, rgbcolors and 1 or rgbcolors and 0 or brightness, alpha)
-	DebugLine(min[4], min[1], rgbcolors and 0 or brightness, rgbcolors and 1 or brightness, rgbcolors and 0 or brightness, alpha)
-
-end
-
 function AutoTooltip(text, position, fontsize, alpha, bold)
 	text = AutoDefault(text or "nil")
 	fontsize = AutoDefault(fontsize or 24)
 	alpha = AutoDefault(alpha or 0.75)
 	bold = AutoDefault(bold or false)
 
+	if not AutoPointInView(position, nil, nil, false) then return end
+
 	UiPush()
-	UiAlign('center middle')
-	local x, y = UiWorldToPixel(position)
-	UiTranslate(x, y)
-	UiWordWrap(UiMiddle())
+		UiAlign('center middle')
+		local x, y = UiWorldToPixel(position)
+		UiTranslate(x, y)
+		UiWordWrap(UiMiddle())
 
-	UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
-	UiColor(0, 0, 0, 0)
-	local rw, rh = UiText(text)
+		UiFont(bold and "bold.ttf" or "regular.ttf", fontsize)
+		UiColor(0, 0, 0, 0)
+		local rw, rh = UiText(text)
 
-	UiColor(0, 0, 0, alpha)
-	UiRect(rw, rh)
+		UiColorFilter(1, 1, 1, alpha)
+		UiColor(unpack(AutoSecondaryColor))
+		UiRect(rw, rh)
 
-	UiColor(unpack(AutoPrimaryColor))
-	UiText(text)
+		UiColor(unpack(AutoPrimaryColor))
+		UiText(text)
 	UiPop()
 end
 
@@ -677,6 +786,7 @@ setmetatable(AutoPad, { __call = function (t, padding) UiTranslate(padding, padd
 AutoPrimaryColor = {0.95, 0.95, 0.95, 1}
 AutoSpecialColor = {1, 1, 0.55, 1}
 AutoSecondaryColor = {0, 0, 0, 0.55}
+AutoFont = 'regular.ttf'
 local Stack = {}
 
 
@@ -849,7 +959,7 @@ function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad
 
 	UiPush()
 		UiWordWrap(UiWidth() - AutoPad.thick)
-		UiFont("regular.ttf", fontsize)
+		UiFont(AutoFont, fontsize)
 		UiButtonHoverColor(unpack(AutoSpecialColor))
 		UiButtonPressColor(0.75, 0.75, 0.75, 1)
 		UiButtonPressDist(0.25)
@@ -882,7 +992,7 @@ function AutoText(name, fontsize, draw, spreadpad)
 
 	UiPush()
 		UiWordWrap(UiWidth() - AutoPad.thick)
-		UiFont("regular.ttf", fontsize)
+		UiFont(AutoFont, fontsize)
 
 		UiColor(0, 0, 0, 0)
 		local rw, rh = UiText(name)

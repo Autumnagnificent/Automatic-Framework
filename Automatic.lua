@@ -1,3 +1,6 @@
+-- VERSION 1.01
+-- I ask that you please do not rename Automatic.lua - Thankyou
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1072,8 +1075,8 @@ end
 ---Creates a Button
 ---@param name string
 ---@param fontsize number
----@param paddingwidth Amount of padding used Horizontally
----@param paddingheight Amount of padding used Vertically
+---@param paddingwidth number Amount of padding used Horizontally
+---@param paddingheight number Amount of padding used Vertically
 ---@param draw boolean Draws the Button
 ---@param spreadpad boolean Adds padding when used with AutoSpread...()
 ---@return boolean Pressed

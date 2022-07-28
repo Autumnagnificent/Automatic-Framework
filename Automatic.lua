@@ -220,6 +220,53 @@ function AutoVecMulti(a, b)
 	}
 end
 
+---Return Vec a divided by Vec b
+---@param a Vec
+---@param b Vec
+---@return Vec
+function AutoVecDiv(a, b)
+	return {
+		a[1] / b[1],
+		a[2] / b[2],
+		a[3] / b[3],
+	}
+end
+
+---Return Vec a to the Power of b
+---@param a Vec
+---@param b number
+---@return Vec
+function AutoVecPow(a, b)
+	return {
+		a[1] ^ b,
+		a[2] ^ b,
+		a[3] ^ b,
+	}
+end
+
+---Return Vec a to the Power of Vec b
+---@param a Vec
+---@param b Vec
+---@return Vec
+function AutoVecPowVec(a, b)
+	return {
+		a[1] ^ b[1],
+		a[2] ^ b[2],
+		a[3] ^ b[3],
+	}
+end
+
+---Return Vec Absoulte Value
+---@param v Vec
+---@return Vec
+function AutoVecAbs(v)
+	return {
+		math.abs(v[1]),
+		math.abs(v[2]),
+		math.abs(v[3]),
+	}
+end
+
 ---Equivalent to math.min(unpack(v))
 ---@param v Vec
 ---@return number
@@ -410,6 +457,110 @@ function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Point Physics------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AutoSimulation = {}
+AutoSimulationSettings = {
+	Gravity = -20,
+	drag = 0.15
+}
+
+---Creates a Point to be Simulated with AutoSimulatePoints(). After using AutoCreatePoint(), you can can also add parameters and change existing ones, such as point.reflectivity, and point.mass
+---@param Position Vec|nil Default is Vec(0, 0, 0)
+---@param Velocity Vec|nil Default is Vec(0, 0, 0)
+---@param Radius number|nil Default is 0
+---@param Collision boolean|nil If the point should check for collision. Default is true
+---@param Simulated boolean|nil If the point is simulated. Default is true
+---@return point table
+function AutoCreatePoint(Position, Velocity, Radius, Collision, Simulated)
+	local newpoint = {}
+	newpoint.pos = AutoDefault(Position, {0, 0, 0})
+	newpoint.vel = AutoDefault(Velocity, {0, 0, 0})
+	newpoint.acc = Vec(0, 0, 0)
+
+	newpoint.radius = AutoDefault(Radius, 0)
+	newpoint.mass = 1
+	newpoint.reflectivity = 0
+
+	newpoint.collision = AutoDefault(Collision, true)
+	newpoint.simulated = AutoDefault(Simulated, true)
+
+	AutoSimulation[#AutoSimulation+1] = newpoint
+	return newpoint
+end
+
+function AutoSimulatePoints(dt)
+	dt = AutoDefault(dt, GetTimeStep())
+
+	for i, v in ipairs(AutoSimulation) do
+		if v.simulated then
+			local new_pos = VecAdd(VecAdd(v.pos, VecScale(v.vel, dt)), VecScale(v.acc, dt ^ 2 * 0.5))
+			local new_acc = (function ()
+				local grav_acc = Vec(0, AutoSimulationSettings.Gravity, 0)
+				local drag_force = VecScale(VecScale(v.vel, VecLength(v.vel)), 0.5 * AutoSimulationSettings.drag)
+				local drag_acc = AutoVecDiv(drag_force, AutoVecOne(v.mass))
+				return VecSub(grav_acc, drag_acc)
+			end)()
+			local new_vel = VecAdd(v.vel, VecScale(VecAdd(v.acc, new_acc), dt * 0.5))
+	
+			if v.collision then
+				local diff = VecSub(new_pos, v.pos)
+				local maxdist = VecLength(diff) + v.radius
+				local hit, point, normal = QueryClosestPoint(new_pos, maxdist)
+				if hit then
+					new_pos = v.pos
+					new_vel = VecScale(VecSub(new_vel, VecScale(normal, VecDot(new_vel, normal) * 2)), v.reflectivity)
+
+					if type(v.collision) == "function" then
+						v.collision(v, i, point)
+					end
+				end
+			end
+			
+			v.pos = new_pos
+			v.vel = new_vel
+			v.acc = new_acc
+		end
+	end
+end
+
+function AutoSimulationDo(func)
+	for i, v in ipairs(AutoSimulation) do
+		func(v, i)
+	end
+end
+
+function AutoDrawSimulation(sizemultiplyer, Occlude, DebugDrawMode)
+	Occlude = AutoDefault(Occlude, true)
+	sizemultiplyer = AutoDefault(sizemultiplyer, 3.5)
+	DebugDrawMode = AutoDefault(DebugDrawMode, false)
+
+	local path = 'ui/common/dot.png'
+	
+	for i, v in ipairs(AutoSimulation) do
+		if DebugDrawMode then
+			AutoDrawTransform(Transform(v.pos), sizemultiplyer * v.radius)
+		else
+			if AutoPointInView(v.pos, nil, nil, Occlude) then
+				UiPush()
+					local x, y = UiWorldToPixel(v.pos)
+					local size = 1 / AutoVecDist(GetCameraTransform().pos, v.pos) * sizemultiplyer
+					if v.color then UiColor(v.color[1], v.color[2], v.color[3], v.color[4]) end
+					UiAlign('center middle')
+					UiTranslate(x, y)
+					
+					UiScale(size)
+					-- UiRect(size, size)
+					UiImage(path)
+				UiPop()
+			end
+		end
+	end
+end
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Table Functions------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -484,9 +635,11 @@ end
 
 ---Returns a Vector for easy use when put into a parameter for xml
 ---@param vec any
+---@param round number
 ---@return string
-function AutoVecToXML(vec)
-	return vec[1] .. ' ' .. vec[2] .. ' ' .. vec[3]
+function AutoVecToXML(vec, round)
+	round = AutoDefault(round, 0)
+	return AutoRound(vec[1], round) .. ' ' .. AutoRound(vec[2], round) .. ' ' .. AutoRound(vec[3], round)
 end
 
 ---A workaround to making a table readonly, don't use, it most likely is bugged in someway
@@ -606,6 +759,13 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck)
 	end
 
 	return seen, dotangle
+end
+
+function AutoPlayerInputDir(length)
+	return {
+		x = (InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
+		y = (InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
+	}
 end
 
 ---Get the last Path Query as a path of points

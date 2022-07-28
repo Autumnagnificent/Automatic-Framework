@@ -208,6 +208,10 @@ function AutoVecOne(length)
 	return VecScale(Vec(1,1,1), length)
 end
 
+function AutoVecMidpoint(a, b)
+	return VecScale(VecAdd(a, b), 0.5)
+end
+
 ---Return Vec a multiplied by Vec b
 ---@param a Vec
 ---@param b Vec
@@ -461,9 +465,13 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 AutoSimulation = {}
-AutoSimulationSettings = {
-	Gravity = -20,
-	drag = 0.15
+AutoSimulation.Points = {}
+AutoSimulation.Joints = {}
+AutoSimSettings = {
+	Gravity = -10,
+	Drag = 0.0,
+	PointsAffectBodies = true,
+	JointIterations = 64
 }
 
 ---Creates a Point to be Simulated with AutoSimulatePoints(). After using AutoCreatePoint(), you can can also add parameters and change existing ones, such as point.reflectivity, and point.mass
@@ -472,73 +480,114 @@ AutoSimulationSettings = {
 ---@param Radius number|nil Default is 0
 ---@param Collision boolean|nil If the point should check for collision. Default is true
 ---@param Simulated boolean|nil If the point is simulated. Default is true
----@return point table
-function AutoCreatePoint(Position, Velocity, Radius, Collision, Simulated)
-	local newpoint = {}
-	newpoint.pos = AutoDefault(Position, {0, 0, 0})
-	newpoint.vel = AutoDefault(Velocity, {0, 0, 0})
-	newpoint.acc = Vec(0, 0, 0)
+---@return table point
+---@return number index
+function AutoSimPoint(Position, Velocity, Radius, Collision, Simulated)
+	local new_point = {}
+	new_point.pos = AutoDefault(Position, {0, 0, 0})
+	new_point.vel = AutoDefault(Velocity, {0, 0, 0})
+	new_point.acc = Vec(0, 0, 0)
 
-	newpoint.radius = AutoDefault(Radius, 0)
-	newpoint.mass = 1
-	newpoint.reflectivity = 0
+	new_point.radius = AutoDefault(Radius, 0)
+	new_point.mass = 1
+	new_point.reflectivity = 0
 
-	newpoint.collision = AutoDefault(Collision, true)
-	newpoint.simulated = AutoDefault(Simulated, true)
+	new_point.collision = AutoDefault(Collision, true)
+	new_point.simulated = AutoDefault(Simulated, true)
 
-	AutoSimulation[#AutoSimulation+1] = newpoint
-	return newpoint
+	local new_index = #AutoSimulation.Points+1
+	AutoSimulation.Points[new_index] = new_point
+	return new_point, new_index
+end
+
+function AutoCreateJoint(A, B, Distance)
+	if not (A and B) then return end
+
+	local new_joint = {}
+	new_joint.pointA = A
+	new_joint.pointB = B
+
+	new_joint.distance = AutoDefault(Distance, AutoVecDist(A.pos, B.pos))
+
+	local new_index = #AutoSimulation.Joints + 1
+	AutoSimulation.Joints[new_index] = new_joint
+	return new_joint, new_index
 end
 
 function AutoSimulatePoints(dt)
 	dt = AutoDefault(dt, GetTimeStep())
-
-	for i, v in ipairs(AutoSimulation) do
-		if v.simulated then
-			local new_pos = VecAdd(VecAdd(v.pos, VecScale(v.vel, dt)), VecScale(v.acc, dt ^ 2 * 0.5))
+	
+	-- Update Points
+	for i, p in ipairs(AutoSimulation.Points) do
+		if p.simulated then
+			local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
 			local new_acc = (function ()
-				local grav_acc = Vec(0, AutoSimulationSettings.Gravity, 0)
-				local drag_force = VecScale(VecScale(v.vel, VecLength(v.vel)), 0.5 * AutoSimulationSettings.drag)
-				local drag_acc = AutoVecDiv(drag_force, AutoVecOne(v.mass))
+				local grav_acc = Vec(0, AutoSimSettings.Gravity, 0)
+				local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * AutoSimSettings.Drag)
+				local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
 				return VecSub(grav_acc, drag_acc)
 			end)()
-			local new_vel = VecAdd(v.vel, VecScale(VecAdd(v.acc, new_acc), dt * 0.5))
+			local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
 	
-			if v.collision then
-				local diff = VecSub(new_pos, v.pos)
-				local maxdist = VecLength(diff) + v.radius
-				local hit, point, normal = QueryClosestPoint(new_pos, maxdist)
+			if p.collision then
+				local diff = VecSub(new_pos, p.pos)
+				local maxdist = VecLength(diff) + p.radius
+				local hit, point, normal, shape = QueryClosestPoint(new_pos, maxdist)
 				if hit then
-					new_pos = v.pos
-					new_vel = VecScale(VecSub(new_vel, VecScale(normal, VecDot(new_vel, normal) * 2)), v.reflectivity)
+					new_pos = p.pos
+					new_vel = VecScale(VecSub(new_vel, VecScale(normal, VecDot(new_vel, normal) * 2)), p.reflectivity)
 
-					if type(v.collision) == "function" then
-						v.collision(v, i, point)
+					if AutoSimSettings.PointsAffectBodies then
+						ApplyBodyImpulse(GetShapeBody(shape), point, VecScale(p.vel, (1 - p.reflectivity) * p.mass))
+					end
+
+					if type(p.collision) == "function" then
+						p.collision(p, i, point, shape)
 					end
 				end
 			end
 			
-			v.pos = new_pos
-			v.vel = new_vel
-			v.acc = new_acc
+			p.pos = new_pos
+			p.vel = new_vel
+			p.acc = new_acc
+		end
+	end
+
+	-- Update Joints
+	for i, j in ipairs(AutoSimulation.Joints) do
+		-- if j.pointA.pos == nil or j.pointB.pos == nil then
+		-- 	table.remove(AutoSimulation.Joints, i)
+		-- 	AutoPrint('AAAAAAAAAAAAAAA')
+		-- end
+
+		for step = 0, AutoSimSettings.JointIterations do
+			local midpoint = AutoVecMidpoint(j.pointA.pos, j.pointB.pos)
+			local dir = VecNormalize(VecSub(j.pointA.pos, j.pointB.pos))
+
+			if j.pointA.simulated then
+				j.pointA.pos = VecAdd(midpoint, VecScale(dir, (j.distance / 2)))
+			end
+			if j.pointB.simulated then
+				j.pointB.pos = VecSub(midpoint, VecScale(dir, (j.distance / 2)))
+			end
 		end
 	end
 end
 
 function AutoSimulationDo(func)
-	for i, v in ipairs(AutoSimulation) do
+	for i, v in ipairs(AutoSimulation.Points) do
 		func(v, i)
 	end
 end
 
-function AutoDrawSimulation(sizemultiplyer, Occlude, DebugDrawMode)
+function AutoDrawSimulationPoints(sizemultiplyer, Occlude, DebugDrawMode)
 	Occlude = AutoDefault(Occlude, true)
 	sizemultiplyer = AutoDefault(sizemultiplyer, 3.5)
 	DebugDrawMode = AutoDefault(DebugDrawMode, false)
 
 	local path = 'ui/common/dot.png'
 	
-	for i, v in ipairs(AutoSimulation) do
+	for i, v in ipairs(AutoSimulation.Points) do
 		if DebugDrawMode then
 			AutoDrawTransform(Transform(v.pos), sizemultiplyer * v.radius)
 		else
@@ -559,6 +608,16 @@ function AutoDrawSimulation(sizemultiplyer, Occlude, DebugDrawMode)
 	end
 end
 
+function AutoDrawSimulationJoints()
+	for i, j in ipairs(AutoSimulation.Joints) do
+		color = {
+			j.pointA.color[1] + j.pointB.color[1] / 2,
+			j.pointA.color[2] + j.pointB.color[2] / 2,
+			j.pointA.color[3] + j.pointB.color[3] / 2,
+		}
+		DrawLine(j.pointA.pos, j.pointB.pos, unpack(color), 1)
+	end
+end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Table Functions------------------------------------------------------------------------------------------------------------------------

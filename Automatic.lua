@@ -1,4 +1,5 @@
--- VERSION 1.01
+-- VERSION 1.10
+-- POINT PHYSICS UPDATE!!!
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -469,7 +470,6 @@ AutoSimSettings = {
 	Gravity = -10,
 	Drag = 0.0,
 	PointsAffectBodies = true,
-	JointIterations = 64
 }
 
 ---Creates a Point to be Simulated with AutoSimulatePoints(). After using AutoCreatePoint(), you can can also add parameters and change existing ones, such as point.reflectivity, and point.mass
@@ -515,14 +515,15 @@ function AutoSimulatePoints(dt)
 	
 			if p.collision then
 				local diff = VecSub(new_pos, p.pos)
-				local maxdist = VecLength(diff) + p.radius
-				local hit, point, normal, shape = QueryClosestPoint(new_pos, maxdist)
+				local dir = VecNormalize(diff)
+				local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
 				if hit then
-					local dist = AutoVecDist(p.pos, point)
+					local point = VecAdd(new_pos, VecScale(dir, dist))
 
-					new_pos = VecAdd(VecScale(diff, dist), p.pos)
+					new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
 					local dot = VecDot(new_vel, normal)
 					new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
+					new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
 					
 					if AutoSimSettings.PointsAffectBodies then
 						ApplyBodyImpulse(GetShapeBody(shape), point, VecScale(p.vel, (1 - p.reflectivity) * p.mass))
@@ -532,15 +533,15 @@ function AutoSimulatePoints(dt)
 						p.collision(p, i, point, shape, dot, dt)
 					end
 				end
-
-				if type(p.simulated) == "function" then
-					p.simulated(p, i, dt)
-				end
 			end
 			
 			p.pos = new_pos
 			p.vel = new_vel
 			p.acc = new_acc
+
+			if type(p.simulated) == "function" then
+				p.simulated(p, i, dt)
+			end
 		end
 	end
 end

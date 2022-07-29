@@ -408,7 +408,7 @@ end
 ---@param saturation number|nil 0 to 1 representing the saturation of the lines, Default is 0
 ---@param value number|nil 0 to 1 representing the value of the lines, Default is 0
 ---@param alpha number|nil the alpha of the lines, Default is 1
----@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
+---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
 	aa, bb = AutoBoundsCorrection(aa, bb)
 	rgbcolors = AutoDefault(rgbcolors, false)
@@ -924,7 +924,7 @@ end
 ---Draws a table of 
 ---@param points any
 ---@param huescale number|nil A multipler to the hue change, Default is 1
----@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
+---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawLines(points, huescale, draw)
 	huescale = AutoDefault(huescale, 1)
 	draw = AutoDefault(draw, false)
@@ -951,7 +951,7 @@ end
 ---@param transform Transform
 ---@param size number the size in meters, Default is 0.5
 ---@param alpha number Default is 1
----@param draw boolean|nil weather to use DebugLine or DrawLine, Default is false (DebugLine)
+---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawTransform(transform, size, alpha, draw)
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
@@ -1218,7 +1218,7 @@ end
 ---@param width number
 ---@param height number
 ---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
----@param clip boolean|nil Weather to clip stuff outside of the container, Default is false
+---@param clip boolean|nil Whether  to clip stuff outside of the container, Default is false
 ---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Defualt is true
 ---@return table containerdata
 function AutoContainer(width, height, padding, clip, draw)

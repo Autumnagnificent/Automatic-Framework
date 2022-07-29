@@ -1,5 +1,4 @@
 -- VERSION 1.10
--- POINT PHYSICS UPDATE!!!
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -480,7 +479,7 @@ AutoSimSettings = {
 ---@param Simulated boolean|nil If the point is simulated. Default is true
 ---@return table point
 ---@return number index
-function AutoSimPoint(Position, Velocity, Radius, Collision, Simulated)
+function AutoSimCreatePoint(Position, Velocity, Radius, Collision, Simulated)
 	local new_point = {}
 	new_point.pos = AutoDefault(Position, {0, 0, 0})
 	new_point.vel = AutoDefault(Velocity, {0, 0, 0})
@@ -498,7 +497,7 @@ function AutoSimPoint(Position, Velocity, Radius, Collision, Simulated)
 	return new_point, new_index
 end
 
-function AutoSimulatePoints(dt)
+function AutoSimUpdate(dt)
 	dt = AutoDefault(dt, GetTimeStep())
 	
 	-- Update Points
@@ -546,13 +545,13 @@ function AutoSimulatePoints(dt)
 	end
 end
 
-function AutoSimulationDo(func)
+function AutoSimDo(func)
 	for i, v in ipairs(AutoSimulation) do
 		func(v, i)
 	end
 end
 
-function AutoDrawSimulationPoints(sizemultiplyer, Occlude, DebugDrawMode)
+function AutoSimDraw(sizemultiplyer, Occlude, DebugDrawMode)
 	Occlude = AutoDefault(Occlude, true)
 	sizemultiplyer = AutoDefault(sizemultiplyer, 3.5)
 	DebugDrawMode = AutoDefault(DebugDrawMode, false)

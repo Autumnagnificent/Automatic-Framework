@@ -1219,7 +1219,7 @@ end
 ---@param height number
 ---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
 ---@param clip boolean|nil Weather to clip stuff outside of the container, Default is false
----@param draw boolean|nil Draws the container's backgorund, otherwise it will be invisible, Defualt is true
+---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Defualt is true
 ---@return table containerdata
 function AutoContainer(width, height, padding, clip, draw)
 	width = AutoDefault(width, 300)

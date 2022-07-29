@@ -465,8 +465,6 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 AutoSimulation = {}
-AutoSimulation.Points = {}
-AutoSimulation.Joints = {}
 AutoSimSettings = {
 	Gravity = -10,
 	Drag = 0.0,
@@ -495,30 +493,16 @@ function AutoSimPoint(Position, Velocity, Radius, Collision, Simulated)
 	new_point.collision = AutoDefault(Collision, true)
 	new_point.simulated = AutoDefault(Simulated, true)
 
-	local new_index = #AutoSimulation.Points+1
-	AutoSimulation.Points[new_index] = new_point
+	local new_index = #AutoSimulation+1
+	AutoSimulation[new_index] = new_point
 	return new_point, new_index
-end
-
-function AutoCreateJoint(A, B, Distance)
-	if not (A and B) then return end
-
-	local new_joint = {}
-	new_joint.pointA = A
-	new_joint.pointB = B
-
-	new_joint.distance = AutoDefault(Distance, AutoVecDist(A.pos, B.pos))
-
-	local new_index = #AutoSimulation.Joints + 1
-	AutoSimulation.Joints[new_index] = new_joint
-	return new_joint, new_index
 end
 
 function AutoSimulatePoints(dt)
 	dt = AutoDefault(dt, GetTimeStep())
 	
 	-- Update Points
-	for i, p in ipairs(AutoSimulation.Points) do
+	for i, p in ipairs(AutoSimulation) do
 		if p.simulated then
 			local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
 			local new_acc = (function ()
@@ -534,16 +518,23 @@ function AutoSimulatePoints(dt)
 				local maxdist = VecLength(diff) + p.radius
 				local hit, point, normal, shape = QueryClosestPoint(new_pos, maxdist)
 				if hit then
-					new_pos = p.pos
-					new_vel = VecScale(VecSub(new_vel, VecScale(normal, VecDot(new_vel, normal) * 2)), p.reflectivity)
+					local dist = AutoVecDist(p.pos, point)
 
+					new_pos = VecAdd(VecScale(diff, dist), p.pos)
+					local dot = VecDot(new_vel, normal)
+					new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
+					
 					if AutoSimSettings.PointsAffectBodies then
 						ApplyBodyImpulse(GetShapeBody(shape), point, VecScale(p.vel, (1 - p.reflectivity) * p.mass))
 					end
 
 					if type(p.collision) == "function" then
-						p.collision(p, i, point, shape)
+						p.collision(p, i, point, shape, dot, dt)
 					end
+				end
+
+				if type(p.simulated) == "function" then
+					p.simulated(p, i, dt)
 				end
 			end
 			
@@ -552,30 +543,10 @@ function AutoSimulatePoints(dt)
 			p.acc = new_acc
 		end
 	end
-
-	-- Update Joints
-	for i, j in ipairs(AutoSimulation.Joints) do
-		-- if j.pointA.pos == nil or j.pointB.pos == nil then
-		-- 	table.remove(AutoSimulation.Joints, i)
-		-- 	AutoPrint('AAAAAAAAAAAAAAA')
-		-- end
-
-		for step = 0, AutoSimSettings.JointIterations do
-			local midpoint = AutoVecMidpoint(j.pointA.pos, j.pointB.pos)
-			local dir = VecNormalize(VecSub(j.pointA.pos, j.pointB.pos))
-
-			if j.pointA.simulated then
-				j.pointA.pos = VecAdd(midpoint, VecScale(dir, (j.distance / 2)))
-			end
-			if j.pointB.simulated then
-				j.pointB.pos = VecSub(midpoint, VecScale(dir, (j.distance / 2)))
-			end
-		end
-	end
 end
 
 function AutoSimulationDo(func)
-	for i, v in ipairs(AutoSimulation.Points) do
+	for i, v in ipairs(AutoSimulation) do
 		func(v, i)
 	end
 end
@@ -587,7 +558,7 @@ function AutoDrawSimulationPoints(sizemultiplyer, Occlude, DebugDrawMode)
 
 	local path = 'ui/common/dot.png'
 	
-	for i, v in ipairs(AutoSimulation.Points) do
+	for i, v in ipairs(AutoSimulation) do
 		if DebugDrawMode then
 			AutoDrawTransform(Transform(v.pos), sizemultiplyer * v.radius)
 		else
@@ -605,17 +576,6 @@ function AutoDrawSimulationPoints(sizemultiplyer, Occlude, DebugDrawMode)
 				UiPop()
 			end
 		end
-	end
-end
-
-function AutoDrawSimulationJoints()
-	for i, j in ipairs(AutoSimulation.Joints) do
-		color = {
-			j.pointA.color[1] + j.pointB.color[1] / 2,
-			j.pointA.color[2] + j.pointB.color[2] / 2,
-			j.pointA.color[3] + j.pointB.color[3] / 2,
-		}
-		DrawLine(j.pointA.pos, j.pointB.pos, unpack(color), 1)
 	end
 end
 

@@ -497,6 +497,9 @@ function AutoSimCreatePoint(Position, Velocity, Radius, Collision, Simulated)
 	return new_point, new_index
 end
 
+
+---Updates all of the point in the Simulation
+---@param dt number The timestep that is used. Default is GetTimeStep()
 function AutoSimUpdate(dt)
 	dt = AutoDefault(dt, GetTimeStep())
 	
@@ -551,21 +554,21 @@ function AutoSimDo(func)
 	end
 end
 
-function AutoSimDraw(sizemultiplyer, Occlude, DebugDrawMode)
+function AutoSimDraw(sizemultiplier, Occlude, DebugDrawMode)
 	Occlude = AutoDefault(Occlude, true)
-	sizemultiplyer = AutoDefault(sizemultiplyer, 3.5)
+	sizemultiplier = AutoDefault(sizemultiplier, 3.5)
 	DebugDrawMode = AutoDefault(DebugDrawMode, false)
 
 	local path = 'ui/common/dot.png'
 	
 	for i, v in ipairs(AutoSimulation) do
 		if DebugDrawMode then
-			AutoDrawTransform(Transform(v.pos), sizemultiplyer * v.radius)
+			AutoDrawTransform(Transform(v.pos), sizemultiplier * v.radius)
 		else
 			if AutoPointInView(v.pos, nil, nil, Occlude) then
 				UiPush()
 					local x, y = UiWorldToPixel(v.pos)
-					local size = 1 / AutoVecDist(GetCameraTransform().pos, v.pos) * sizemultiplyer
+					local size = 1 / AutoVecDist(GetCameraTransform().pos, v.pos) * sizemultiplier
 					if v.color then UiColor(v.color[1], v.color[2], v.color[3], v.color[4]) end
 					UiAlign('center middle')
 					UiTranslate(x, y)

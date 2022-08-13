@@ -473,6 +473,7 @@ function AutoSimInstance()
 
 		},
 		Settings = {
+			Steps = 1,
 			Gravity = -10,
 			Drag = 0.0,
 			PointsAffectBodies = true,
@@ -511,56 +512,60 @@ function AutoSimInstance()
 	---Updates all of the point in the Simulation
 	---@param dt number The timestep that is used. Default is GetTimeStep()
 	function t:Simulate(dt)
-		dt = AutoDefault(dt, GetTimeStep())
+		dt = AutoDefault(dt, GetTimeStep()) / self.Settings.Steps
+		
+		for _ = 1, self.Settings.Steps do
+			-- Update Points
+			for i, p in ipairs(self.Points) do
+				if p.simulate then
+					AutoExecute(p.presimulate, p, i, dt)
+					
+					local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
+					local new_acc = (function()
+						local grav_acc = Vec(0, self.Settings.Gravity, 0)
+						local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * self.Settings.Drag)
+						local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
+						return VecSub(grav_acc, drag_acc)
+					end)()
+					local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
 
-		-- Update Points
-		for i, p in ipairs(self.Points) do
-			if p.simulate then
-				AutoExecute(p.presimulate, p, i, dt)
-				
-				local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
-				local new_acc = (function()
-					local grav_acc = Vec(0, self.Settings.Gravity, 0)
-					local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * self.Settings.Drag)
-					local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
-					return VecSub(grav_acc, drag_acc)
-				end)()
-				local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
+					local collided = false
+					local collisiondata = {}
 
-				local collisiondata = {}
+					if p.collision then
+						local diff = VecSub(new_pos, p.pos)
+						local dir = VecNormalize(diff)
+						local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
+						if hit then
+							local colpoint = VecAdd(new_pos, VecScale(dir, dist))
 
-				if p.collision then
-					local diff = VecSub(new_pos, p.pos)
-					local dir = VecNormalize(diff)
-					local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
-					if hit then
-						local colpoint = VecAdd(new_pos, VecScale(dir, dist))
+							new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
+							local dot = VecDot(new_vel, normal)
+							new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
+							new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
 
-						new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
-						local dot = VecDot(new_vel, normal)
-						new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
-						new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
+							local incoming = VecDot(VecNormalize(new_vel), normal)
+							if self.Settings.PointsAffectBodies then
+								ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(p.vel, incoming * p.mass))
+							end
 
-						local incoming = VecDot(VecNormalize(new_vel), normal)
-						if self.Settings.PointsAffectBodies then
-							ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(p.vel, incoming * p.mass))
+							collided = true
+							collisiondata = {
+								location = colpoint,
+								normal = normal,
+								shape = shape,
+								incoming = incoming,
+							}
 						end
-
-						collisiondata = {
-							location = colpoint,
-							normal = normal,
-							shape = shape,
-							incoming = incoming,
-						}
 					end
+
+					p.pos = new_pos
+					p.vel = new_vel
+					p.acc = new_acc
+
+					if collided then AutoExecute(p.collision, p, i, collisiondata) end
+					AutoExecute(p.simulate, p, i, dt)
 				end
-
-				p.pos = new_pos
-				p.vel = new_vel
-				p.acc = new_acc
-
-				AutoExecute(p.collision, p, i, collisiondata)
-				AutoExecute(p.simulate, p, i, dt)
 			end
 		end
 	end

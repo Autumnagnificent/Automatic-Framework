@@ -1,4 +1,4 @@
--- VERSION 1.10
+-- VERSION 1.21
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -50,10 +50,13 @@ end
 ---@param a2 number To number a2
 ---@param b1 number To the range of b1
 ---@param b2 number To number b2
+---@param clamp boolean|nil Clamp the number between b1 and b2, Default is false
 ---@return number
-function AutoMap(v, a1, a2, b1, b2)
+function AutoMap(v, a1, a2, b1, b2, clamp)
+	clamp = AutoDefault(clamp, false)
 	if a1 == a2 then return b2 end
-	return b1 + ((v - a1) * (b2 - b1)) / (a2 - a1)
+	local mapped = b1 + ((v - a1) * (b2 - b1)) / (a2 - a1)
+	return clamp and AutoClamp(mapped, math.min(b1, b2), math.max(b1, b2)) or mapped
 end
 
 ---Limits a value from going below the min and above the max
@@ -142,7 +145,7 @@ end
 ---@param b Vec
 ---@return number
 function AutoVecDist(a, b)
-	return math.sqrt( (a[1] - b[1])^2 + (a[2] - b[2])^2 + (a[3] - b[3])^2 )
+	return VecLength(VecSub(b, a))
 end
 
 ---Return a vector that has the magnitude of b, but with the direction of a
@@ -302,7 +305,7 @@ end
 ---Return Vec v with it's z value replaced by subz
 ---@param v Vec
 ---@param subz number
-function AutoVecSubsituteY(v, subz)
+function AutoVecSubsituteZ(v, subz)
 	return Vec(v[1], v[2], subz)
 end
 
@@ -464,122 +467,156 @@ end
 ----------------Point Physics------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
-AutoSimulation = {}
-AutoSimSettings = {
-	Gravity = -10,
-	Drag = 0.0,
-	PointsAffectBodies = true,
-}
+function AutoSimInstance()
+	local t = {
+		Points = {
 
----Creates a Point to be Simulated with AutoSimulatePoints(). After using AutoCreatePoint(), you can can also add parameters and change existing ones, such as point.reflectivity, and point.mass
----@param Position Vec|nil Default is Vec(0, 0, 0)
----@param Velocity Vec|nil Default is Vec(0, 0, 0)
----@param Radius number|nil Default is 0
----@param Collision boolean|nil If the point should check for collision. Default is true
----@param Simulated boolean|nil If the point is simulated. Default is true
----@return table point
----@return number index
-function AutoSimCreatePoint(Position, Velocity, Radius, Collision, Simulated)
-	local new_point = {}
-	new_point.pos = AutoDefault(Position, {0, 0, 0})
-	new_point.vel = AutoDefault(Velocity, {0, 0, 0})
-	new_point.acc = Vec(0, 0, 0)
+		},
+		Settings = {
+			Gravity = -10,
+			Drag = 0.0,
+			PointsAffectBodies = true,
+		}
+	}
 
-	new_point.radius = AutoDefault(Radius, 0)
-	new_point.mass = 1
-	new_point.reflectivity = 0
+	---Creates a Point to be Simulated with SimInstance:CreatePoint(), you can add parameters after it is created and change existing ones, such as point.reflectivity, and point.mass
+	---@param Position Vec|nil Default is Vec(0, 0, 0)
+	---@param Velocity Vec|nil Default is Vec(0, 0, 0)
+	---@return table point
+	---@return number newindex
+	function t:CreatePoint(Position, Velocity)
+		local new_point = {}
+		new_point.pos = AutoDefault(Position, { 0, 0, 0 })
+		new_point.vel = AutoDefault(Velocity, { 0, 0, 0 })
+		new_point.acc = Vec(0, 0, 0)
 
-	new_point.collision = AutoDefault(Collision, true)
-	new_point.simulated = AutoDefault(Simulated, true)
+		new_point.radius = 0
+		new_point.mass = 1
+		new_point.reflectivity = 0
 
-	local new_index = #AutoSimulation+1
-	AutoSimulation[new_index] = new_point
-	return new_point, new_index
-end
+		new_point.collision = true
+		new_point.simulate = true
+		new_point.presimulate = nil
+		new_point.draw = true
+		new_point.remove = nil
+		
+		new_point.color = { 1, 1, 1, 1 }
 
+		local new_index = #self.Points + 1
+		self.Points[new_index] = new_point
 
----Updates all of the point in the Simulation
----@param dt number The timestep that is used. Default is GetTimeStep()
-function AutoSimUpdate(dt)
-	dt = AutoDefault(dt, GetTimeStep())
-	
-	-- Update Points
-	for i, p in ipairs(AutoSimulation) do
-		if p.simulated then
-			local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
-			local new_acc = (function ()
-				local grav_acc = Vec(0, AutoSimSettings.Gravity, 0)
-				local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * AutoSimSettings.Drag)
-				local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
-				return VecSub(grav_acc, drag_acc)
-			end)()
-			local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
-	
-			if p.collision then
-				local diff = VecSub(new_pos, p.pos)
-				local dir = VecNormalize(diff)
-				local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
-				if hit then
-					local point = VecAdd(new_pos, VecScale(dir, dist))
+		return new_point, new_index
+	end
 
-					new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
-					local dot = VecDot(new_vel, normal)
-					new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
-					new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
-					
-					if AutoSimSettings.PointsAffectBodies then
-						ApplyBodyImpulse(GetShapeBody(shape), point, VecScale(p.vel, (1 - p.reflectivity) * p.mass))
-					end
+	---Updates all of the point in the Simulation
+	---@param dt number The timestep that is used. Default is GetTimeStep()
+	function t:Simulate(dt)
+		dt = AutoDefault(dt, GetTimeStep())
 
-					if type(p.collision) == "function" then
-						p.collision(p, i, point, shape, dot, dt)
+		-- Update Points
+		for i, p in ipairs(self.Points) do
+			if p.simulate then
+				AutoExecute(p.presimulate, p, i, dt)
+				
+				local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
+				local new_acc = (function()
+					local grav_acc = Vec(0, self.Settings.Gravity, 0)
+					local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * self.Settings.Drag)
+					local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
+					return VecSub(grav_acc, drag_acc)
+				end)()
+				local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
+
+				if p.collision then
+					local diff = VecSub(new_pos, p.pos)
+					local dir = VecNormalize(diff)
+					local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
+					if hit then
+						local colpoint = VecAdd(new_pos, VecScale(dir, dist))
+
+						new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
+						local dot = VecDot(new_vel, normal)
+						new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
+						new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
+
+						local incoming = VecDot(VecNormalize(new_vel), normal)
+						if self.Settings.PointsAffectBodies then
+							ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(p.vel, incoming * p.mass))
+						end
+
+						local collisiondata = {
+							location = colpoint,
+							normal = normal,
+							shape = shape,
+							incoming = incoming,
+							newposition = new_pos,
+							newvelocity = new_vel
+						}
+
+						AutoExecute(p.collision, p, i, collisiondata)
 					end
 				end
-			end
-			
-			p.pos = new_pos
-			p.vel = new_vel
-			p.acc = new_acc
 
-			if type(p.simulated) == "function" then
-				p.simulated(p, i, dt)
+				p.pos = new_pos
+				p.vel = new_vel
+				p.acc = new_acc
+
+				AutoExecute(p.simulate, p, i, dt)
 			end
 		end
 	end
-end
 
-function AutoSimDo(func)
-	for i, v in ipairs(AutoSimulation) do
-		func(v, i)
+	function t:Remove(point)
+		AutoExecute(point.remove, point)
+
+		-- Cleanup
+		for i, v in pairs(point) do
+			point[i] = nil
+		end
+		
+		point = nil
 	end
-end
 
-function AutoSimDraw(sizemultiplier, Occlude, DebugDrawMode)
-	Occlude = AutoDefault(Occlude, true)
-	sizemultiplier = AutoDefault(sizemultiplier, 3.5)
-	DebugDrawMode = AutoDefault(DebugDrawMode, false)
+	function t:Do(func)
+		for i, p in ipairs(self.Points) do
+			AutoExecute(func, p, i)
+		end
+	end
 
-	local path = 'ui/common/dot.png'
-	
-	for i, v in ipairs(AutoSimulation) do
-		if DebugDrawMode then
-			AutoDrawTransform(Transform(v.pos), sizemultiplier * v.radius)
-		else
-			if AutoPointInView(v.pos, nil, nil, Occlude) then
-				UiPush()
-					local x, y = UiWorldToPixel(v.pos)
-					local size = 1 / AutoVecDist(GetCameraTransform().pos, v.pos) * sizemultiplier
-					if v.color then UiColor(v.color[1], v.color[2], v.color[3], v.color[4]) end
-					UiAlign('center middle')
-					UiTranslate(x, y)
-					
-					UiScale(size)
-					-- UiRect(size, size)
-					UiImage(path)
-				UiPop()
+	function t:Draw(Image, SizeMultiplier, Occlude, DebugDrawMode)
+		Image = AutoDefault (Image, 'ui/common/dot.png')
+		SizeMultiplier = AutoDefault(SizeMultiplier, 3.5)
+		Occlude = AutoDefault(Occlude, true)
+		DebugDrawMode = AutoDefault(DebugDrawMode, false)
+
+		local inview = true
+		
+		for i, p in ipairs(self.Points) do
+			if p.draw then
+				if DebugDrawMode then
+					AutoDrawTransform(Transform(p.pos), SizeMultiplier * p.radius)
+				else
+					inview, angle, dist = AutoPointInView(p.pos, nil, nil, Occlude)
+					if inview then
+						UiPush()
+							local x, y = UiWorldToPixel(p.pos)
+							local size = 1 / dist * SizeMultiplier
+							if p.color then UiColor(p.color[1], p.color[2], p.color[3], p.color[4]) end
+							UiAlign('center middle')
+							UiTranslate(x, y)
+
+							UiScale(size)
+							UiImage(Image)
+						UiPop()
+					end
+				end
+
+				AutoExecute(p.draw, p, i, inview)
 			end
 		end
 	end
+
+	return t
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -653,6 +690,20 @@ end
 ---@return any
 function AutoDefault(v, default)
 	if v == nil then return default else return v end
+end
+
+function AutoExecute(f, ...)
+	if not f then return end
+
+	if type(f) == "function" then
+		f(unpack(arg))
+	elseif type(f) == "table" then
+		for i, sub_f in ipairs(f) do
+			if type(sub_f) == "function" then
+				sub_f(v, unpack(arg))
+			end
+		end
+	end
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -762,7 +813,8 @@ end
 ---@param angle number|nil The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean|nil Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
----@return number angle The Angle the point is away from the center of the looking direction
+---@return number|nil angle The Angle the point is away from the center of the looking direction
+---@return number|nil distance The Distance from the point to fromtrans
 function AutoPointInView(point, fromtrans, angle, raycastcheck)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
@@ -775,12 +827,13 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck)
 	local dotangle = math.deg(math.acos(dot))
 	local seen = dotangle < angle/2
 
+	local dist = AutoVecDist(fromtrans.pos, point)
 	if raycastcheck then
-		local hit = QueryRaycast(fromtrans.pos, fromtopointdir, AutoVecDist(fromtrans.pos, point), 0, true)
+		local hit = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
 		if hit then return false end
 	end
 
-	return seen, dotangle
+	return seen, dotangle, dist
 end
 
 function AutoPlayerInputDir(length)
@@ -847,19 +900,31 @@ end
 ---@param body number
 ---@param time number
 ---@param raycast boolean|nil Check and Halt on Collision, Default is false
+---@param funcbefore function|nil
 ---@return table log
 ---@return table vel
 ---@return table normal
-function AutoPredictPosition(body, time, raycast)
+function AutoPredictPosition(body, time, raycast, funcbefore)
 	raycast = AutoDefault(raycast, false)
-	local pos = AutoWorldCenterOfMass(body)
-	local vel = GetBodyVelocity(body)
-	local log = { VecCopy(pos) }
+	local point = {
+		pos = AutoWorldCenterOfMass(body),
+		vel = GetBodyVelocity(body)
+	}
+	local log = { VecCopy(point.pos) }
 	local normal = Vec(0, 1, 0)
 
 	for steps = 0, time, GetTimeStep() do
-		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
-		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
+		if type(funcbefore) == "function" then
+			funcbefore(point)
+		elseif type(funcbefore) == "table" then
+			for _, func in ipairs(funcbefore) do
+				func(point)
+			end
+		end
+		
+		point.vel = VecAdd(point.vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
+		point.pos = VecAdd(point.pos, VecScale(point.vel, GetTimeStep()))
+		log[#log+1] = AutoTableDeepCopy(point.pos)
 
 		if raycast then
 			local last = log[#log - 1]
@@ -869,7 +934,7 @@ function AutoPredictPosition(body, time, raycast)
 		end
 	end
 
-	return log, vel, normal
+	return log, point.vel, normal
 end
 
 ---Attempt to predict the position of the player in time
@@ -924,16 +989,20 @@ end
 ---Draws a table of 
 ---@param points any
 ---@param huescale number|nil A multipler to the hue change, Default is 1
+---@param offset number|nil Offsets the hue for every point, Default is 0
+---@param alpha number|nil Sets the alpha of the line, Default is 1
 ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawLines(points, huescale, draw)
+function AutoDrawLines(points, huescale, offset, alpha, draw)
 	huescale = AutoDefault(huescale, 1)
+	offset = AutoDefault(offset, 0)
+	alpha = AutoDefault(alpha, 1)
 	draw = AutoDefault(draw, false)
 	
 	local lines = {}
 	local dist = 0
 	for i = 1, #points - 1 do
-		local color = AutoHSVToRGB(dist / 10 * huescale, 0.5, 1)
-		table.insert(lines, { points[i], points[i + 1], color[1], color[2], color[3], 1 })
+		local color = AutoHSVToRGB((dist / 10 * huescale) + offset, 0.5, 1)
+		table.insert(lines, { points[i], points[i + 1], color[1], color[2], color[3], alpha })
 
 		dist = dist + AutoVecDist(points[i], points[i + 1])
 	end
@@ -991,11 +1060,11 @@ function AutoDrawBodyDebug(body, size)
 end
 
 ---Draws some text at a world position.
----@param text string
----@param position Vec
----@param fontsize number
----@param alpha number
----@param bold boolean
+---@param text string|number|nil Text Displayed, Default is 'nil'
+---@param position Vec The WorldSpace Position
+---@param fontsize number|nil Fontsize, Default is 24
+---@param alpha number|nil Alpha, Default is 0.75
+---@param bold boolean|nil Use Bold Font, Default is false
 function AutoTooltip(text, position, fontsize, alpha, bold)
 	text = AutoDefault(text or "nil")
 	fontsize = AutoDefault(fontsize or 24)
@@ -1219,7 +1288,7 @@ end
 ---@param height number
 ---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
 ---@param clip boolean|nil Whether  to clip stuff outside of the container, Default is false
----@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Defualt is true
+---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
 ---@return table containerdata
 function AutoContainer(width, height, padding, clip, draw)
 	width = AutoDefault(width, 300)

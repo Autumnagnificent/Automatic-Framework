@@ -1,4 +1,4 @@
--- VERSION 1.21
+-- VERSION 1.25
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -527,6 +527,8 @@ function AutoSimInstance()
 				end)()
 				local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
 
+				local collisiondata = {}
+
 				if p.collision then
 					local diff = VecSub(new_pos, p.pos)
 					local dir = VecNormalize(diff)
@@ -544,16 +546,12 @@ function AutoSimInstance()
 							ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(p.vel, incoming * p.mass))
 						end
 
-						local collisiondata = {
+						collisiondata = {
 							location = colpoint,
 							normal = normal,
 							shape = shape,
 							incoming = incoming,
-							newposition = new_pos,
-							newvelocity = new_vel
 						}
-
-						AutoExecute(p.collision, p, i, collisiondata)
 					end
 				end
 
@@ -561,6 +559,7 @@ function AutoSimInstance()
 				p.vel = new_vel
 				p.acc = new_acc
 
+				AutoExecute(p.collision, p, i, collisiondata)
 				AutoExecute(p.simulate, p, i, dt)
 			end
 		end

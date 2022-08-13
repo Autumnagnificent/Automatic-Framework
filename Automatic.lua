@@ -566,6 +566,8 @@ function AutoSimInstance()
 		end
 	end
 
+	---Removes a point from the Simulation, Calls point.remove if it is a function or table of functions
+	---@param point table The Point that should be removed
 	function t:Remove(point)
 		AutoExecute(point.remove, point)
 
@@ -577,30 +579,36 @@ function AutoSimInstance()
 		point = nil
 	end
 
+	---Iterate through every Point
+	---@param func function The Function that is called, called with the input parameter of (Point, Index)
 	function t:Do(func)
 		for i, p in ipairs(self.Points) do
 			AutoExecute(func, p, i)
 		end
 	end
 
-	function t:Draw(Image, SizeMultiplier, Occlude, DebugDrawMode)
-		Image = AutoDefault (Image, 'ui/common/dot.png')
+	---Draw every point in which point.draw is not false (by default, point.draw is true), calling p.draw at the end if it is a function
+	---@param Image string|false|nil A image that is drawn in the position of the points, Default is 'ui/common/dot.png', if set to false, then draws a Transform at the position instead
+	---@param SizeMultiplier number|nil a multipler for the size of the drawn image, Default is 3.5
+	---@param Occlude boolean|nil Whether to hide points that are obscured by walls, Default is true
+	function t:Draw(Image, SizeMultiplier, Occlude)
+		Image = AutoDefault(Image, 'ui/common/dot.png')
 		SizeMultiplier = AutoDefault(SizeMultiplier, 3.5)
 		Occlude = AutoDefault(Occlude, true)
-		DebugDrawMode = AutoDefault(DebugDrawMode, false)
 
 		local inview = true
 		
 		for i, p in ipairs(self.Points) do
 			if p.draw then
-				if DebugDrawMode then
-					AutoDrawTransform(Transform(p.pos), SizeMultiplier * p.radius)
-				else
-					inview, angle, dist = AutoPointInView(p.pos, nil, nil, Occlude)
-					if inview then
+				inview, angle, dist = AutoPointInView(p.pos, nil, nil, Occlude)
+				if inview then
+					local x, y = UiWorldToPixel(p.pos)
+					local size = 1 / dist * SizeMultiplier
+
+					if not Image then
+						AutoDrawTransform(Transform(p.pos), size / 10)
+					else
 						UiPush()
-							local x, y = UiWorldToPixel(p.pos)
-							local size = 1 / dist * SizeMultiplier
 							if p.color then UiColor(p.color[1], p.color[2], p.color[3], p.color[4]) end
 							UiAlign('center middle')
 							UiTranslate(x, y)

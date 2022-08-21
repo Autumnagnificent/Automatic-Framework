@@ -1184,6 +1184,99 @@ function AutoTooltip(text, position, fontsize, alpha, bold)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Graphing-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AutoGraphs = {}
+
+function AutoGraphContinuous(id, value, range)
+	local Graph = AutoDefault(AutoGraphs[id], {
+		scan = 0,
+		range = AutoDefault(range, 64),
+		values = {}
+	})
+
+	Graph.scan = AutoWrap(Graph.scan + 1, 1, range)
+	Graph.values[Graph.scan] = value
+
+	AutoGraphs[id] = Graph
+end
+
+function AutoGraphFunction(id, rangemin, rangemax, func, steps)
+	rangemin = AutoDefault(rangemin, 0)
+	rangemax = AutoDefault(rangemax, 1)
+	steps = AutoDefault(steps, 100)
+
+	func = AutoDefault(func, function(x)
+		return AutoLogistic(x, 1, -10, 0.5)
+	end)
+
+	local Graph = {
+		values = {}
+	}
+
+	for i = 1, steps do
+		local v = func(AutoMap(i / steps, 0, 1, rangemin, rangemax))
+		Graph.values[i] = v
+	end
+
+	AutoGraphs[id] = Graph
+end
+
+function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
+	local Graph = AutoGraphs[id]
+	if Graph == nil then error("Graph Doesn't exist, nil") end
+
+	sizex = AutoDefault(sizex, 128)
+	sizey = AutoDefault(sizey, 64)
+
+	UiPush()
+	AutoContainer(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, nil, true)
+
+	local minval = 0
+	local maxval = 0
+	for _, v in ipairs(Graph.values) do
+		if v < minval then minval = v end
+		if v > maxval then maxval = v end
+	end
+
+	minval = AutoDefault(rangemin, minval)
+	maxval = AutoDefault(rangemax, maxval)
+
+	for i = 1, #Graph.values - 1 do
+		if Graph.values[i] == AutoClamp(Graph.values[i], minval, maxval) then
+			local a = Vec(
+				AutoMap(i, 1, #Graph.values, 0, sizex),
+				AutoMap(Graph.values[i], minval, maxval, sizey, 0),
+				0
+			)
+			local b = Vec(
+				AutoMap(i + 1, 1, #Graph.values, 0, sizex),
+				AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
+				0
+			)
+
+			local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
+			local distance = AutoVecDist(a, b)
+			local width = AutoDefault(linewidth, 2)
+
+			UiPush()
+			UiTranslate(a[1] - width / 2, a[2] - width / 2)
+			UiRotate(angle)
+
+			UiColor(unpack(AutoPrimaryColor))
+			UiAlign('left top')
+			UiRect(width, distance + 1)
+			UiPop()
+		end
+	end
+	UiPop()
+
+	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
+	HandleSpread(AutoGetSpread(), data, 'draw')
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Registry-------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1580,97 +1673,4 @@ function AutoMarker(size)
 		UiColor(unpack(AutoSpecialColor))
 		UiImage('ui/common/dot.png')
 	UiPop()
-end
-
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Graphing-------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
-
-AutoGraphs = {}
-
-function AutoGraphContinuous(id, value, range)
-	local Graph = AutoDefault(AutoGraphs[id], {
-		scan = 0,
-		range = AutoDefault(range, 64),
-		values = {}
-	})
-
-	Graph.scan = AutoWrap(Graph.scan + 1, 1, range)
-	Graph.values[Graph.scan] = value
-	
-	AutoGraphs[id] = Graph
-end
-
-function AutoGraphFunction(id, rangemin, rangemax, func, steps)
-	rangemin = AutoDefault(rangemin, 0)
-	rangemax = AutoDefault(rangemax, 1)
-	steps = AutoDefault(steps, 100)
-	
-	func = AutoDefault(func, function (x)
-		return AutoLogistic(x, 1, -10, 0.5)
-	end)
-
-	local Graph = {
-		values = {}
-	}
-	
-	for i = 1, steps do
-		local v = func(AutoMap(i / steps, 0, 1, rangemin, rangemax))
-		Graph.values[i] = v
-	end
-
-	AutoGraphs[id] = Graph
-end
-
-function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
-	local Graph = AutoGraphs[id]
-	if Graph == nil then error("Graph Doesn't exist, nil") end
-
-	sizex = AutoDefault(sizex, 128)
-	sizey = AutoDefault(sizey, 64)
-
-	UiPush()
-		AutoContainer(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, nil, true)
-
-		local minval = 0
-		local maxval = 0
-		for _, v in ipairs(Graph.values) do
-			if v < minval then minval = v end
-			if v > maxval then maxval = v end
-		end
-
-		minval = AutoDefault(rangemin, minval)
-		maxval = AutoDefault(rangemax, maxval)
-		
-		for i = 1, #Graph.values - 1 do
-			if Graph.values[i] == AutoClamp(Graph.values[i], minval, maxval) then
-				local a = Vec(
-					AutoMap(i, 1, #Graph.values, 0, sizex),
-					AutoMap(Graph.values[i], minval, maxval, sizey, 0),
-					0
-				)
-				local b = Vec(
-					AutoMap(i + 1, 1, #Graph.values, 0, sizex),
-					AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
-					0
-				)
-			
-				local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
-				local distance = AutoVecDist(a, b)
-			local width = AutoDefault(linewidth, 2)
-	
-				UiPush()
-					UiTranslate(a[1] - width / 2, a[2] - width / 2)
-					UiRotate(angle)
-	
-					UiColor(unpack(AutoPrimaryColor))
-					UiAlign('left top')
-					UiRect(width, distance + 1)
-				UiPop()
-			end
-		end
-	UiPop()
-
-	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-	HandleSpread(AutoGetSpread(), data, 'draw')
 end

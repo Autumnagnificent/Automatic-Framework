@@ -1,4 +1,4 @@
--- VERSION 1.25
+-- VERSION 1.5
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ function AutoClamp(v, min, max)
 	end
 end
 
----Wraps a value inbetween a range
+---Wraps a value inbetween a range, Thank you iaobardar for the Optimization
 ---@param v number The number to wrap
 ---@param min number|nil The minimum range
 ---@param max number|nil The maximum range
@@ -85,9 +85,7 @@ function AutoWrap(v, min, max)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
 
-	AutoMap(v, min, max, 0, 1)
-	v = v % 1
-	return AutoMap(v, 0, 1, min, max)
+	return (v - min) % (max - min) + min
 end
 
 ---Lerp function, Is not clamped meaning it if t is above 1 then it will 'overshoot'
@@ -511,10 +509,11 @@ function AutoSimInstance()
 
 	---Updates all of the point in the Simulation
 	---@param dt number The timestep that is used. Default is GetTimeStep()
-	function t:Simulate(dt)
+	function t:Simulate(dt, showsteps)
 		dt = AutoDefault(dt, GetTimeStep()) / self.Settings.Steps
+		showsteps = AutoDefault(showsteps, false)
 		
-		for _ = 1, self.Settings.Steps do
+		for _ = 1, not showsteps and self.Settings.Steps or 1 do
 			-- Update Points
 			for i, p in ipairs(self.Points) do
 				if p.simulate then
@@ -523,7 +522,7 @@ function AutoSimInstance()
 					local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
 					local new_acc = (function()
 						local grav_acc = Vec(0, self.Settings.Gravity, 0)
-						local drag_force = VecScale(VecScale(p.vel, VecLength(p.vel)), 0.5 * self.Settings.Drag)
+						local drag_force = VecScale(p.vel, 0.5 * self.Settings.Drag)
 						local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
 						return VecSub(grav_acc, drag_acc)
 					end)()
@@ -538,15 +537,18 @@ function AutoSimInstance()
 						local hit, dist, normal, shape = QueryRaycast(new_pos, dir, VecLength(diff) + p.radius)
 						if hit then
 							local colpoint = VecAdd(new_pos, VecScale(dir, dist))
+							local precol_vel = VecCopy(new_vel)
 
-							new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
 							local dot = VecDot(new_vel, normal)
+							local incoming = -VecDot(VecNormalize(precol_vel), normal)
+							
+							new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
+							
 							new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
 							new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
 
-							local incoming = VecDot(VecNormalize(new_vel), normal)
 							if self.Settings.PointsAffectBodies then
-								ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(p.vel, incoming * p.mass))
+								ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(precol_vel, incoming * p.mass))
 							end
 
 							collided = true
@@ -610,7 +612,7 @@ function AutoSimInstance()
 					local size = 1 / dist * SizeMultiplier
 
 					if not Image then
-						AutoDrawTransform(Transform(p.pos), size / 10)
+						AutoDrawTransform(Transform(p.pos, p.rot and p.rot or QuatEuler(0, 0, 0)), size / 10)
 					else
 						UiPush()
 							if p.color then UiColor(p.color[1], p.color[2], p.color[3], p.color[4]) end
@@ -632,6 +634,51 @@ function AutoSimInstance()
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Second Order System------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---Sets up a Second Order System, using code by t3ssel8r
+---@param frequency number The frequency in which the system will respond to input
+---@param dampening number
+---@param response number
+function AutoSOS(initalposition, frequency, dampening, response)
+	t = {}
+
+	t.xp = initalposition
+	t.current = initalposition
+	t.yd = 0
+	
+	t.k1 = dampening / (math.pi * frequency)
+	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
+	t.k3 = response * dampening / (2 * math.pi * frequency)
+	
+	return t
+end
+
+function AutoSOSUpdate(sos, Ideal, time)
+	time = AutoDefault(time, GetTimeStep())
+	local xd = (Ideal - sos.xp) / time
+	sos.xp = Ideal
+
+	sos.current = sos.current + time * sos.yd
+	sos.yd = sos.yd + time * (Ideal + sos.k3 * xd - sos.current - sos.k1 * sos.yd) / sos.k2
+end
+
+function AutoSOSTable(initaltable, frequency, dampening, response)
+	local t = {}
+	for i = 1, #initaltable do
+		t[i] = AutoSOS(initaltable[i] or 0, frequency, dampening, response)
+	end
+	return t
+end
+
+function AutoSOSTableUpdate(sostable, Ideal, time)
+	for i, v in pairs(sostable) do
+		v = AutoSOSUpdate(v, Ideal[i] or v.current, time)
+	end
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Table Functions------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -645,6 +692,14 @@ function AutoTableCount(t)
 	end
 
 	return c
+end
+
+function AutoTableSub(t, key)
+	local _t = {}
+	for i, v in ipairs(t) do
+		_t[i] = t[key]
+	end
+	return _t
 end
 
 ---Returns true and the index if the v is in t, otherwise returns false and nil
@@ -716,6 +771,30 @@ function AutoExecute(f, ...)
 			end
 		end
 	end
+end
+
+---Returns a Linear Interpolated Transform, Interpolated by t.
+---@param a Transformation
+---@param b Transformation
+---@param t number
+---@param t2 number|nil
+---@return table
+function AutoTransformLerp(a, b, t, t2)
+	if t2 == nil then
+		t2 = t
+	end
+	return Transform(
+		VecLerp(a.pos, b.pos, t),
+		QuatSlerp(a.rot, b.rot, t2)
+	)
+end
+
+function AutoTransformFwd(t)
+	return TransformToParentVec(t, Vec(0, 0, -1))
+end
+
+function AutoTransformRight(t)
+	return TransformToParentVec(t, Vec(1, 0, 0))
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -1105,7 +1184,7 @@ function AutoTooltip(text, position, fontsize, alpha, bold)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Registry-------------------------------------------------------------------------------------------------------------------------
+----------------Registry-------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function AutoKeyDefaultInt(path, default)
@@ -1292,7 +1371,7 @@ function HandleSpread(gs, data, type, spreadpad)
 	end
 end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------User Interface Creation Functions-------------------------------------------------------------------------------------------------------------------------
+----------------User Interface Creation Functions------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Create a Container with new bounds
@@ -1501,4 +1580,97 @@ function AutoMarker(size)
 		UiColor(unpack(AutoSpecialColor))
 		UiImage('ui/common/dot.png')
 	UiPop()
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Graphing-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AutoGraphs = {}
+
+function AutoGraphContinuous(id, value, range)
+	local Graph = AutoDefault(AutoGraphs[id], {
+		scan = 0,
+		range = AutoDefault(range, 64),
+		values = {}
+	})
+
+	Graph.scan = AutoWrap(Graph.scan + 1, 1, range)
+	Graph.values[Graph.scan] = value
+	
+	AutoGraphs[id] = Graph
+end
+
+function AutoGraphFunction(id, rangemin, rangemax, func, steps)
+	rangemin = AutoDefault(rangemin, 0)
+	rangemax = AutoDefault(rangemax, 1)
+	steps = AutoDefault(steps, 100)
+	
+	func = AutoDefault(func, function (x)
+		return AutoLogistic(x, 1, -10, 0.5)
+	end)
+
+	local Graph = {
+		values = {}
+	}
+	
+	for i = 1, steps do
+		local v = func(AutoMap(i / steps, 0, 1, rangemin, rangemax))
+		Graph.values[i] = v
+	end
+
+	AutoGraphs[id] = Graph
+end
+
+function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
+	local Graph = AutoGraphs[id]
+	if Graph == nil then error("Graph Doesn't exist, nil") end
+
+	sizex = AutoDefault(sizex, 128)
+	sizey = AutoDefault(sizey, 64)
+
+	UiPush()
+		AutoContainer(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, nil, true)
+
+		local minval = 0
+		local maxval = 0
+		for _, v in ipairs(Graph.values) do
+			if v < minval then minval = v end
+			if v > maxval then maxval = v end
+		end
+
+		minval = AutoDefault(rangemin, minval)
+		maxval = AutoDefault(rangemax, maxval)
+		
+		for i = 1, #Graph.values - 1 do
+			if Graph.values[i] == AutoClamp(Graph.values[i], minval, maxval) then
+				local a = Vec(
+					AutoMap(i, 1, #Graph.values, 0, sizex),
+					AutoMap(Graph.values[i], minval, maxval, sizey, 0),
+					0
+				)
+				local b = Vec(
+					AutoMap(i + 1, 1, #Graph.values, 0, sizex),
+					AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
+					0
+				)
+			
+				local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
+				local distance = AutoVecDist(a, b)
+			local width = AutoDefault(linewidth, 2)
+	
+				UiPush()
+					UiTranslate(a[1] - width / 2, a[2] - width / 2)
+					UiRotate(angle)
+	
+					UiColor(unpack(AutoPrimaryColor))
+					UiAlign('left top')
+					UiRect(width, distance + 1)
+				UiPop()
+			end
+		end
+	UiPop()
+
+	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
+	HandleSpread(AutoGetSpread(), data, 'draw')
 end

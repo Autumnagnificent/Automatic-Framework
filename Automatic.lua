@@ -1,4 +1,4 @@
--- VERSION 1.5
+-- VERSION 1.55
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1189,6 +1189,10 @@ end
 
 AutoGraphs = {}
 
+---Creates a Continuous Graph that can be drawn. The given value is added into the graph as the previous ones are kept in memory.
+---@param id string
+---@param value number
+---@param range number|nil Default is 64
 function AutoGraphContinuous(id, value, range)
 	local Graph = AutoDefault(AutoGraphs[id], {
 		scan = 0,
@@ -1202,6 +1206,12 @@ function AutoGraphContinuous(id, value, range)
 	AutoGraphs[id] = Graph
 end
 
+---Creates a Graph with values within a range fed into a given function.
+---@param id string
+---@param rangemin number|nil Default is 0 
+---@param rangemax number|nil Default is 1
+---@param func function|nil Is fed one parameter, a number ranging from rangemin to rangemax, Defaults to a Logisitc Function
+---@param steps number|nil How many steps, or the interval of values taken from the range.
 function AutoGraphFunction(id, rangemin, rangemax, func, steps)
 	rangemin = AutoDefault(rangemin, 0)
 	rangemax = AutoDefault(rangemax, 1)
@@ -1223,6 +1233,13 @@ function AutoGraphFunction(id, rangemin, rangemax, func, steps)
 	AutoGraphs[id] = Graph
 end
 
+---Draws a given graph with some parameters
+---@param id string
+---@param sizex number width of the graph, Default is 128
+---@param sizey number height of the graph, Default is 64
+---@param rangemin number|nil If left nil, then the graph will automatically stretch the values to fill the bottom of the graph. Default is nil
+---@param rangemax number|nil If left nil, then the graph will automatically stretch the values to fill the top of the graph. Default is nil
+---@param linewidth number|nil The line width, Default is 2
 function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	local Graph = AutoGraphs[id]
 	if Graph == nil then error("Graph Doesn't exist, nil") end
@@ -1261,12 +1278,12 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 			local width = AutoDefault(linewidth, 2)
 
 			UiPush()
-			UiTranslate(a[1] - width / 2, a[2] - width / 2)
-			UiRotate(angle)
+				UiTranslate(a[1] - width / 2, a[2] - width / 2)
+				UiRotate(angle)
 
-			UiColor(unpack(AutoPrimaryColor))
-			UiAlign('left top')
-			UiRect(width, distance + 1)
+				UiColor(unpack(AutoPrimaryColor))
+				UiAlign('left top')
+				UiRect(width, distance + 1)
 			UiPop()
 		end
 	end

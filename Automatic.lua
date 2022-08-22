@@ -1,4 +1,4 @@
--- VERSION 1.55
+-- VERSION 1.6
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -261,7 +261,7 @@ function AutoVecPowVec(a, b)
 	}
 end
 
----Return Vec Absoulte Value
+---Return Vec Absolute Value
 ---@param v Vec
 ---@return Vec
 function AutoVecAbs(v)
@@ -646,7 +646,7 @@ function AutoSOS(initalposition, frequency, dampening, response)
 
 	t.xp = initalposition
 	t.current = initalposition
-	t.yd = 0
+	t.vel = 0
 	
 	t.k1 = dampening / (math.pi * frequency)
 	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
@@ -660,8 +660,8 @@ function AutoSOSUpdate(sos, Ideal, time)
 	local xd = (Ideal - sos.xp) / time
 	sos.xp = Ideal
 
-	sos.current = sos.current + time * sos.yd
-	sos.yd = sos.yd + time * (Ideal + sos.k3 * xd - sos.current - sos.k1 * sos.yd) / sos.k2
+	sos.current = sos.current + time * sos.vel
+	sos.vel = sos.vel + time * (Ideal + sos.k3 * xd - sos.current - sos.k1 * sos.vel) / sos.k2
 end
 
 function AutoSOSTable(initaltable, frequency, dampening, response)
@@ -674,7 +674,7 @@ end
 
 function AutoSOSTableUpdate(sostable, Ideal, time)
 	for i, v in pairs(sostable) do
-		v = AutoSOSUpdate(v, Ideal[i] or v.current, time)
+		v = AutoSOSUpdate(v, AutoDefault(Ideal[i], v.current), time)
 	end
 end
 
@@ -697,9 +697,15 @@ end
 function AutoTableSub(t, key)
 	local _t = {}
 	for i, v in ipairs(t) do
-		_t[i] = t[key]
+		_t[i] = v[key]
 	end
 	return _t
+end
+
+function AutoTableAppend(t, key, tset)
+	for i, v in pairs(t) do
+		v[key] = tset[i]
+	end
 end
 
 ---Returns true and the index if the v is in t, otherwise returns false and nil
@@ -1300,7 +1306,7 @@ end
 function AutoKeyDefaultInt(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
-		return GetInt(path)
+		return GetInt(path, default)
 	else
 		SetInt(path, default)
 		return default
@@ -1310,7 +1316,7 @@ end
 function AutoKeyDefaultFloat(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
-		return GetFloat(path)
+		return GetFloat(path, default)
 	else
 		SetFloat(path, default)
 		return default
@@ -1320,7 +1326,7 @@ end
 function AutoKeyDefaultString(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
-		return GetString(path)
+		return GetString(path, default)
 	else
 		SetString(path, default)
 		return default

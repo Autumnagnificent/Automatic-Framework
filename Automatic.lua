@@ -1,4 +1,4 @@
--- VERSION 1.6
+-- VERSION 1.7
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -638,15 +638,20 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Sets up a Second Order System, using code by t3ssel8r
+---@param inital number|table The inital current value of the system, if given a SOS instead, then it will just calculate the k values
 ---@param frequency number The frequency in which the system will respond to input
 ---@param dampening number
 ---@param response number
-function AutoSOS(initalposition, frequency, dampening, response)
+function AutoSOS(inital, frequency, dampening, response)
 	t = {}
 
-	t.xp = initalposition
-	t.current = initalposition
-	t.vel = 0
+	if type(inital) ~= "table" then
+		t.xp = inital
+		t.current = inital
+		t.vel = 0
+	else
+		t = AutoTableDeepCopy(inital)
+	end
 	
 	t.k1 = dampening / (math.pi * frequency)
 	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
@@ -963,6 +968,18 @@ end
 function AutoQueryRejectBodies(bodies)
 	for i in pairs(bodies) do
 		QueryRejectBody(bodies[i])
+	end
+end
+
+function AutoRejectShapesWithoutTag(tag)
+	local all = FindShapes(nil, true)
+	local keep = {}
+	for _, v in pairs(FindShapes(tag, true)) do
+		keep[v] = v
+	end
+
+	for _, v in pairs(all) do
+		if keep[v] == nil then QueryRejectShape(v) end
 	end
 end
 

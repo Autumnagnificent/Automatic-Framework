@@ -917,22 +917,30 @@ end
 ---@return boolean seen If the point is in View
 ---@return number|nil angle The Angle the point is away from the center of the looking direction
 ---@return number|nil distance The Distance from the point to fromtrans
-function AutoPointInView(point, fromtrans, angle, raycastcheck)
+function AutoPointInView(point, fromtrans, angle, raycastcheck, raycasterror)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
 	raycastcheck = AutoDefault(raycastcheck, true)
+	raycasterror = AutoDefault(raycasterror, 0)
 
 	local fromtopointdir = VecNormalize(VecSub(point, fromtrans.pos))
 	local fromdir = TransformToParentVec(fromtrans, Vec(0, 0, -1))
 
 	local dot = VecDot(fromtopointdir, fromdir)
 	local dotangle = math.deg(math.acos(dot))
-	local seen = dotangle < angle/2
+	local seen = dotangle < angle / 2
 
 	local dist = AutoVecDist(fromtrans.pos, point)
 	if raycastcheck then
-		local hit = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
-		if hit then return false end
+		local hit, hitdist = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
+		if hit then
+			if raycasterror > 0 then
+				local hitpoint = VecAdd(fromtrans.pos, VecScale(fromtopointdir, hitdist))
+				if AutoVecDist(hitpoint, point) > raycasterror then return false end
+			else
+				return false
+			end
+		end
 	end
 
 	return seen, dotangle, dist

@@ -1,4 +1,4 @@
--- VERSION 1.7
+-- VERSION 1.85
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -88,13 +88,20 @@ function AutoWrap(v, min, max)
 	return (v - min) % (max - min) + min
 end
 
----Lerp function, Is not clamped meaning it if t is above 1 then it will 'overshoot'
+---Lerp function, If t is above 1 then it will 'overshoot'
 ---@param a number Goes from number A
 ---@param b number To number B
 ---@param t number Interpolated by T
 ---@return number
-function AutoLerpUnclamped(a, b, t)
+function AutoLerp(a, b, t)
 	return (1 - t) * a + t * b
+end
+
+function AutoLerpWrap(a, b, t, w)
+	local m = w
+    local da = (b - a) % m
+	local n = (da * 2) % m - da
+	return a + n * t
 end
 
 ---Moves a towards b by t
@@ -290,26 +297,45 @@ end
 ---@param v Vec
 ---@param subx number
 function AutoVecSubsituteX(v, subx)
-	return Vec(subx, v[2], v[3])
+	v[1] = subx
+	return v
 end
 
 ---Return Vec v with it's y value replaced by suby
 ---@param v Vec
 ---@param suby number
 function AutoVecSubsituteY(v, suby)
-	return Vec(v[1], suby, v[3])
+	v[2] = suby
+	return v
 end
 
 ---Return Vec v with it's z value replaced by subz
 ---@param v Vec
 ---@param subz number
 function AutoVecSubsituteZ(v, subz)
-	return Vec(v[1], v[2], subz)
+	v[3] = subz
+	return v
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Bounds Functions-----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---Get the center of a body's bounds
+---@param body number
+---@return table
+function AutoBodyBoundsCenter(body)
+    local aa, bb = GetBodyBounds(body)
+	return VecScale(VecAdd(aa, bb), 0.5)
+end
+
+---Get the center of a shapes's bounds
+---@param shape number
+---@return table
+function AutoShapeBoundsCenter(shape)
+    local aa, bb = GetShapeBounds(shape)
+	return VecScale(VecAdd(aa, bb), 0.5)
+end
 
 ---Takes two vectors and modifys them so they can be used in other bound functions
 ---@param aa Vec
@@ -472,8 +498,6 @@ function AutoSimInstance()
 		},
 		Settings = {
 			Steps = 1,
-			Gravity = -10,
-			Drag = 0.0,
 			PointsAffectBodies = true,
 		}
 	}
@@ -491,7 +515,9 @@ function AutoSimInstance()
 
 		new_point.radius = 0
 		new_point.mass = 1
-		new_point.reflectivity = 0
+		new_point.drag = 0.0
+        new_point.reflectivity = 0
+		new_point.gravity = Vec(0, -10, 0)
 
 		new_point.collision = true
 		new_point.simulate = true
@@ -521,8 +547,8 @@ function AutoSimInstance()
 					
 					local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
 					local new_acc = (function()
-						local grav_acc = Vec(0, self.Settings.Gravity, 0)
-						local drag_force = VecScale(p.vel, 0.5 * self.Settings.Drag)
+						local grav_acc = VecCopy(p.gravity)
+						local drag_force = VecScale(p.vel, 0.5 * p.drag)
 						local drag_acc = AutoVecDiv(drag_force, AutoVecOne(p.mass))
 						return VecSub(grav_acc, drag_acc)
 					end)()
@@ -678,8 +704,10 @@ function AutoSOSTable(initaltable, frequency, dampening, response)
 end
 
 function AutoSOSTableUpdate(sostable, Ideal, time)
+	time = AutoDefault(time, GetTimeStep())
+
 	for i, v in pairs(sostable) do
-		v = AutoSOSUpdate(v, AutoDefault(Ideal[i], v.current), time)
+		AutoSOSUpdate(v, AutoDefault(Ideal[i], v.current), time)
 	end
 end
 
@@ -697,6 +725,13 @@ function AutoTableCount(t)
 	end
 
 	return c
+end
+
+function AutoTableConcat(t1, t2)
+	for i = 1, #t2 do
+		t1[#t1 + 1] = t2[i]
+	end
+	return t1
 end
 
 function AutoTableSub(t, key)
@@ -772,13 +807,13 @@ end
 
 function AutoExecute(f, ...)
 	if not f then return end
-
+	
 	if type(f) == "function" then
 		f(unpack(arg))
 	elseif type(f) == "table" then
-		for i, sub_f in ipairs(f) do
+		for _, sub_f in pairs(f) do
 			if type(sub_f) == "function" then
-				sub_f(v, unpack(arg))
+				sub_f(unpack(arg))
 			end
 		end
 	end
@@ -806,6 +841,11 @@ end
 
 function AutoTransformRight(t)
 	return TransformToParentVec(t, Vec(1, 0, 0))
+end
+
+function AutoEulerTable(quat)
+    local x, y, z = GetQuatEuler(quat)
+	return {x = x, y = y, z = z}
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -923,28 +963,38 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck, raycasterror)
 	raycastcheck = AutoDefault(raycastcheck, true)
 	raycasterror = AutoDefault(raycasterror, 0)
 
+	local useangle = angle ~= -1
+	
 	local fromtopointdir = VecNormalize(VecSub(point, fromtrans.pos))
 	local fromdir = TransformToParentVec(fromtrans, Vec(0, 0, -1))
 
+	local dist = AutoVecDist(fromtrans.pos, point)
+	
 	local dot = VecDot(fromtopointdir, fromdir)
 	local dotangle = math.deg(math.acos(dot))
-	local seen = dotangle < angle / 2
-
-	local dist = AutoVecDist(fromtrans.pos, point)
-	if raycastcheck then
-		local hit, hitdist = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
-		if hit then
-			if raycasterror > 0 then
-				local hitpoint = VecAdd(fromtrans.pos, VecScale(fromtopointdir, hitdist))
-				if AutoVecDist(hitpoint, point) > raycasterror then return false end
-			else
-				return false
+    local seen = dotangle < angle / 2
+	
+	seen = not useangle and true or seen
+	
+	if seen then
+		if raycastcheck then
+			local hit, hitdist = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
+			if hit then
+				if raycasterror > 0 then
+					local hitpoint = VecAdd(fromtrans.pos, VecScale(fromtopointdir, hitdist))
+					if AutoVecDist(hitpoint, point) > raycasterror then
+						seen = false
+					end
+				else
+					seen = false
+				end
 			end
 		end
 	end
 
 	return seen, dotangle, dist
 end
+
 
 function AutoPlayerInputDir(length)
 	return {
@@ -1184,16 +1234,19 @@ end
 ---Draws some text at a world position.
 ---@param text string|number|nil Text Displayed, Default is 'nil'
 ---@param position Vec The WorldSpace Position
+---@param occlude boolean|nil Hides the tooltip behind walls, Default is false
+
 ---@param fontsize number|nil Fontsize, Default is 24
 ---@param alpha number|nil Alpha, Default is 0.75
 ---@param bold boolean|nil Use Bold Font, Default is false
-function AutoTooltip(text, position, fontsize, alpha, bold)
+function AutoTooltip(text, position, occlude, fontsize, alpha, bold)
 	text = AutoDefault(text or "nil")
+	occlude = AutoDefault(occlude or false)
 	fontsize = AutoDefault(fontsize or 24)
 	alpha = AutoDefault(alpha or 0.75)
 	bold = AutoDefault(bold or false)
 
-	if not AutoPointInView(position, nil, nil, false) then return end
+	if not AutoPointInView(position, nil, nil, occlude) then return end
 
 	UiPush()
 		UiAlign('center middle')
@@ -1327,6 +1380,90 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Registry-------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoKey(...)
+	local s = ''
+	for i=1, #arg do
+		if s == '' then
+			s = arg[i]
+		else
+			s = s .. '.' .. arg[i]
+		end
+    end
+	return s
+end
+
+function AutoTableToRegistry(key, tbl, parenttype)
+	ClearKey(key)
+    if not tbl then return end
+	
+	parenttype = AutoDefault(parenttype, 'string')
+	SetString(AutoKey(key, '__keytype'), parenttype)
+	SetString(AutoKey(key, '__valuetype'), 'table')
+
+	
+	for k, v in pairs(tbl) do
+		local valtype = type(v)
+		local keytype = type(k)
+		
+		if k ~= '__keytype' and k ~= '__valuetype' then
+			local newkey = AutoKey(key, k)
+			if valtype == 'nil' then
+				ClearKey(newkey)
+			elseif valtype == 'table' then
+				AutoTableToRegistry(newkey, v)
+				SetString(AutoKey(newkey, '__keytype'), keytype)
+				SetString(AutoKey(newkey, '__valuetype'), 'table')
+			else
+				if valtype == 'number' then
+					SetFloat(newkey, tonumber(v))
+				elseif valtype == 'boolean' then
+					SetBool(newkey, v)
+				else
+					SetString(newkey, tostring(v))
+				end
+
+				-- SetString(newkey, tostring(v))
+				SetString(AutoKey(newkey, '__keytype'), keytype)
+				SetString(AutoKey(newkey, '__valuetype'), valtype)
+			end
+		end
+	end
+end
+
+function AutoTableFromRegistry(key)
+	if not HasKey(key) then return nil end
+    local subkeys = ListKeys(key)
+	local isvalue = GetString(AutoKey(key, '__valuetype')) ~= 'table'
+
+	if not isvalue then
+		local tbl = {}
+		
+		for _, k in pairs(subkeys) do
+			if k ~= '__keytype' and k ~= '__valuetype' then
+				local t = GetString(AutoKey(key, k, '__keytype'))
+				
+				if t == 'number' then
+					tbl[tonumber(k)] = AutoTableFromRegistry(AutoKey(key, k))
+				else
+					tbl[k] = AutoTableFromRegistry(AutoKey(key, k))
+				end
+			end
+		end
+		
+		return tbl
+	else
+        local t = GetString(AutoKey(key, '__valuetype'))
+		
+		if t == 'number' then
+			return GetFloat(key)
+		elseif t == 'boolean' then
+            return GetInt(key) ~= 0
+		else
+			return GetString(key)
+		end
+    end
+end
 
 function AutoKeyDefaultInt(path, default)
 	if path == nil then error("path nil") end
@@ -1564,8 +1701,9 @@ end
 ---@param spreadpad boolean Adds padding when used with AutoSpread...()
 ---@return boolean Pressed
 ---@return table ButtonData
-function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad)
+function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, spreadpad)
 	fontsize = AutoDefault(fontsize, 28)
+	color = AutoDefault(color, AutoPrimaryColor)
 	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
 	paddingheight = AutoDefault(paddingheight, AutoPad.thin)
 	draw = AutoDefault(draw, true)
@@ -1584,9 +1722,9 @@ function AutoButton(name, fontsize, paddingwidth, paddingheight, draw, spreadpad
 		
 		if draw then
 			hover = UiIsMouseInRect(padrw, padrh)
-			UiColor(unpack(AutoPrimaryColor))
+			UiColor(unpack(color))
 			
-			UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(AutoPrimaryColor))
+			UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(color))
 			pressed = UiTextButton(name, padrw, padrh)
 		end
 	UiPop()

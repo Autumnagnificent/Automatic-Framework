@@ -1,4 +1,4 @@
--- VERSION 1.9
+-- VERSION 1.95
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ end
 ---@param steep number How steep the curve is
 ---@param offset number The horizontal offset of the middle of the curve
 ---@param rangemin number Maps this number to 0
----@param rangemax number Maps this numver to 1
+---@param rangemax number Maps this number to 1
 ---@return number
 function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
 	v = AutoLogistic(v, max, steep, offset)
@@ -40,7 +40,7 @@ end
 function AutoRound(v, increment)
 	increment = AutoDefault(increment, 1)
 	if increment == 0 then return v end
-	s = 1 / increment
+	local s = 1 / increment
 	return math.floor(v * s + 0.5) / s
 end
 
@@ -85,7 +85,7 @@ function AutoWrap(v, min, max)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
 
-	return (v - min) % (max - min) + min
+	return (v - min) % ((max + 1) - min) + min
 end
 
 ---Lerp function, If t is above 1 then it will 'overshoot'
@@ -1281,8 +1281,8 @@ end
 
 ---Draws a Transform
 ---@param transform Transform
----@param size number the size in meters, Default is 0.5
----@param alpha number Default is 1
+---@param size number|nil the size in meters, Default is 0.5
+---@param alpha number|nil Default is 1
 ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawTransform(transform, size, alpha, draw)
 	if not transform['pos'] then
@@ -1309,6 +1309,54 @@ function AutoDrawTransform(transform, size, alpha, draw)
 			DrawLine(unpack(v))
 		else
 			DebugLine(unpack(v))
+		end
+	end
+
+	return transform
+end
+
+---Draws a Transform as a Cone
+---@param transform Transform
+---@param sides number|nil the amount of sides on the cone, Default is 12
+---@param angle number|nil how wide the cone is in degrees, Default is 25
+---@param size number|nil the size in meters, Default is 0.5
+---@param color table|nil Default is 1
+---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
+function AutoDrawCone(transform, sides, angle, size, color, draw)
+	if not transform['pos'] then
+		DebugPrint('AutoDrawCone given input not a transform')
+	end
+
+	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
+	size = AutoDefault(size, 0.5)
+	color = AutoDefault(color, { 1, 1, 1, 1 })
+	draw = AutoDefault(draw, false)
+	sides = AutoDefault(sides, 12)
+	angle = AutoDefault(angle, 25)
+
+	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
+
+	local lines = {}
+	local endpoints = {}
+	for i = 1, sides do
+		local rotated = TransformCopy(transform)
+		local rr = i / sides * 360
+		rotated.rot = QuatRotateQuat(rotated.rot, QuatEuler(angle, 0, rr))
+
+		local endpoint = TransformToParentPoint(rotated, Vec(0, 0, -size))
+		lines[#lines + 1] = { transform['pos'], endpoint }
+		endpoints[#endpoints + 1] = endpoint
+	end
+
+	for i = 1, #endpoints do
+		lines[#lines + 1] = { endpoints[i], endpoints[AutoWrap(i + 1, 1, #endpoints)] }
+	end
+
+	for i, v in ipairs(lines) do
+		if draw then
+			DrawLine(v[1], v[2], unpack(color))
+		else
+			DebugLine(v[1], v[2], unpack(color))
 		end
 	end
 

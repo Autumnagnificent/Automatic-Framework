@@ -1016,6 +1016,22 @@ function AutoHSVToRGB(hue, sat, val)
 	return out
 end
 
+function AutoStringToByteTable(str)
+	local t = {}
+	for i = 1, #str do
+		t[i] = (str:sub(i, i)):byte()
+	end
+	return t
+end
+
+function AutoByteTableToString(t)
+	local str = ''
+	for i, b in ipairs(t) do
+		str = str .. string.char(b)
+	end
+	return str
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Game Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1636,6 +1652,16 @@ function AutoKeyDefaultString(path, default)
 		return GetString(path, default)
 	else
 		SetString(path, default)
+		return default
+	end
+end
+
+function AutoKeyDefaultBool(path, default)
+	if path == nil then error("path nil") end
+	if HasKey(path) then
+		return GetBool(path)
+	else
+		SetBool(path, default)
 		return default
 	end
 end

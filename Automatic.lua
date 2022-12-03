@@ -1,4 +1,4 @@
--- VERSION 1.95
+-- VERSION 1.97
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1084,8 +1084,8 @@ end
 
 function AutoPlayerInputDir(length)
 	return {
-		x = (InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
-		y = (InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
+		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
+		(InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
 	}
 end
 
@@ -1554,78 +1554,6 @@ function AutoKey(...)
 	return s
 end
 
-function AutoTableToRegistry(key, tbl, parenttype)
-	ClearKey(key)
-	if not tbl then return end
-
-	parenttype = AutoDefault(parenttype, 'string')
-	SetString(AutoKey(key, '__keytype'), parenttype)
-	SetString(AutoKey(key, '__valuetype'), 'table')
-
-
-	for k, v in pairs(tbl) do
-		local valtype = type(v)
-		local keytype = type(k)
-
-		if k ~= '__keytype' and k ~= '__valuetype' then
-			local newkey = AutoKey(key, k)
-			if valtype == 'nil' then
-				ClearKey(newkey)
-			elseif valtype == 'table' then
-				AutoTableToRegistry(newkey, v)
-				SetString(AutoKey(newkey, '__keytype'), keytype)
-				SetString(AutoKey(newkey, '__valuetype'), 'table')
-			else
-				if valtype == 'number' then
-					SetFloat(newkey, tonumber(v))
-				elseif valtype == 'boolean' then
-					SetBool(newkey, v)
-				else
-					SetString(newkey, tostring(v))
-				end
-
-				-- SetString(newkey, tostring(v))
-				SetString(AutoKey(newkey, '__keytype'), keytype)
-				SetString(AutoKey(newkey, '__valuetype'), valtype)
-			end
-		end
-	end
-end
-
-function AutoTableFromRegistry(key)
-	if not HasKey(key) then return nil end
-	local subkeys = ListKeys(key)
-	local isvalue = GetString(AutoKey(key, '__valuetype')) ~= 'table'
-
-	if not isvalue then
-		local tbl = {}
-
-		for _, k in pairs(subkeys) do
-			if k ~= '__keytype' and k ~= '__valuetype' then
-				local t = GetString(AutoKey(key, k, '__keytype'))
-
-				if t == 'number' then
-					tbl[tonumber(k)] = AutoTableFromRegistry(AutoKey(key, k))
-				else
-					tbl[k] = AutoTableFromRegistry(AutoKey(key, k))
-				end
-			end
-		end
-
-		return tbl
-	else
-		local t = GetString(AutoKey(key, '__valuetype'))
-
-		if t == 'number' then
-			return GetFloat(key)
-		elseif t == 'boolean' then
-			return GetInt(key) ~= 0
-		else
-			return GetString(key)
-		end
-	end
-end
-
 function AutoKeyDefaultInt(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
@@ -1667,6 +1595,53 @@ function AutoKeyDefaultBool(path, default)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Registry Binded Table------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+local RegistryTableMeta = {
+	__index = function (self, key)
+		local path = AutoKey(self.__path, key)
+        local children = ListKeys(path)
+
+		if #children > 0 then
+			return AutoRegistryBindedTable(path)
+		else
+			local str = GetString(path)
+			local num = tonumber(str)
+			return num or str
+		end
+		
+	end,
+	__newindex = function (self, key, value)
+        local path = AutoKey(self.__path, key)
+		
+		local function checkvalue (currentpath, v)
+			if type(v) == 'table' then
+				for vk, vv in pairs(v) do
+					local vpath = AutoKey(currentpath, vk)
+					checkvalue(vpath, vv)
+				end
+			else
+				SetString(currentpath, v)
+			end
+        end
+		
+		checkvalue(path, value)
+    end,
+    __call = function(self)
+		
+	end
+}
+
+function AutoRegistryBindedTable(path)
+    local t = {}
+	t.__path = path
+    setmetatable(t, RegistryTableMeta)
+	
+	return t
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------User Interface-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1683,14 +1658,14 @@ local Stack = {}
 ---@param alignment string
 ---@return table
 function AutoAlignmentToPos(alignment)
-	v, y = 0, 0
-	if string.find(alignment, 'left') then v = -1 end
-	if string.find(alignment, 'center') then v = 0 end
-	if string.find(alignment, 'right') then v = 1 end
+	str, y = 0, 0
+	if string.find(alignment, 'left') then str = -1 end
+	if string.find(alignment, 'center') then str = 0 end
+	if string.find(alignment, 'right') then str = 1 end
 	if string.find(alignment, 'bottom') then y = -1 end
 	if string.find(alignment, 'middle') then y = 0 end
 	if string.find(alignment, 'top') then y = 1 end
-	return { x = v, y = y }
+	return { x = str, y = y }
 end
 
 ---UiTranslate and UiAlign to the Center
@@ -1760,11 +1735,11 @@ function AutoSetSpread(Spread)
 	local count = AutoTableCount(Stack)
 	for i = count, 1, -1 do
 		if Stack[i].type == 'spread' then
-			v = Stack[i]
+			str = Stack[i]
 		end
 	end
 
-	v = Spread
+	str = Spread
 end
 
 ---Stop the last known Spread

@@ -668,50 +668,46 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Sets up a Second Order System, using code by t3ssel8r
----@param inital number|table The inital current value of the system, if given a SOS instead, then it will just calculate the k values
+---@param inital number|table The inital current value of the system
 ---@param frequency number The frequency in which the system will respond to input
----@param dampening number
+---@param zeta number
 ---@param response number
-function AutoSOS(inital, frequency, dampening, response)
+function AutoCreateSOS(inital, frequency, zeta, response)
 	t = {}
+	t.value = inital
+	t.last = inital
+	t.vel = 0
 
-	if type(inital) ~= "table" then
-		t.xp = inital
-		t.current = inital
-		t.vel = 0
-	else
-		t = AutoTableDeepCopy(inital)
-	end
-
-	t.k1 = dampening / (math.pi * frequency)
+	t.k1 = zeta / (math.pi * frequency)
 	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
-	t.k3 = response * dampening / (2 * math.pi * frequency)
+	t.k3 = response * zeta / (2 * math.pi * frequency)
 
 	return t
 end
 
-function AutoSOSUpdate(sos, Ideal, time)
+function AutoSOSUpdate(sos, desired, time)
 	time = AutoDefault(time, GetTimeStep())
-	local xd = (Ideal - sos.xp) / time
-	sos.xp = Ideal
+	local xd = (desired - sos.last) / time
+	sos.last = desired
 
-	sos.current = sos.current + time * sos.vel
-	sos.vel = sos.vel + time * (Ideal + sos.k3 * xd - sos.current - sos.k1 * sos.vel) / sos.k2
+	local k2_stable = math.max(sos.k2, time ^ 2 / 2 + time * sos.k1 / 2, time * sos.k1)
+	sos.value = sos.value + time * sos.vel
+	sos.vel = sos.vel + time * (desired + sos.k3 * xd - sos.value - sos.k1 * sos.vel) / k2_stable
 end
 
-function AutoSOSTable(initaltable, frequency, dampening, response)
+function AutoBatchCreateSOS(initaltable, frequency, dampening, response)
 	local t = {}
-	for i = 1, #initaltable do
-		t[i] = AutoSOS(initaltable[i] or 0, frequency, dampening, response)
+	for i, v in pairs(initaltable) do
+		t[i] = AutoCreateSOS(initaltable[i] or 0, frequency, dampening, response)
 	end
 	return t
 end
 
-function AutoSOSTableUpdate(sostable, Ideal, time)
+function AutoBatchSOSUpdate(sostables, desired, time)
 	time = AutoDefault(time, GetTimeStep())
 
-	for i, v in pairs(sostable) do
-		AutoSOSUpdate(v, AutoDefault(Ideal[i], v.current), time)
+	for i, v in pairs(sostables) do
+		AutoSOSUpdate(v, AutoDefault(desired[i], v.value), time)
 	end
 end
 
@@ -916,7 +912,7 @@ end
 
 function AutoEulerTable(quat)
 	local x, y, z = GetQuatEuler(quat)
-	return { x = x, y = y, z = z }
+	return { x, y, z }
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -1523,12 +1519,12 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 			local width = AutoDefault(linewidth, 2)
 
 			UiPush()
-			UiTranslate(a[1] - width / 2, a[2] - width / 2)
-			UiRotate(angle)
+				UiTranslate(a[1] - width / 2, a[2] - width / 2)
+				UiRotate(angle)
 
-			UiColor(unpack(AutoPrimaryColor))
-			UiAlign('left top')
-			UiRect(width, distance + 1)
+				UiColor(unpack(AutoPrimaryColor))
+				UiAlign('left top')
+				UiRect(width, distance + 1)
 			UiPop()
 		end
 	end

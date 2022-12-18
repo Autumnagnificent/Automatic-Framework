@@ -3,7 +3,7 @@
 **This is a Framework made to stop you from wasting your time, It contains more than alot.** It was also created to be easy to understand and out of the way as possible. Every Function Starts with **Auto**.
 
 It has every function I have ever used that I deemed worthy enough to be included, its ever growing and will contuine to be added to. 
-[**Check out the Wiki for Every Single Function**](https://github.com/SpunkyTheHedgeHog/Automatic-Framework/wiki).
+[**Check out the Wiki for a very outdated list if Every Single Function**](https://github.com/SpunkyTheHedgeHog/Automatic-Framework/wiki).
 
 If you want to add your Function to the List, make a Issue or Ping me on Discord!
 

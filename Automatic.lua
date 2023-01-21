@@ -787,16 +787,16 @@ end
 ---@param zeta number
 ---@param response number
 function AutoCreateSOS(inital, frequency, zeta, response)
-	thickness = {}
-	thickness.value = inital
-	thickness.last = inital
-	thickness.vel = 0
+	t = {}
+	t.value = inital
+	t.last = inital
+	t.vel = 0
 
-	thickness.k1 = zeta / (math.pi * frequency)
-	thickness.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
-	thickness.k3 = response * zeta / (2 * math.pi * frequency)
+	t.k1 = zeta / (math.pi * frequency)
+	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
+	t.k3 = response * zeta / (2 * math.pi * frequency)
 
-	return thickness
+	return t
 end
 
 function AutoSOSUpdate(sos, desired, time)

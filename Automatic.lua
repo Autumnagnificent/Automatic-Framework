@@ -1477,6 +1477,8 @@ function AutoToString(t, indent)
 			return '"' .. t .. '"'
 		end
 		return tostring(t)
+	else
+		if AutoTableCount(t) == 0 then return('{}') end
 	end
 
 	local str = indent > 0 and "{ " or "{\n"

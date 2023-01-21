@@ -1151,6 +1151,9 @@ end
 ----------------Game Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---Usually, the Primary Menu Button only is suppose to work in the mod's level, this is a work around to have it work in any level.
+---@param title any
+---@return boolean
 function AutoPrimaryMenuButton(title)
 	local value = PauseMenuButton(title, true)
 
@@ -1164,12 +1167,17 @@ function AutoPrimaryMenuButton(title)
 	return value
 end
 
+---Goes through a table and performs Delete() on each element
+---@param t any
 function AutoDeleteHandles(t)
 	for k, v in pairs(t) do
 		Delete(v)
 	end
 end
 
+---Goes through each shape on a body and adds up their voxel count
+---@param body any
+---@return number
 function AutoGetBodyVoxels(body)
 	local v = 0
 	for _, s in pairs(GetBodyShapes(body)) do
@@ -1178,6 +1186,10 @@ function AutoGetBodyVoxels(body)
 	return v
 end
 
+---Gets the angle from a point to the forward direction of a transform
+---@param point any
+---@param fromtrans any
+---@return number
 function AutoPointToAngle(point, fromtrans)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
 
@@ -1395,6 +1407,8 @@ end
 ----------------Environment--------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---Returns a table of every property of the current environment
+---@return table
 function AutoGetEnvironment()
 	local params = {
 		'skybox',
@@ -1438,6 +1452,8 @@ function AutoGetEnvironment()
 	return assembled
 end
 
+---Sets every environment property of AutoGetEnvironment
+---@param Environment any
 function AutoSetEnvironment(Environment)
 	for k, v in pairs(Environment) do
 		SetEnvironmentProperty(k, unpack(v))
@@ -1448,6 +1464,10 @@ end
 ----------------Showing Debug--------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---Creates a neatly formatted table of a value, including tables.
+---@param t any
+---@param indent any
+---@return string
 function AutoToString(t, indent)
 	local indent_str = '  '
 	local indent = indent or 0
@@ -2074,14 +2094,23 @@ function HandleSpread(gs, data, type, spreadpad)
 	end
 end
 
-function AutoTextInput(old, maxlength, allowlowercase, allowspecial, forcekey)
-	old = AutoDefault(old, '')
+---Given the current string, will return a modified string based on the input of the user. It's basically just a text box. Has a few options.
+---@param current any
+---@param maxlength any
+---@param allowlowercase any
+---@param allowspecial any
+---@param forcekey any
+---@return any
+---@return any
+---@return boolean
+function AutoTextInput(current, maxlength, allowlowercase, allowspecial, forcekey)
+	current = AutoDefault(current, '')
 	maxlength = AutoDefault(maxlength, 1 / 0)
 	allowlowercase = AutoDefault(allowlowercase, true)
 	allowspecial = AutoDefault(allowspecial, true)
 	forcekey = AutoDefault(forcekey, nil)
 
-	local modified = old
+	local modified = current
 
 	local special = {
 		['1'] = '!',
@@ -2119,7 +2148,7 @@ function AutoTextInput(old, maxlength, allowlowercase, allowspecial, forcekey)
 		end
 	end
 
-	return modified, lpk ~= '' and lpk or nil, modified ~= old
+	return modified, lpk ~= '' and lpk or nil, modified ~= current
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------

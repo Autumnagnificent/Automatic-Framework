@@ -1,4 +1,4 @@
--- VERSION 2.03
+-- VERSION 2.04
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1468,10 +1468,10 @@ end
 ---@param t any
 ---@param indent any
 ---@return string
-function AutoToString(t, singleline_at, indents)
+function AutoToString(t, singleline_at, indent_str, indents)
 	local singleline_at = singleline_at or 1
 	local indents = indents or 0
-	local indent_str = '  '
+	local indent_str = indent_str or '  '
 	local str = ""
 
 	if type(t) ~= "table" then
@@ -1493,7 +1493,7 @@ function AutoToString(t, singleline_at, indents)
 		end
 
 		local k_str = type(k) == "number" and '' or (tostring(k) .. " = ")
-		local v_str = AutoToString(v, singleline_at - 1, indents + 1)
+		local v_str = AutoToString(v, singleline_at - 1, indent_str, indents + 1)
 		str = str .. k_str .. v_str .. ", "
 
         if not passedSLthreshold then
@@ -1507,9 +1507,10 @@ end
 ---A Alternative to DebugPrint that uses AutoInspect(), works with tables. Returns the value
 ---@param value any
 ---@param singleline_at any
----@return any value
-function AutoInspect(value, singleline_at)
-	local text = AutoToString(value, singleline_at or 3)
+---@param indent_str any
+---@return any
+function AutoInspect(value, singleline_at, indent_str)
+	local text = AutoToString(value, singleline_at or 3, indent_str)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
         local t = split[i]
@@ -1524,9 +1525,11 @@ end
 
 ---AutoInspect that prints to console
 ---@param value any
----@return any value
-function AutoInspectConsole(value, singleline_at)
-	print(AutoToString(value, singleline_at or 3))
+---@param singleline_at any
+---@param indent_str any
+---@return any
+function AutoInspectConsole(value, singleline_at, indent_str)
+	print(AutoToString(value, singleline_at or 3, indent_str))
 	return value
 end
 

@@ -196,6 +196,9 @@ function AutoFlex(table, span, padding)
 	return flexxed
 end
 
+---Takes in a variable number of arguments which are considered as weights. It returns a number, the index of the selected weight using a bias based on the weight values. Good for Biased Randomness.
+---@param ... weights
+---@return number selected
 function AutoBias(...)
 	local T = {}
 	local max = 0

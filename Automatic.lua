@@ -1,4 +1,4 @@
--- VERSION 2.01
+-- VERSION 2.02
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1468,9 +1468,11 @@ end
 ---@param t any
 ---@param indent any
 ---@return string
-function AutoToString(t, indent)
+function AutoToString(t, singleline_at, indents)
+	local singleline_at = singleline_at or 1
+	local indents = indents or 0
 	local indent_str = '  '
-	local indent = indent or 0
+	local str = ""
 
 	if type(t) ~= "table" then
 		if type(t) == "string" then
@@ -1480,15 +1482,25 @@ function AutoToString(t, indent)
 	else
 		if AutoTableCount(t) == 0 then return('{}') end
 	end
+	
+	local passedSLthreshold = singleline_at <= 0
+	str = passedSLthreshold and "{ " or "{\n"
+	if passedSLthreshold then indents = indents + 1 end
 
-	local str = indent > 0 and "{ " or "{\n"
 	for k, v in pairs(t) do
-		if indent == 0 then str = str .. indent_str end
-		str = str ..
-			(type(k) == "number" and AutoToString(v, indent + 1) or tostring(k) .. " = " .. AutoToString(v, indent + 1)) .. ", "
-		if indent == 0 then str = str .. "\n" end
+		if not passedSLthreshold then
+			str = str .. indent_str:rep(indents+1)
+		end
+
+		local k_str = type(k) == "number" and '' or (tostring(k) .. " = ")
+		local v_str = AutoToString(v, singleline_at - 1, indents + 1)
+		str = str .. k_str .. v_str .. ", "
+
+        if not passedSLthreshold then
+            str = str .. "\n"
+		end
 	end
-	str = (indent > 0 and str:sub(1, -3) or str) .. (indent > 0 and " }" or string.rep(indent_str, indent) .. "}")
+	str = (passedSLthreshold and str:sub(1, -3) or str) .. (passedSLthreshold and " }" or (indent_str:rep(indents) .. "}"))
 	return str
 end
 
@@ -1522,9 +1534,9 @@ end
 function AutoInspectConsole(...)
 	arg.n = nil
 	if #arg > 1 then
-		print(AutoToString(arg))
+		print(AutoToString(arg, 3))
 	elseif #arg > 0 then
-		print(AutoToString(arg[1]))
+		print(AutoToString(arg[1], 3))
 	else
 
 	end
@@ -2161,6 +2173,18 @@ function AutoTextInput(current, maxlength, allowlowercase, allowspecial, forceke
 
 	return modified, lpk ~= '' and lpk or nil, modified ~= current
 end
+
+-- local keys = {
+-- 	"lmb", "mmb", "rmb", -- mouse
+-- 	"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", -- numerical
+-- 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+-- 	"y", "z", -- alphabatical
+-- 	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", -- function key
+-- 	"uparrow", "downarrow", "leftarrow", "rightarrow", -- arrow key
+-- 	"backspace", "alt", "delete", "home", "end", "pgup", "pgdown", "insert", "return", "space", "shift", "ctrl", "tab",
+-- 	"esc", --random key
+-- 	",", ".", "-", "+", -- undocumented key (yes, '=' key is '+' key)
+-- }
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------User Interface Creation Functions------------------------------------------------------------------------------------------------------

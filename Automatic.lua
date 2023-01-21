@@ -145,6 +145,9 @@ function AutoDist(a, b)
 	return math.abs(a - b)
 end
 
+---Normalizes all values in a table to have a magnitude of 1 - Scales every number to still represent the same "direction"
+---@param table table { 1, 2, 3, 4 }
+---@return table
 function AutoNormalize(table)
 	local norm = {}
 	local maxabs = 0
@@ -159,6 +162,13 @@ function AutoNormalize(table)
 	return norm
 end
 
+---Takes a table of weights, like {1, 2, 0.5, 0.5}, and produces a table of how much space each weight would take up if it were to span over a given length.
+---If given the weights {1, 2, 0.5, 0.5}, with a span length of 100, the resulting table would be = {25, 50, 12.5, 12.5}.
+---A padding parameter can also be added which can be used to make Ui easier. Iterate through the resulting table, after each UiRect, move the width + the padding parameter
+---@param table weights
+---@param span number
+---@param padding number
+---@return table
 function AutoFlex(table, span, padding)
 	local istable = type(table) == "table"
 	table = not istable and (function()

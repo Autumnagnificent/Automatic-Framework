@@ -1,4 +1,4 @@
--- VERSION 2.02
+-- VERSION 2.03
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1504,43 +1504,30 @@ function AutoToString(t, singleline_at, indents)
 	return str
 end
 
----A Alternative to DebugPrint that uses AutoInspect(), works with tables. Returns the Input
----@param ... any
----@return unknown Arguments
-function AutoInspect(...)
-	arg.n = nil
-	local text
-	if #arg > 1 then
-		text = AutoToString(arg)
-	elseif #arg > 0 then
-		text = AutoToString(arg[1])
-	end
-
+---A Alternative to DebugPrint that uses AutoInspect(), works with tables. Returns the value
+---@param value any
+---@param singleline_at any
+---@return any value
+function AutoInspect(value, singleline_at)
+	local text = AutoToString(value, singleline_at or 3)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
         local t = split[i]
-		if i > 20 then
-			t = t .. ' - Some of AutoInspect has been cut off (' .. #split - 20 .. ' Lines Cut)'
+		if i > 20 and i == #split then
+			t = t .. ' - Some of AutoInspect has been cut off (' .. #split - 20 .. ' Lines Cut), lowering `singleline_at` may give more room'
 		end
 		DebugPrint(t)
 	end
 	
-	return unpack(arg)
+	return value
 end
 
 ---AutoInspect that prints to console
----@param ... any
----@return unknown Arguments
-function AutoInspectConsole(...)
-	arg.n = nil
-	if #arg > 1 then
-		print(AutoToString(arg, 3))
-	elseif #arg > 0 then
-		print(AutoToString(arg[1], 3))
-	else
-
-	end
-	return unpack(arg)
+---@param value any
+---@return any value
+function AutoInspectConsole(value, singleline_at)
+	print(AutoToString(value, singleline_at or 3))
+	return value
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"
@@ -1835,6 +1822,41 @@ function AutoKey(...)
 		end
 	end
 	return s
+end
+
+function AutoDebugRegistryKey(key)
+	local t = {}
+	function delve(k, current)
+		local subkeys = ListKeys(k)
+		local splitkey = AutoSplit(k, '.')
+		local neatkey = splitkey[#splitkey]
+		if #subkeys > 0 then
+			current[neatkey] = {}
+			for _, subkey in ipairs(subkeys) do
+				delve(AutoKey(k, subkey), current[neatkey])
+			end
+		else
+			current[neatkey] = HasKey(k) and GetString(k) or nil
+		end
+    end
+	
+    delve(key, t)
+	return t
+end
+
+function delve(key, current)
+	local subkeys = ListKeys(key)
+	local splitkey = AutoSplit(key, '.')
+	local neatkey = splitkey[#splitkey]
+	if #subkeys > 0 then
+		current[neatkey] = {}
+
+		for _, subkey in ipairs(subkeys) do
+			delve(AutoKey(key, subkey), current[neatkey])
+		end
+	else
+		current[neatkey] = HasKey(key) and GetString(key) or nil
+	end
 end
 
 function AutoKeyDefaultInt(path, default)

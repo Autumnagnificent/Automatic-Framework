@@ -1495,13 +1495,22 @@ end
 ---@return unknown Arguments
 function AutoInspect(...)
 	arg.n = nil
+	local text
 	if #arg > 1 then
-		DebugPrint(AutoToString(arg))
+		text = AutoToString(arg)
 	elseif #arg > 0 then
-		DebugPrint(AutoToString(arg[1]))
-	else
-
+		text = AutoToString(arg[1])
 	end
+
+	local split = AutoSplit(text, '\n')
+	for i=1, #split do
+        local t = split[i]
+		if i > 20 then
+			t = t .. ' - Some of AutoInspect has been cut off (' .. #split - 20 .. ' Lines Cut)'
+		end
+		DebugPrint(t)
+	end
+	
 	return unpack(arg)
 end
 

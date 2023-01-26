@@ -1,5 +1,12 @@
--- VERSION 2.04
+-- VERSION 2.05
 -- I ask that you please do not rename Automatic.lua - Thankyou
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Shortcuts-------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
@@ -314,7 +321,7 @@ end
 ---@param length number return the vector of size length, Default is 1
 ---@return Vec
 function AutoVecOne(length)
-	return VecScale(Vec(1, 1, 1), length)
+	return VecScale(Vec(1, 1, 1), length or 1)
 end
 
 function AutoVecMidpoint(a, b)
@@ -865,7 +872,7 @@ end
 
 function AutoTableSub(t, key)
 	local _t = {}
-	for i, v in ipairs(t) do
+	for i, v in pairs(t) do
 		_t[i] = v[key]
 	end
 	return _t
@@ -1247,11 +1254,11 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck, raycasterror)
 end
 
 function AutoPlayerInputDir(length)
-	return {
+	return VecScale({
 		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
 		(InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
 		0,
-	}
+	}, length)
 end
 
 ---Get the last Path Query as a path of points
@@ -1460,23 +1467,64 @@ function AutoSetEnvironment(Environment)
 	end
 end
 
+---comment
+---@param r any
+---@param g any
+---@param b any
+---@param a any
+---@param sprite any|nil Defaults to TD's 'ui/menu/white-32.png'
+function AutoSolidBackground(r, g, b, a, sprite)
+	r = AutoDefault(r, 0)
+	g = AutoDefault(g, 0)
+	b = AutoDefault(b, 0)
+	a = AutoDefault(a, 1)
+	sprite = AutoDefault(sprite, AutoFlatSprite)
+
+	local cam = GetCameraTransform()
+	local distance = 256
+	local overextention = 2
+	local transforms = {
+		Transform(VecAdd(cam.pos, Vec(0, 0, distance))),
+		Transform(VecAdd(cam.pos, Vec(0, 0, -distance))),
+		Transform(VecAdd(cam.pos, Vec(-distance, 0, 0)), QuatEuler(0, 90)),
+		Transform(VecAdd(cam.pos, Vec(distance, 0, 0)), QuatEuler(0, 90)),
+		Transform(VecAdd(cam.pos, Vec(0, -distance, 0)), QuatEuler(90, 0, 0)),
+		Transform(VecAdd(cam.pos, Vec(0, distance, 0)), QuatEuler(90, 0, 0)),
+	}
+	for i, v in ipairs(transforms) do
+		DrawSprite(sprite, v, distance * 2 + overextention, distance * 2 + overextention,
+			r, g, b, a, true, false
+		)
+	end
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Showing Debug--------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Creates a neatly formatted table of a value, including tables.
 ---@param t any
----@param indent any
+---@param singleline_at number
+---@param indent_str string
+---@param round_numbers number
+---@param indents number
 ---@return string
-function AutoToString(t, singleline_at, indent_str, indents)
+function AutoToString(t, singleline_at, indent_str, round_numbers, indents)
 	local singleline_at = singleline_at or 1
 	local indents = indents or 0
+	local round_numbers = round_numbers or false
 	local indent_str = indent_str or '  '
 	local str = ""
 
 	if type(t) ~= "table" then
 		if type(t) == "string" then
 			return '"' .. t .. '"'
+		elseif type(t) == 'number' then
+			if round_numbers then
+				return tostring(AutoRound(t, round_numbers))
+			else
+				return tostring(t)
+			end
 		end
 		return tostring(t)
 	else
@@ -1493,7 +1541,7 @@ function AutoToString(t, singleline_at, indent_str, indents)
 		end
 
 		local k_str = type(k) == "number" and '' or (tostring(k) .. " = ")
-		local v_str = AutoToString(v, singleline_at - 1, indent_str, indents + 1)
+		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, indents + 1)
 		str = str .. k_str .. v_str .. ", "
 
         if not passedSLthreshold then
@@ -1509,8 +1557,8 @@ end
 ---@param singleline_at any
 ---@param indent_str any
 ---@return any
-function AutoInspect(value, singleline_at, indent_str)
-	local text = AutoToString(value, singleline_at or 3, indent_str)
+function AutoInspect(value, singleline_at, indent_str, round_numbers)
+	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
         local t = split[i]
@@ -1528,8 +1576,8 @@ end
 ---@param singleline_at any
 ---@param indent_str any
 ---@return any
-function AutoInspectConsole(value, singleline_at, indent_str)
-	print(AutoToString(value, singleline_at or 3, indent_str))
+function AutoInspectConsole(value, singleline_at, indent_str, round_numbers)
+	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
 	return value
 end
 
@@ -1827,7 +1875,7 @@ function AutoKey(...)
 	return s
 end
 
-function AutoDebugRegistryKey(key)
+function AutoExpandRegistryKey(key)
 	local t = {}
 	function delve(k, current)
 		local subkeys = ListKeys(k)
@@ -1843,7 +1891,10 @@ function AutoDebugRegistryKey(key)
 		end
     end
 	
-    delve(key, t)
+	for _, k in pairs(ListKeys(key)) do
+		delve(AutoKey(key, k), t)
+    end
+	
 	return t
 end
 

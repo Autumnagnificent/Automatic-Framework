@@ -434,7 +434,7 @@ end
 --- @param vec table The vector to rotate
 --- @param axis table The rotation axis, a unit vector
 --- @param angle number The rotation angle in degrees
---- @return table The rotated vector
+--- @return table vec The rotated vector
 function AutoVecRotate(vec, axis, angle)
 	local quat = QuatAxisAngle(axis, angle)
 	return QuatRotateVec(quat, vec)
@@ -1654,8 +1654,8 @@ function AutoDrawLines(points, huescale, offset, alpha, draw)
 	local lines = {}
 	local dist = 0
 	for i = 1, #points - 1 do
-		local color = AutoHSVToRGB((dist / 10 * huescale) + offset, 0.5, 1)
-		table.insert(lines, { points[i], points[i + 1], color[1], color[2], color[3], alpha })
+		local c1, c2, c3 = AutoHSVToRGB((dist / 10 * huescale) + offset, 0.5, 1)
+		table.insert(lines, { points[i], points[i + 1], c1, c2, c3, alpha })
 
 		dist = dist + AutoVecDist(points[i], points[i + 1])
 	end

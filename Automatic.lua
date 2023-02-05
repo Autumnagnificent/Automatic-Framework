@@ -1,4 +1,4 @@
--- VERSION 2.05
+-- VERSION 2.1
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 
@@ -7,6 +7,38 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
+AutoColors = {
+	background_dark = { 0.28627450980392, 0.25490196078431, 0.38039215686275 },
+	background_light = { 0.41960784313725, 0.39607843137255, 0.58823529411765 },
+	wood_dark = { 0.6, 0.33725490196078, 0.42352941176471 },
+	wood_light = { 0.78039215686275, 0.53333333333333, 0.56470588235294 },
+	rock_dark = { 0.41960784313725, 0.38039215686275, 0.46666666666667 },
+	rock_light = { 0.49803921568627, 0.46274509803922, 0.55686274509804 },
+	green_dark = { 0.3843137254902, 0.76078431372549, 0.76078431372549 },
+	green_light = { 0.4156862745098, 0.90980392156863, 0.63529411764706 },
+	jade_dark = { 0.33725490196078, 0.52156862745098, 0.6 },
+	jade_light = { 0.29411764705882, 0.68627450980392, 0.69019607843137 },
+	aqua_dark = { 0.28627450980392, 0.46666666666667, 0.58039215686275 },
+	aqua_light = { 0.32156862745098, 0.60392156862745, 0.78039215686275 },
+	pastel_dark = { 1, 0.7921568627451, 0.83137254901961 },
+	pastel_light = { 0.80392156862745, 0.70588235294118, 0.85882352941176 },
+	pink_dark = { 0.70196078431373, 0.45098039215686, 0.64313725490196 },
+	pink_light = { 0.94901960784314, 0.57647058823529, 0.86274509803922 },
+	purple_dark = { 0.56470588235294, 0.34117647058824, 0.63921568627451 },
+	purple_light = { 0.77647058823529, 0.45098039215686, 0.8156862745098 },
+	yellow_dark = { 0.7921568627451, 0.65490196078431, 0.32156862745098 },
+	yellow_light = { 0.89803921568627, 0.75686274509804, 0.36862745098039 },
+	amber_dark = { 0.7843137254902, 0.50196078431373, 0.28627450980392 },
+	amber_light = { 0.96470588235294, 0.63921568627451, 0.18039215686275 },
+	red_dark = { 0.72549019607843, 0.35686274509804, 0.48627450980392 },
+	red_light = { 0.84313725490196, 0.33333333333333, 0.41960784313725 },
+	white_dark = { 0.84705882352941, 0.74509803921569, 0.61960784313725 },
+	white_light = { 0.96470588235294, 0.91372549019608, 0.80392156862745 },
+	blue_dark = { 0.2078431372549, 0.31372549019608, 0.43921568627451 },
+	blue_light = { 0.19607843137255, 0.61176470588235, 0.78823529411765 },
+	alert_dark = { 0.22352941176471, 0.098039215686275, 0.2 },
+	alert_light = { 0.74901960784314, 0.21960784313725, 0.49019607843137 },
+}
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
@@ -74,13 +106,7 @@ end
 function AutoClamp(v, min, max)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
-	if v < min then
-		return min
-	elseif v > max then
-		return max
-	else
-		return v
-	end
+	return math.max(math.min(v, max), min)
 end
 
 ---Limits a value from going below the min and above the max
@@ -153,18 +179,19 @@ function AutoDist(a, b)
 end
 
 ---Normalizes all values in a table to have a magnitude of 1 - Scales every number to still represent the same "direction"
----@param table table { 1, 2, 3, 4 }
+---@param t table { 1, 2, 3, 4 }
+---@param scale number Defualt 1
 ---@return table
-function AutoNormalize(table)
+function AutoNormalize(t, scale)
 	local norm = {}
 	local maxabs = 0
-	for i = 1, #table do
-		local abs = math.abs(table[i])
+	for i = 1, #t do
+		local abs = math.abs(t[i])
 		maxabs = abs > maxabs and abs or maxabs
 	end
 
-	for i = 1, #table do
-		norm[i] = table[i] / maxabs
+	for i = 1, #t do
+		norm[i] = t[i] / maxabs * AutoDefault(scale, 1)
 	end
 	return norm
 end
@@ -172,33 +199,35 @@ end
 ---Takes a table of weights, like {1, 2, 0.5, 0.5}, and produces a table of how much space each weight would take up if it were to span over a given length.
 ---If given the weights {1, 2, 0.5, 0.5}, with a span length of 100, the resulting table would be = {25, 50, 12.5, 12.5}.
 ---A padding parameter can also be added which can be used to make Ui easier. Iterate through the resulting table, after each UiRect, move the width + the padding parameter
----@param table weights
+---@param weights table|number weights
 ---@param span number
 ---@param padding number
 ---@return table
-function AutoFlex(table, span, padding)
-	local istable = type(table) == "table"
-	table = not istable and (function()
+function AutoFlex(weights, span, padding)
+	local istable = type(weights) == "table"
+	weights = not istable and (function()
 		local t = {}
-		for i = 1, table do
+		for i = 1, weights do
 			t[i] = 1
 		end
 		return t
-	end)() or table
+	end)() or weights
 
 	span = AutoDefault(span, 1)
+	padding = AutoDefault(padding, 0)
+	local count = #weights
 
-	local spanfloor = math.floor(span)
-	local spanT = span % 1
 	local flexxed = {}
-	local normalized = AutoNormalize(table)
+	local normalized = AutoNormalize(weights)
 	local max = 0
-	for i = 1, #normalized do
+	for i = 1, count do
 		max = max + normalized[i]
 	end
 
-	for i = 1, #normalized do
-		flexxed[i] = (normalized[i] / max) * ((spanfloor - spanT) - #normalized * AutoDefault(padding, 0))
+
+	local padding_deduction = (padding / count) * (count - 1)
+	for i = 1, count do
+		flexxed[i] = (normalized[i] / max) * span - padding_deduction
 	end
 	return flexxed
 end
@@ -255,8 +284,8 @@ end
 
 ---Return the Vector Rounded to a number
 ---@param vec Vec
----@param r Vec
----@return number
+---@param r number
+---@return Vec
 function AutoVecRound(vec, r)
 	return Vec(AutoRound(vec[1], r), AutoRound(vec[2], r), AutoRound(vec[3], r))
 end
@@ -848,6 +877,14 @@ function AutoTableCount(t)
 	return c
 end
 
+function AutoTableRepeatValue(v, r)
+	local t = {}
+	for i=1,r do
+		t[#t+1] = type(v) == 'table' and AutoTableDeepCopy(v) or v
+    end
+	return t
+end
+
 function AutoTableConcat(t1, t2)
 	for i = 1, #t2 do
 		t1[#t1 + 1] = t2[i]
@@ -874,6 +911,22 @@ function AutoTableSub(t, key)
 	local _t = {}
 	for i, v in pairs(t) do
 		_t[i] = v[key]
+	end
+	return _t
+end
+
+function AutoTableListKeys(t)
+	local _t = {}
+	for k, _ in pairs(t) do
+		_t[#_t+1] = k
+	end
+	return _t
+end
+
+function AutoTableSwapKeysAndValues(t)
+	local _t = {}
+	for k, v in pairs(t) do
+		_t[v] = k
 	end
 	return _t
 end
@@ -1427,7 +1480,7 @@ function AutoGetEnvironment()
 		'ambientexponent',
 		'fogColor',
 		'fogParams',
-		'sunBirghtness',
+		'sunBrightness',
 		'sunColorTint',
 		'sunDir',
 		'sunSpread',
@@ -1452,7 +1505,7 @@ function AutoGetEnvironment()
 	}
 
 	local assembled = {}
-	for _, k in pairs(params) do
+	for _, k in ipairs(params) do
 		assembled[k] = { GetEnvironmentProperty(k) }
 	end
 
@@ -1728,25 +1781,27 @@ function AutoTooltip(text, position, occlude, fontsize, alpha)
 	alpha = AutoDefault(alpha or 0.75)
 	bold = AutoDefault(bold or false)
 
-	if not AutoPointInView(position, nil, nil, occlude) then return end
+	if occlude then if not AutoPointInView(position, nil, nil, occlude) then return end end
 
 	UiPush()
 	UiAlign('center middle')
-	local x, y = UiWorldToPixel(position)
-	UiTranslate(x, y)
-	UiWordWrap(UiMiddle())
-
-	UiFont(AutoFont, fontsize)
-	UiColor(0, 0, 0, 0)
-	local rw, rh = UiText(text)
-
-	UiColorFilter(1, 1, 1, alpha)
-	UiColor(unpack(AutoSecondaryColor))
-	UiRect(rw, rh)
-
-	UiColor(unpack(AutoPrimaryColor))
-	UiText(text)
-	UiPop()
+	local x, y, dist = UiWorldToPixel(position)
+	if dist > 0 then
+		UiTranslate(x, y)
+		UiWordWrap(UiMiddle())
+		
+		UiFont(AutoFont, fontsize)
+		UiColor(0, 0, 0, 0)
+		local rw, rh = UiText(text)
+		
+		UiColorFilter(1, 1, 1, alpha)
+		UiColor(unpack(AutoSecondaryColor))
+		UiRect(rw, rh)
+		
+		UiColor(unpack(AutoPrimaryColor))
+		UiText(text)
+		UiPop()
+	end
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1877,7 +1932,7 @@ end
 
 function AutoExpandRegistryKey(key)
 	local t = {}
-	function delve(k, current)
+	local function delve(k, current)
 		local subkeys = ListKeys(k)
 		local splitkey = AutoSplit(k, '.')
 		local neatkey = splitkey[#splitkey]
@@ -2113,8 +2168,9 @@ function AutoSpreadHorizontal(count)
 end
 
 function AutoGetSpread()
-	_l = 0
+	local _l = 0
 	local count = AutoTableCount(AutoSpreadStack)
+	if count <= 0 then return nil end
 	for i = count, 1, -1 do
 		if AutoSpreadStack[i].type == 'spread' then
 			_l = _l + 1
@@ -2163,7 +2219,7 @@ function AutoSpreadEnd()
 		if count <= 0 then
 			return unitdata
 		end
-	end
+    end
 end
 
 function HandleSpread(gs, data, type, spreadpad)
@@ -2354,7 +2410,7 @@ end
 ---@param draw boolean Draws the Text
 ---@param spread boolean Adds padding when used with AutoSpread...()
 ---@return table TextData
-function AutoText(name, fontsize, draw, spread)
+function AutoText(name, fontsize, color, draw, spread)
 	fontsize = AutoDefault(fontsize, 28)
 	draw = AutoDefault(draw, true)
 	spread = AutoDefault(spread, true)
@@ -2371,7 +2427,7 @@ function AutoText(name, fontsize, draw, spread)
 		UiWindow(rw, rh)
 		AutoCenter()
 
-		UiColor(unpack(AutoPrimaryColor))
+		UiColor(unpack(color or AutoPrimaryColor))
 		UiText(name)
 		UiPop()
 	end
@@ -2470,40 +2526,3 @@ function AutoMarker(size)
 	UiImage('ui/common/dot.png')
 	UiPop()
 end
-
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Presets--------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
-
-AutoColors = {
-	background_dark = { 0.28627450980392, 0.25490196078431, 0.38039215686275 },
-	background_light = { 0.41960784313725, 0.39607843137255, 0.58823529411765 },
-	wood_dark = { 0.6, 0.33725490196078, 0.42352941176471 },
-	wood_light = { 0.78039215686275, 0.53333333333333, 0.56470588235294 },
-	rock_dark = { 0.41960784313725, 0.38039215686275, 0.46666666666667 },
-	rock_light = { 0.49803921568627, 0.46274509803922, 0.55686274509804 },
-	green_dark = { 0.3843137254902, 0.76078431372549, 0.76078431372549 },
-	green_light = { 0.4156862745098, 0.90980392156863, 0.63529411764706 },
-	jade_dark = { 0.33725490196078, 0.52156862745098, 0.6 },
-	jade_light = { 0.29411764705882, 0.68627450980392, 0.69019607843137 },
-	aqua_dark = { 0.28627450980392, 0.46666666666667, 0.58039215686275 },
-	aqua_light = { 0.32156862745098, 0.60392156862745, 0.78039215686275 },
-	pastel_dark = { 1, 0.7921568627451, 0.83137254901961 },
-	pastel_light = { 0.80392156862745, 0.70588235294118, 0.85882352941176 },
-	pink_dark = { 0.70196078431373, 0.45098039215686, 0.64313725490196 },
-	pink_light = { 0.94901960784314, 0.57647058823529, 0.86274509803922 },
-	purple_dark = { 0.56470588235294, 0.34117647058824, 0.63921568627451 },
-	purple_light = { 0.77647058823529, 0.45098039215686, 0.8156862745098 },
-	yellow_dark = { 0.7921568627451, 0.65490196078431, 0.32156862745098 },
-	yellow_light = { 0.89803921568627, 0.75686274509804, 0.36862745098039 },
-	amber_dark = { 0.7843137254902, 0.50196078431373, 0.28627450980392 },
-	amber_light = { 0.96470588235294, 0.63921568627451, 0.18039215686275 },
-	red_dark = { 0.72549019607843, 0.35686274509804, 0.48627450980392 },
-	red_light = { 0.84313725490196, 0.33333333333333, 0.41960784313725 },
-	white_dark = { 0.84705882352941, 0.74509803921569, 0.61960784313725 },
-	white_light = { 0.96470588235294, 0.91372549019608, 0.80392156862745 },
-	blue_dark = { 0.2078431372549, 0.31372549019608, 0.43921568627451 },
-	blue_light = { 0.19607843137255, 0.61176470588235, 0.78823529411765 },
-	alert_dark = { 0.22352941176471, 0.098039215686275, 0.2 },
-	alert_light = { 0.74901960784314, 0.21960784313725, 0.49019607843137 },
-}

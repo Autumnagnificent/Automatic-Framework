@@ -487,6 +487,14 @@ function AutoShapeBoundsCenter(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
+function AutoBoundsExpandPoint(pos, expansion)
+	if type(expansion) =="number" then
+		expansion = AutoVecOne(expansion)
+	end
+
+	return VecSub(pos, expansion), VecAdd(pos, expansion)
+end
+
 ---Takes two vectors and modifys them so they can be used in other bound functions
 ---@param aa Vec
 ---@param bb Vec
@@ -519,7 +527,6 @@ end
 function AutoBoundsGetPos(aa, bb, vec)
 	vec = AutoDefault(vec, Vec(0, 0, 0))
 
-	aa, bb = AutoBoundsCorrection(aa, bb)
 	vec = AutoVecMap(vec, -1, 1, 0, 1)
 	local sizevec = VecSub(bb, aa)
 
@@ -533,7 +540,6 @@ end
 ---@param bb Vec Maximum Bound Corner
 ---@return table
 function AutoBoundsGetFaceCenters(aa, bb)
-	aa, bb = AutoBoundsCorrection(aa, bb)
 	return {
 		AutoBoundsGetPos(aa, bb, Vec(0, -1, 0)),
 		AutoBoundsGetPos(aa, bb, Vec(0, 1, 0)),
@@ -549,17 +555,23 @@ end
 ---@param bb Vec Maximum Bound Corner
 ---@return table
 function AutoBoundsGetCorners(aa, bb)
-	aa, bb = AutoBoundsCorrection(aa, bb)
-	return {
-		AutoBoundsGetPos(aa, bb, Vec(-1, -1, -1)),
-		AutoBoundsGetPos(aa, bb, Vec(1, -1, -1)),
-		AutoBoundsGetPos(aa, bb, Vec(-1, 1, -1)),
-		AutoBoundsGetPos(aa, bb, Vec(-1, -1, 1)),
-		AutoBoundsGetPos(aa, bb, Vec(-1, 1, 1)),
-		AutoBoundsGetPos(aa, bb, Vec(1, -1, 1)),
-		AutoBoundsGetPos(aa, bb, Vec(1, 1, -1)),
-		AutoBoundsGetPos(aa, bb, Vec(1, 1, 1)),
+	local mid = {}
+	for i = 1, 3 do
+		mid[i] = (aa[i] + bb[i]) / 2
+	end
+
+	local corners = {
+		{ bb[1], mid[2], mid[3] },
+		{ aa[1], mid[2], mid[3] },
+		{ mid[1], bb[2], mid[3] },
+		{ mid[1], aa[2], mid[3] },
+		{ mid[1], mid[2], bb[3] },
+		{ mid[1], mid[2], aa[3] },
+		{ aa[1], bb[2], mid[3] },
+		{ bb[1], aa[2], mid[3] }
 	}
+
+	return corners
 end
 
 ---Get data about the size of the given Bounds
@@ -569,12 +581,31 @@ end
 ---@return the smallest edge size of the Bounds
 ---@return the longest edge size of the Bounds
 function AutoBoundsSize(aa, bb)
-	aa, bb = AutoBoundsCorrection(aa, bb)
 	local size = VecSub(bb, aa)
 	local minval = math.min(unpack(size))
 	local maxval = math.max(unpack(size))
 
 	return size, minval, maxval
+end
+
+function AutoSubdivideBounds(aa, bb)
+	local mid = {}
+	for i = 1, 3 do
+		mid[i] = (aa[i] + bb[i]) / 2
+	end
+
+	local bounds = {
+		{ { aa[1], mid[2], mid[3] }, { mid[1], bb[2], bb[3] } },
+		{ { mid[1], mid[2], mid[3] }, { bb[1], bb[2], bb[3] } },
+		{ { mid[1], aa[2], mid[3] }, { bb[1], mid[2], bb[3] } },
+		{ { aa[1], aa[2], mid[3] }, { mid[1], mid[2], bb[3] } },
+		{ { aa[1], mid[2], aa[3] }, { mid[1], bb[2], mid[3] } },
+		{ { mid[1], mid[2], aa[3] }, { bb[1], bb[2], mid[3] } },
+		{ { mid[1], aa[2], aa[3] }, { bb[1], mid[2], mid[3] } },
+		{ { aa[1], aa[2], aa[3] }, { mid[1], mid[2], mid[3] } }
+	}
+
+	return bounds
 end
 
 ---Draws the world space bounds between the given bounds
@@ -586,18 +617,13 @@ end
 ---@param value number|nil 0 to 1 representing the value of the lines, Default is 0
 ---@param alpha number|nil the alpha of the lines, Default is 1
 ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
-	aa, bb = AutoBoundsCorrection(aa, bb)
-	rgbcolors = AutoDefault(rgbcolors, false)
-
-	hue = AutoDefault(hue, 0)
-	saturation = AutoDefault(saturation, 0)
-	value = AutoDefault(value, 0)
+function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
+	colorR = AutoDefault(colorR, 0)
+	colorG = AutoDefault(colorG, 0)
+	colorB = AutoDefault(colorB, 0)
 	alpha = AutoDefault(alpha, 1)
-
+	rgbcolors = AutoDefault(rgbcolors, false)
 	draw = AutoDefault(draw, false)
-
-	local color = AutoHSVToRGB(hue, saturation, value)
 
 	min, max = {
 		[1] = Vec(aa[1], aa[2], aa[3]),
@@ -613,21 +639,21 @@ function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
 
 	-- This code made me want to give up
 	local lines = {
-		{ min[2], min[3], color[1], color[2], color[3], alpha },
-		{ min[3], min[4], color[1], color[2], color[3], alpha },
-		{ max[1], max[2], color[1], color[2], color[3], alpha },
-		{ max[4], max[1], color[1], color[2], color[3], alpha },
-		{ min[2], max[2], color[1], color[2], color[3], alpha },
-		{ min[4], max[4], color[1], color[2], color[3], alpha },
+		{ min[2], min[3], colorR, colorG, colorB, alpha },
+		{ min[3], min[4], colorR, colorG, colorB, alpha },
+		{ max[1], max[2], colorR, colorG, colorB, alpha },
+		{ max[4], max[1], colorR, colorG, colorB, alpha },
+		{ min[2], max[2], colorR, colorG, colorB, alpha },
+		{ min[4], max[4], colorR, colorG, colorB, alpha },
 
-		{ min[1], min[2], rgbcolors and 1 or color[1], rgbcolors and 0 or color[2], rgbcolors and 0 or color[3], alpha },
-		{ max[2], max[3], rgbcolors and 0 or color[1], rgbcolors and 1 or color[2], rgbcolors and 0 or color[3], alpha },
-		{ max[3], max[4], rgbcolors and 1 or color[1], rgbcolors and 0 or color[2], rgbcolors and 0 or color[3], alpha },
-		{ min[1], max[1], rgbcolors and 0 or color[1], rgbcolors and 0 or color[2],
-			rgbcolors and 1 or rgbcolors and 0 or color[3], alpha },
-		{ min[3], max[3], rgbcolors and 0 or color[1], rgbcolors and 0 or color[2],
-			rgbcolors and 1 or rgbcolors and 0 or color[3], alpha },
-		{ min[4], min[1], rgbcolors and 0 or color[1], rgbcolors and 1 or color[2], rgbcolors and 0 or color[3], alpha },
+		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
 	}
 
 	for i, v in ipairs(lines) do
@@ -636,6 +662,63 @@ function AutoDrawBounds(aa, bb, rgbcolors, hue, saturation, value, alpha, draw)
 		else
 			DebugLine(unpack(v))
 		end
+	end
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Octree Functions-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _layer)
+	_layer = _layer or 0
+	if _layer >= (Layers or 5) then return end
+
+	conditionalFuction = AutoDefault(conditionalFuction, AutoQueryBoundsForBody)
+
+	local check, querydata = conditionalFuction(BoundsAA, BoundsBB)
+	local node = {
+		aa = BoundsAA,
+		bb = BoundsBB,
+		check = check,
+		querydata = querydata,
+		layer = _layer,
+		children = {},
+	}
+
+	if check then
+		for _, nb in ipairs(AutoSubdivideBounds(BoundsAA, BoundsBB)) do
+			local aa, bb = unpack(nb)
+			node.children[#node.children + 1] = AutoProcessOctree(aa, bb, Layers, conditionalFuction, _layer + 1)
+		end
+	end
+
+	return node
+end
+
+function AutoQueryBoundsForBody(aa, bb)
+	QueryRequire('physical large')
+	local mid = VecLerp(aa, bb, 0.5)
+	local radius = AutoVecDist(aa, bb) * 0.707 / 2
+	local hit, point, normal, shape = QueryClosestPoint(mid, radius)
+	return hit, { pos = point, normal = normal, shape }
+end
+
+function AutoVisualizeOctree(node, layer)
+	if node == nil then return end
+
+	if layer then
+		if node.layer > layer then
+			return
+		end
+	end
+
+	if node.check and (not layer or (node.layer == layer)) then
+		local c1, c2, c3 = AutoHSVToRGB(node.layer / 10, 1, 1)
+		AutoDrawBounds(node.aa, node.bb, c1, c2, c3, 1)
+	end
+
+	for _, child in ipairs(node.children) do
+		AutoVisualizeOctree(child, layer)
 	end
 end
 
@@ -1674,9 +1757,10 @@ end
 ---@param size number|nil the size in meters, Default is 0.5
 ---@param alpha number|nil Default is 1
 ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawTransform(transform, size, alpha, draw)
+function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	if not transform['pos'] then
-		DebugPrint('AutoDrawTransform given input not a transform')
+		-- DebugPrint('AutoDrawTransform given input not a transform')
+		transform = Transform(transform)
 	end
 
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))

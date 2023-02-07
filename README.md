@@ -6,5 +6,5 @@ It has every function I have ever used that I deemed worthy enough to be include
 [**Check out the Wiki for a very outdated list if Every Single Function**](https://github.com/SpunkyTheHedgeHog/Automatic-Framework/wiki).
 
 I strongly recommend you to use this in combinination with **VScode**, the **Lua Server** Extention, and **Thomasims's Teardown API LuaDoc**.
-You can setup the Thomasims's Teardown API LuaDoc (Which allows for Doccumented functions, and Autocompletion) here :
+You can setup the Thomasims's Teardown API LuaDoc (Which allows for Documented functions, and Autocompletion) here :
 https://gist.github.com/Thomasims/87ae244a1456f543787b12aee91e2fe8

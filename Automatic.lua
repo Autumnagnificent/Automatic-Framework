@@ -282,6 +282,15 @@ function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
 end
 
+function AutoVecMove(a, b, t)
+	local m = VecNormalize(VecSub(a, b))
+    return {
+		AutoMove(a[1], b[1], m[1] * t),
+		AutoMove(a[2], b[2], m[2] * t),
+		AutoMove(a[3], b[3], m[3] * t),
+	}
+end
+
 ---Return the Vector Rounded to a number
 ---@param vec Vec
 ---@param r number

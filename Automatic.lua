@@ -439,6 +439,18 @@ function AutoVecMax(v)
 	return math.max(unpack(v))
 end
 
+function AutoVecOrthoDirection(vec, scale)
+	local maxValue = math.max(math.abs(vec[1]), math.abs(vec[2]), math.abs(vec[3]))
+
+	if maxValue == math.abs(vec[1]) then
+		return vec[1] > 0 and { (scale or 1), 0, 0 } or { -(scale or 1), 0, 0 }
+	elseif maxValue == math.abs(vec[2]) then
+		return vec[2] > 0 and { 0, (scale or 1), 0 } or { 0, -(scale or 1), 0 }
+	else
+		return vec[3] > 0 and { 0, 0, (scale or 1) } or { 0, 0, -(scale or 1) }
+	end
+end
+
 --- Rotates a vector around an axis by a given angle
 --- @param vec table The vector to rotate
 --- @param axis table The rotation axis, a unit vector
@@ -496,12 +508,12 @@ function AutoShapeBoundsCenter(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
-function AutoBoundsExpandPoint(pos, expansion)
-	if type(expansion) =="number" then
-		expansion = AutoVecOne(expansion)
+function AutoBoundsExpandPoint(pos, halfextents)
+	if type(halfextents) =="number" then
+		halfextents = AutoVecOne(halfextents)
 	end
 
-	return VecSub(pos, expansion), VecAdd(pos, expansion)
+	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
 end
 
 ---Takes two vectors and modifys them so they can be used in other bound functions
@@ -674,6 +686,9 @@ function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
 	}
 
+	local DrawLine = DrawLine
+	local DebugLine = DebugLine
+
 	for i, v in ipairs(lines) do
 		if draw then
 			DrawLine(unpack(v))
@@ -721,7 +736,7 @@ function AutoQueryBoundsForBody(aa, bb)
 	return hit, { pos = point, normal = normal, shape }
 end
 
-function AutoVisualizeOctree(node, layer, drawfunction)
+function AutoDrawOctree(node, layer, drawfunction)
 	if node == nil then return end
 
 	if layer then
@@ -740,7 +755,7 @@ function AutoVisualizeOctree(node, layer, drawfunction)
 	end
 
 	for _, child in ipairs(node.children) do
-		AutoVisualizeOctree(child, layer, drawfunction)
+		AutoDrawOctree(child, layer, drawfunction)
 	end
 end
 
@@ -1340,6 +1355,44 @@ function AutoDeleteHandles(t)
 	end
 end
 
+---QueryRaycast with some extra features; Also puts everything into a table
+---@param origin table
+---@param direction table
+---@param maxDist number
+---@param radius number
+---@param rejectTransparent boolean
+---@return table
+function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
+	direction = direction and VecNormalize(direction) or nil
+	
+	local data = {}
+	data.hit, data.dist, data.normal, data.shape = QueryRaycast(origin, direction, maxDist, radius, rejectTransparent)
+	data.hitpoint = VecAdd(origin, VecScale(direction, data.dist))
+	data.dot = VecDot(direction, data.normal)
+	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
+
+	return data
+end
+
+---AutoRaycast from point A to point B. The distance will default to the distance between the points, but can be set.
+---@param pointA table
+---@param pointB table
+---@param manualDistance number
+---@param radius number
+---@param rejectTransparent boolean
+---@return table
+function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
+    local diff = VecSub(pointB, pointA)
+    return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
+end
+
+function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
+	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
+    local fwd = AutoTransformFwd(trans)
+
+	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent)
+end
+
 ---Goes through each shape on a body and adds up their voxel count
 ---@param body any
 ---@return number
@@ -1809,6 +1862,13 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	end
 
 	return transform
+end
+
+function AutoDrawBox(point, halfextents, r, g, b, a)
+    local aa, bb = AutoBoundsExpandPoint(point, halfextents)
+	AutoDrawBounds(aa, bb, r, g, b, a)
+	
+	return aa, bb
 end
 
 ---Draws a Transform as a Cone

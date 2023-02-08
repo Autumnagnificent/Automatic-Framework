@@ -597,22 +597,31 @@ function AutoBoundsSize(aa, bb)
 	return size, minval, maxval
 end
 
-function AutoSubdivideBounds(aa, bb)
-	local mid = {}
-	for i = 1, 3 do
-		mid[i] = (aa[i] + bb[i]) / 2
-	end
+function AutoSubdivideBounds(aa, bb, levels)
+	levels = levels or 1
+	local bounds = { { aa, bb } }
 
-	local bounds = {
-		{ { aa[1], mid[2], mid[3] }, { mid[1], bb[2], bb[3] } },
-		{ { mid[1], mid[2], mid[3] }, { bb[1], bb[2], bb[3] } },
-		{ { mid[1], aa[2], mid[3] }, { bb[1], mid[2], bb[3] } },
-		{ { aa[1], aa[2], mid[3] }, { mid[1], mid[2], bb[3] } },
-		{ { aa[1], mid[2], aa[3] }, { mid[1], bb[2], mid[3] } },
-		{ { mid[1], mid[2], aa[3] }, { bb[1], bb[2], mid[3] } },
-		{ { mid[1], aa[2], aa[3] }, { bb[1], mid[2], mid[3] } },
-		{ { aa[1], aa[2], aa[3] }, { mid[1], mid[2], mid[3] } }
-	}
+	for level = 1, levels do
+		local newBounds = {}
+
+		for _, bound in ipairs(bounds) do
+			local mid = {}
+			for i = 1, 3 do
+				mid[i] = (bound[1][i] + bound[2][i]) / 2
+			end
+
+			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
+			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
+			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
+			table.insert(newBounds, { { bound[1][1], bound[1][2], mid[3] }, { mid[1], mid[2], bound[2][3] } })
+			table.insert(newBounds, { { bound[1][1], mid[2], bound[1][3] }, { mid[1], bound[2][2], mid[3] } })
+			table.insert(newBounds, { { mid[1], mid[2], bound[1][3] }, { bound[2][1], bound[2][2], mid[3] } })
+			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
+			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
+		end
+
+		bounds = newBounds
+	end
 
 	return bounds
 end
@@ -679,8 +688,8 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _layer)
-	_layer = _layer or 0
-	if _layer >= (Layers or 5) then return end
+	_layer = _layer or 1
+	if _layer >= (Layers or 5) + 1 then return end
 
 	conditionalFuction = AutoDefault(conditionalFuction, AutoQueryBoundsForBody)
 
@@ -712,7 +721,7 @@ function AutoQueryBoundsForBody(aa, bb)
 	return hit, { pos = point, normal = normal, shape }
 end
 
-function AutoVisualizeOctree(node, layer)
+function AutoVisualizeOctree(node, layer, drawfunction)
 	if node == nil then return end
 
 	if layer then
@@ -721,13 +730,17 @@ function AutoVisualizeOctree(node, layer)
 		end
 	end
 
-	if node.check and (not layer or (node.layer == layer)) then
-		local c1, c2, c3 = AutoHSVToRGB(node.layer / 10, 1, 1)
-		AutoDrawBounds(node.aa, node.bb, c1, c2, c3, 1)
+	if not drawfunction then
+		if node.check and (not layer or (node.layer == layer)) then
+			local c1, c2, c3 = AutoHSVToRGB(node.layer / 10, 1, 1)
+			AutoDrawBounds(node.aa, node.bb, c1, c2, c3, 1)
+		end
+	elseif not layer or (node.layer == layer) then
+		drawfunction(node, layer)
 	end
 
 	for _, child in ipairs(node.children) do
-		AutoVisualizeOctree(child, layer)
+		AutoVisualizeOctree(child, layer, drawfunction)
 	end
 end
 

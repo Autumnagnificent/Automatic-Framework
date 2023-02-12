@@ -1960,8 +1960,7 @@ function AutoTooltip(text, position, occlude, fontsize, alpha)
 		UiColor(0, 0, 0, 0)
 		local rw, rh = UiText(text)
 		
-		UiColorFilter(1, 1, 1, alpha)
-		UiColor(unpack(AutoSecondaryColor))
+		UiColor(0, 0, 0, alpha)
 		UiRect(rw, rh)
 		
 		UiColor(unpack(AutoPrimaryColor))
@@ -2077,7 +2076,7 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	UiPop()
 
 	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-	HandleSpread(AutoGetSpread(), data, 'draw')
+	AutoHandleSpread(AutoGetSpread(), data, 'draw')
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2388,7 +2387,7 @@ function AutoSpreadEnd()
     end
 end
 
-function HandleSpread(gs, data, type, spreadpad)
+function AutoHandleSpread(gs, data, type, spreadpad)
 	spreadpad = AutoDefault(spreadpad, false)
 
 	if not AutoGetSpread() then return end
@@ -2565,7 +2564,7 @@ function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, sp
 	UiPop()
 
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return pressed, data
 end
@@ -2600,7 +2599,7 @@ function AutoText(name, fontsize, color, draw, spread)
 	UiPop()
 
 	local data = { rect = { w = rw, h = rh }, hover = UiIsMouseInRect(rw, rh) }
-	if spread then HandleSpread(AutoGetSpread(), data, 'draw', true) end
+	if spread then AutoHandleSpread(AutoGetSpread(), data, 'draw', true) end
 
 	return data
 end
@@ -2648,7 +2647,7 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 	UiPop()
 
 	local data = { value = set, released = released, rect = { w = width, h = paddingheight * 2 + dotheight } }
-	HandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
+	AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
 
 	return set, data
 end
@@ -2676,7 +2675,7 @@ function AutoImage(path, width, height, border, spreadpad)
 	local hover = UiIsMouseInRect(width, height)
 
 	local data = { hover = hover, rect = { w = width, h = height } }
-	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return data
 end

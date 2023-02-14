@@ -1035,6 +1035,18 @@ function AutoTableSub(t, key)
 	return _t
 end
 
+---Same as AutoTableSub, but uses ipairs instead
+---@param t any
+---@param key any
+---@return table
+function AutoTableSubi(t, key)
+	local _t = {}
+	for i, v in ipairs(t) do
+		_t[i] = v[key]
+	end
+	return _t
+end
+
 function AutoTableListKeys(t)
 	local _t = {}
 	for k, _ in pairs(t) do
@@ -1137,6 +1149,19 @@ function AutoVecTableLerp(a, b, t)
 	local c = {}
 	for k, _ in pairs(a) do
 		c[k] = VecLerp(a[k], b[k], t)
+	end
+	return c
+end
+
+---Calls VecLerp on a table of Vectors
+---@param a table A table of values
+---@param b table A table of values the same size of a
+---@param t number
+---@return table
+function AutoTableLerp(a, b, t)
+	local c = {}
+	for k, _ in pairs(a) do
+		c[k] = AutoLerp(a[k], b[k], t)
 	end
 	return c
 end
@@ -1469,7 +1494,7 @@ function AutoPlayerInputDir(length)
 		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
 		(InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
 		0,
-	}, length)
+	}, length or 1)
 end
 
 ---Get the last Path Query as a path of points
@@ -1960,7 +1985,8 @@ function AutoTooltip(text, position, occlude, fontsize, alpha)
 		UiColor(0, 0, 0, 0)
 		local rw, rh = UiText(text)
 		
-		UiColor(0, 0, 0, alpha)
+		UiColorFilter(1, 1, 1, alpha)
+		UiColor(unpack(AutoSecondaryColor))
 		UiRect(rw, rh)
 		
 		UiColor(unpack(AutoPrimaryColor))
@@ -2076,7 +2102,7 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	UiPop()
 
 	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-	AutoHandleSpread(AutoGetSpread(), data, 'draw')
+	HandleSpread(AutoGetSpread(), data, 'draw')
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2387,7 +2413,7 @@ function AutoSpreadEnd()
     end
 end
 
-function AutoHandleSpread(gs, data, type, spreadpad)
+function HandleSpread(gs, data, type, spreadpad)
 	spreadpad = AutoDefault(spreadpad, false)
 
 	if not AutoGetSpread() then return end
@@ -2495,35 +2521,35 @@ end
 ---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
 ---@return table containerdata
 function AutoContainer(width, height, padding, clip, draw)
-	width = AutoDefault(width, 300)
-	height = AutoDefault(height, 400)
-	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
-	clip = AutoDefault(clip, false)
-	draw = AutoDefault(draw, true)
+    width = AutoDefault(width, 300)
+    height = AutoDefault(height, 400)
+    padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
+    clip = AutoDefault(clip, false)
+    draw = AutoDefault(draw, true)
 
-	local paddingwidth = math.max(width - padding * 2, padding * 2)
-	local paddingheight = math.max(height - padding * 2, padding * 2)
+    local paddingwidth = math.max(width - padding * 2, padding * 2)
+    local paddingheight = math.max(height - padding * 2, padding * 2)
 
-	UiWindow(width, height, clip)
+    UiWindow(width, height, clip)
 
-	UiAlign('left top')
-	if draw then
-		UiPush()
-		UiColor(unpack(AutoSecondaryColor))
-		UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
-		UiPop()
-	end
+    UiAlign('left top')
+    if draw then
+        UiPush()
+        UiColor(unpack(AutoSecondaryColor))
+        UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
+        UiPop()
+    end
 
-	hover = UiIsMouseInRect(UiWidth(), UiHeight())
+    hover = UiIsMouseInRect(UiWidth(), UiHeight())
 
-	UiTranslate(padding, padding)
-	UiWindow(paddingwidth, paddingheight, false)
+    UiTranslate(padding, padding)
+    UiWindow(paddingwidth, paddingheight, false)
 
-	local offset = { x = 0, y = 0 }
+    local offset = { x = 0, y = 0 }
 
-	UiTranslate(offset.x, offset.y)
+    UiTranslate(offset.x, offset.y)
 
-	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
+    return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
 ---Creates a Button
@@ -2564,7 +2590,7 @@ function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, sp
 	UiPop()
 
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return pressed, data
 end
@@ -2599,7 +2625,7 @@ function AutoText(name, fontsize, color, draw, spread)
 	UiPop()
 
 	local data = { rect = { w = rw, h = rh }, hover = UiIsMouseInRect(rw, rh) }
-	if spread then AutoHandleSpread(AutoGetSpread(), data, 'draw', true) end
+	if spread then HandleSpread(AutoGetSpread(), data, 'draw', true) end
 
 	return data
 end
@@ -2647,7 +2673,7 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 	UiPop()
 
 	local data = { value = set, released = released, rect = { w = width, h = paddingheight * 2 + dotheight } }
-	AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
+	HandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
 
 	return set, data
 end
@@ -2675,9 +2701,23 @@ function AutoImage(path, width, height, border, spreadpad)
 	local hover = UiIsMouseInRect(width, height)
 
 	local data = { hover = hover, rect = { w = width, h = height } }
-	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return data
+end
+
+function AutoUiLine(p1, p2, width)
+	width = AutoDefault(width, 2)
+	local angle = math.atan2(p2[1] - p1[1], p2[2] - p1[2]) * 180 / math.pi
+	local distance = AutoVecDist(p1, p2)
+
+	UiPush()
+		UiTranslate(p1[1] - width / 2, p1[2] - width / 2)
+		UiRotate(angle)
+
+		UiAlign('center top')
+		UiRect(width, distance + 1)
+	UiPop()
 end
 
 ---Creates a handy little marker, doesnt effect anything, purely visual

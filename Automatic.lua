@@ -965,7 +965,7 @@ function AutoSOSUpdate(sos, desired, time)
 	sos.vel = sos.vel + time * (desired + sos.k3 * xd - sos.value - sos.k1 * sos.vel) / k2_stable
 end
 
-function AutoBatchCreateSOS(initaltable, frequency, dampening, response)
+function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
 	local t = {}
 	for i, v in pairs(initaltable) do
 		t[i] = AutoCreateSOS(initaltable[i] or 0, frequency, dampening, response)
@@ -973,7 +973,7 @@ function AutoBatchCreateSOS(initaltable, frequency, dampening, response)
 	return t
 end
 
-function AutoBatchSOSUpdate(sostable, desired, time)
+function AutoSOSUpdateBatch(sostable, desired, time)
 	time = AutoDefault(time, GetTimeStep())
 
 	for i, v in pairs(sostable) do
@@ -1215,10 +1215,10 @@ function AutoEulerTable(quat)
 	return Vec(x, y, z)
 end
 
-function AutoTransformWithEuler(transform)
+function AutoEulerTransform(eulerTransform)
 	return {
-		pos = VecCopy(transform.pos),
-		rot = AutoEulerTable(transform.rot)
+		pos = VecCopy(eulerTransform.pos),
+		rot = QuatEuler(unpack(eulerTransform.rot))
 	}
 end
 
@@ -1822,6 +1822,10 @@ function AutoClearConsole()
 	for i = 1, 24 do DebugPrint('') end
 end
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Drawing Stuff--------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
 ---Draws a table of
 ---@param points any
 ---@param huescale number|nil A multipler to the hue change, Default is 1
@@ -1942,19 +1946,6 @@ function AutoDrawCone(transform, sides, angle, size, color, draw)
 	end
 
 	return transform
-end
-
----Draws some Debug information about a body
----@param body number
----@param size number
-function AutoDrawBodyDebug(body, size)
-	local trans = GetBodyTransform(body)
-	AutoDrawTransform(trans, size)
-
-	local vel = GetBodyVelocity(body)
-	local worldvel = VecAdd(vel, trans.pos)
-	DebugLine(trans.pos, worldvel)
-	AutoTooltip(AutoRound(AutoSpeed(body), 0.001), trans.pos, 16, 0.35)
 end
 
 ---Draws some text at a world position.
@@ -2102,7 +2093,7 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	UiPop()
 
 	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-	HandleSpread(AutoGetSpread(), data, 'draw')
+	AutoHandleSpread(AutoGetSpread(), data, 'draw')
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2288,13 +2279,12 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 AutoPad = { none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128 }
-setmetatable(AutoPad, { __call = function(t, padding) UiTranslate(padding, padding) end })
 
 AutoPrimaryColor = { 0.95, 0.95, 0.95, 1 }
 AutoSpecialColor = { 1, 1, 0.55, 1 }
 AutoSecondaryColor = { 0, 0, 0, 0.55 }
 AutoFont = 'regular.ttf'
-AutoSpreadStack = {}
+local SpreadStack = {}
 
 ---Takes an alignment and returns a Vector representation.
 ---@param alignment string
@@ -2319,54 +2309,54 @@ end
 ---The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
 ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadDown(padding)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin) })
+	table.insert(SpreadStack, { type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin) })
 	UiPush()
 end
 
 ---The next Auto Ui functions will be spread Up until AutoSpreadEnd() is called
 ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadUp(padding)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin) })
+	table.insert(SpreadStack, { type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin) })
 	UiPush()
 end
 
 ---The next Auto Ui functions will be spread Right until AutoSpreadEnd() is called
 ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadRight(padding)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin) })
+	table.insert(SpreadStack, { type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin) })
 	UiPush()
 end
 
 ---The next Auto Ui functions will be spread Left until AutoSpreadEnd() is called
 ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadLeft(padding)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin) })
+	table.insert(SpreadStack, { type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin) })
 	UiPush()
 end
 
 ---The next Auto Ui functions will be spread Verticlely across the Height of the Bounds until AutoSpreadEnd() is called
 ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
 function AutoSpreadVerticle(count)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'verticle', length = UiHeight(), count = count })
+	table.insert(SpreadStack, { type = 'spread', direction = 'verticle', length = UiHeight(), count = count })
 	UiPush()
 end
 
 ---The next Auto Ui functions will be spread Horizontally across the Width of the Bounds until AutoSpreadEnd() is called
 ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
 function AutoSpreadHorizontal(count)
-	table.insert(AutoSpreadStack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
+	table.insert(SpreadStack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 	UiPush()
 end
 
 function AutoGetSpread()
 	local _l = 0
-	local count = AutoTableCount(AutoSpreadStack)
+	local count = AutoTableCount(SpreadStack)
 	if count <= 0 then return nil end
 	for i = count, 1, -1 do
-		if AutoSpreadStack[i].type == 'spread' then
+		if SpreadStack[i].type == 'spread' then
 			_l = _l + 1
 			if _l >= 1 then
-				return AutoSpreadStack[i], _l
+				return SpreadStack[i], _l
 			end
 		end
 	end
@@ -2374,10 +2364,10 @@ function AutoGetSpread()
 end
 
 function AutoSetSpread(Spread)
-	local count = AutoTableCount(AutoSpreadStack)
+	local count = AutoTableCount(SpreadStack)
 	for i = count, 1, -1 do
-		if AutoSpreadStack[i].type == 'spread' then
-			str = AutoSpreadStack[i]
+		if SpreadStack[i].type == 'spread' then
+			str = SpreadStack[i]
 		end
 	end
 
@@ -2391,19 +2381,19 @@ function AutoSpreadEnd()
 	-- local _, LastSpread = AutoGetSpread(1)
 
 	while true do
-		local count = #AutoSpreadStack
+		local count = #SpreadStack
 
-		if AutoSpreadStack[count].type ~= 'spread' then
-			if AutoSpreadStack[count].data.rect then
-				local rect = AutoSpreadStack[count].data.rect
+		if SpreadStack[count].type ~= 'spread' then
+			if SpreadStack[count].data.rect then
+				local rect = SpreadStack[count].data.rect
 				unitdata.comb.w, unitdata.comb.h = unitdata.comb.w + rect.w, unitdata.comb.h + rect.h
 				unitdata.max.w, unitdata.max.h = math.max(unitdata.max.w, rect.w), math.max(unitdata.max.h, rect.h)
 			end
 
-			table.remove(AutoSpreadStack, count)
+			table.remove(SpreadStack, count)
 		else
 			UiPop()
-			table.remove(AutoSpreadStack, count)
+			table.remove(SpreadStack, count)
 
 			return unitdata
 		end
@@ -2413,7 +2403,7 @@ function AutoSpreadEnd()
     end
 end
 
-function HandleSpread(gs, data, type, spreadpad)
+function AutoHandleSpread(gs, data, type, spreadpad)
 	spreadpad = AutoDefault(spreadpad, false)
 
 	if not AutoGetSpread() then return end
@@ -2436,7 +2426,7 @@ function HandleSpread(gs, data, type, spreadpad)
 	end
 
 	if type ~= nil then
-		table.insert(AutoSpreadStack, { type = type, data = data })
+		table.insert(SpreadStack, { type = type, data = data })
 	end
 end
 
@@ -2590,7 +2580,7 @@ function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, sp
 	UiPop()
 
 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return pressed, data
 end
@@ -2625,7 +2615,7 @@ function AutoText(name, fontsize, color, draw, spread)
 	UiPop()
 
 	local data = { rect = { w = rw, h = rh }, hover = UiIsMouseInRect(rw, rh) }
-	if spread then HandleSpread(AutoGetSpread(), data, 'draw', true) end
+	if spread then AutoHandleSpread(AutoGetSpread(), data, 'draw', true) end
 
 	return data
 end
@@ -2673,7 +2663,7 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 	UiPop()
 
 	local data = { value = set, released = released, rect = { w = width, h = paddingheight * 2 + dotheight } }
-	HandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
+	AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
 
 	return set, data
 end
@@ -2701,7 +2691,7 @@ function AutoImage(path, width, height, border, spreadpad)
 	local hover = UiIsMouseInRect(width, height)
 
 	local data = { hover = hover, rect = { w = width, h = height } }
-	if draw then HandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
 
 	return data
 end

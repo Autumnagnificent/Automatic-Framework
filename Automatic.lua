@@ -263,15 +263,28 @@ end
 ----------------Vector Functions-----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
----Return a Random Vector
----@param length number
----@param precision number|nil 0.001 by default
+--- Return a Random Vector with an optional offset and scale
+---@param param1 number|table
+---@param param2 number|nil
 ---@return table
-function AutoRndVec(length, precision)
-	precision = AutoDefault(precision, 0.01)
-	local m = 1 / precision
-	local v = VecNormalize(Vec(math.random(-m, m), math.random(-m, m), math.random(-m, m)))
-	return VecScale(v, length)
+function AutoVecRnd(param1, param2)
+	local offset, scale
+	if type(param1) == "table" then
+		offset = param1
+		scale = param2 or 1
+	else
+		offset = { 0, 0, 0 }
+		scale = param1
+	end
+
+	local rndVec = VecNormalize({
+		(math.random() * 2 - 1),
+		(math.random() * 2 - 1),
+		(math.random() * 2 - 1),
+	})
+
+	local v = VecAdd(offset, VecScale(rndVec, scale))
+	return v
 end
 
 ---Return the Distance between Two Vectors
@@ -943,7 +956,7 @@ end
 ---@param zeta number
 ---@param response number
 function AutoCreateSOS(inital, frequency, zeta, response)
-	t = {}
+	local t = {}
 	t.value = inital
 	t.last = inital
 	t.vel = 0
@@ -966,17 +979,37 @@ function AutoSOSUpdate(sos, desired, time)
 end
 
 function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
-	local t = {}
-	for i, v in pairs(initaltable) do
-		t[i] = AutoCreateSOS(initaltable[i] or 0, frequency, dampening, response)
+	local sos = { value = nil }
+	for i, v in ipairs(initaltable) do
+		sos[i] = AutoCreateSOS(initaltable[i] or 0, frequency, dampening, response)
 	end
-	return t
+    return setmetatable(sos, {
+        __index = function(t, k)
+            if k == 'value' then
+                local v = {}
+                for i = 1, #t do
+                    v[i] = rawget(t, i).value
+                end
+
+                return v
+            end
+        end,
+		__newindex = function(t, k, v)
+			if k == 'value' then
+				for i = 1, #v do
+					local s = rawget(t, i)
+					s.value = v[i]
+					s.last = v[i]
+				end
+			end
+		end
+	})
 end
 
 function AutoSOSUpdateBatch(sostable, desired, time)
 	time = AutoDefault(time, GetTimeStep())
 
-	for i, v in pairs(sostable) do
+	for i, v in ipairs(sostable) do
 		AutoSOSUpdate(v, AutoDefault(desired[i], v.value), time)
 	end
 end
@@ -1296,7 +1329,7 @@ end
 ---@param b number|nil The blue from 0 to 1
 ---@return number, number, number Returns the hue, the saturation, and the value
 function AutoRGBToHSV(r, g, b)
-	r, g, b = r / 255, g / 255, b / 255
+	r, g, b = r, g, b
 	local max, min = math.max(r, g, b), math.min(r, g, b)
 	local h, s, v
 	v = max
@@ -1392,7 +1425,7 @@ function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	
 	local data = {}
 	data.hit, data.dist, data.normal, data.shape = QueryRaycast(origin, direction, maxDist, radius, rejectTransparent)
-	data.hitpoint = VecAdd(origin, VecScale(direction, data.dist))
+	data.intersection = VecAdd(origin, VecScale(direction, data.dist))
 	data.dot = VecDot(direction, data.normal)
 	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
 
@@ -1416,6 +1449,17 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
     local fwd = AutoTransformFwd(trans)
 
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent)
+end
+
+function AutoRaycastPlane(startPos, direction, planePos, planeNormal)
+	local denom = VecDot(planeNormal, direction)
+	if denom < 1e-6 then -- If the dot product is too small, the ray and plane are parallel
+		local offset = VecSub(planePos, startPos)
+		local distance = VecDot(offset, planeNormal) / denom
+		local intersection = VecAdd(startPos, VecScale(direction, distance))
+		return { hit = true, intersection = intersection, distance = distance }
+	end
+	return { hit = false }
 end
 
 ---Goes through each shape on a body and adds up their voxel count
@@ -1699,7 +1743,11 @@ end
 ---@param Environment any
 function AutoSetEnvironment(Environment)
 	for k, v in pairs(Environment) do
-		SetEnvironmentProperty(k, unpack(v))
+		if type(v) == "table" then
+			SetEnvironmentProperty(k, unpack(v))
+		else
+			SetEnvironmentProperty(k, v)
+		end
 	end
 end
 
@@ -1734,27 +1782,79 @@ function AutoSolidBackground(r, g, b, a, sprite)
 	end
 end
 
+function AutoSolidEnvironment(pathToDDS)
+	return {
+		skybox = { pathToDDS },
+		wind = { 0, 0, 0 },
+		sunFogScale = { 0 },
+		puddleamount = { 0 },
+		skyboxbrightness = { 1 },
+		wetness = { 0 },
+		snowonground = {},
+		sunDir = { 0, 0, 0 },
+		nightlight = { true },
+		fogscale = { 0 },
+		constant = { 0, 0, 0 },
+		slippery = { 0 },
+		brightness = { 1 },
+		snowdir = { 0, 0, 1, 0 },
+		snowamount = { 0, 0 },
+		skyboxtint = { 1, 1, 1 },
+		sunLength = { 0 },
+		sunGlare = { 0 },
+		waterhurt = { 0 },
+		fogColor = { 0, 0, 0 },
+		exposure = { 1, 1 },
+		ambience = { "outdoor/field.ogg", 1 },
+		ambientexponent = { 0.10000000149012 },
+		fogParams = { 0, 0, 0, 0 },
+		sunBrightness = { 0 },
+		ambient = { 1 },
+		skyboxrot = { 0 },
+		puddlesize = { 0 },
+		rain = { 0 },
+		sunColorTint = { 0, 0, 0 },
+		sunSpread = { 0 },
+	}
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Showing Debug--------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--- Returns the current Line Number.
+---
+--- This function is adapted from the UMF Framework
+---
+--- https://github.com/Thomasims/TeardownUMF/blob/master/src/util/debug.lua
+---@param level number|nil Optional
+---@return number
+function AutoGetCurrentLine(level)
+	level = (level or 0)
+	local _, line = pcall(error, '', level + 3) -- The level + 3 is to get out of error, then out of pcall, then out of this function
+	return tonumber(AutoSplit(line, ':')[2])
+end
+
 ---Creates a neatly formatted table of a value, including tables.
 ---@param t any
----@param singleline_at number
----@param indent_str string
----@param round_numbers number
----@param indents number
+---@param singleline_at number|nil
+---@param indent_str string|nil
+---@param round_numbers number|nil
+---@param indents number|nil
+---@param visited_tables table|nil
 ---@return string
-function AutoToString(t, singleline_at, indent_str, round_numbers, indents)
+function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, indents, visited_tables)
 	local singleline_at = singleline_at or 1
-	local indents = indents or 0
+    local indent_str = indent_str or '  '
 	local round_numbers = round_numbers or false
-	local indent_str = indent_str or '  '
+	local format_keys = format_keys or false
+	local indents = indents or 0
+	local visited_tables = visited_tables or {}
 	local str = ""
 
 	if type(t) ~= "table" then
 		if type(t) == "string" then
-			return '"' .. t .. '"'
+			return string.format("%q", t)
 		elseif type(t) == 'number' then
 			if round_numbers then
 				return tostring(AutoRound(t, round_numbers))
@@ -1764,6 +1864,8 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, indents)
 		end
 		return tostring(t)
 	else
+		if visited_tables[t] then return string.format('"<circular reference of %s>"', tostring(t)) end
+		visited_tables[t] = true
 		if AutoTableCount(t) == 0 then return('{}') end
 	end
 	
@@ -1776,8 +1878,8 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, indents)
 			str = str .. indent_str:rep(indents+1)
 		end
 
-		local k_str = type(k) == "number" and '' or (tostring(k) .. " = ")
-		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, indents + 1)
+		local k_str = type(k) == "number" and '' or ((format_keys and string.format("%q", tostring(k)) or tostring(k)) .. " = ")
+		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, format_keys, indents + 1, visited_tables)
 		str = str .. k_str .. v_str .. ", "
 
         if not passedSLthreshold then
@@ -1813,8 +1915,13 @@ end
 ---@param indent_str any
 ---@return any
 function AutoInspectConsole(value, singleline_at, indent_str, round_numbers)
-	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
-	return value
+    print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
+    return value
+end
+
+function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers)
+	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
+	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers))
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"

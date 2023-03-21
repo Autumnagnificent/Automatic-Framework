@@ -1272,17 +1272,17 @@ end
 
 function AutoTransformFwd(t, scale)
 	scale = AutoDefault(scale, 1)
-	return TransformToParentVec(t, Vec(0, 0, -scale))
+	return QuatRotateVec(t.rot, Vec(0, 0, -scale))
 end
 
 function AutoTransformUp(t, scale)
 	scale = AutoDefault(scale, 1)
-	return TransformToParentVec(t, Vec(0, scale))
+	return QuatRotateVec(t.rot, Vec(0, scale))
 end
 
 function AutoTransformRight(t, scale)
 	scale = AutoDefault(scale, 1)
-	return TransformToParentVec(t, Vec(scale))
+	return QuatRotateVec(t.rot, Vec(scale))
 end
 
 function AutoTransformOffset(t, offset)
@@ -1506,7 +1506,6 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 end
 
 function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, planeHeight, oneway)
-	-- Compute the four corners of the plane
 	local halfWidth = planeWidth / 2
 	local halfHeight = planeHeight / 2
 	local corner1 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, -halfHeight, 0)))
@@ -1514,10 +1513,8 @@ function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, plane
 	local corner3 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfWidth, halfHeight, 0)))
 	local corner4 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, halfHeight, 0)))
 
-	-- Compute the normal of the plane
 	local normal = QuatRotateVec(planeTransform.rot, { 0, 0, -1 })
 
-	-- Compute the intersection of the ray with the plane
 	local rayDirDotNormal = VecDot(direction, normal)
 	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
 		-- Ray is parallel to plane, or wrong way; no intersection
@@ -1529,7 +1526,7 @@ function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, plane
 
 		local dist = AutoVecDist(startPos, intersection)
 
-		-- Check if the intersection is inside the plane bounds
+		-- Check if the intersection is inside the plane's bounds
 		local edge1 = VecSub(corner2, corner1)
 		local edge2 = VecSub(corner3, corner2)
 		local edge3 = VecSub(corner4, corner3)
@@ -1551,11 +1548,13 @@ function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, plane
 		checkInsideEdge(vec3, edge3)
 		checkInsideEdge(vec4, edge4)
 
-		if isInside and t > 0 then
-			return { hit = true, intersection = intersection, normal = normal, dist = dist, dot = rayDirDotNormal }
-		else
-			return { hit = false, intersection = intersection, normal = normal, dist = dist, dot = rayDirDotNormal }
-		end
+		return {
+            hit = isInside and t > 0,
+            intersection = intersection,
+            normal = normal,
+            dist = dist,
+            dot = rayDirDotNormal,
+		}
 	end
 end
 
@@ -2157,7 +2156,7 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
-function AutoDrawPlane(transform, planeWidth, planeHeight, subDivisions, r, g, b, a)
+function AutoDrawPlane(transform, planeWidth, planeHeight, pattern, patternstrength, r, g, b, a)
 	-- Extract position and rotation from the Transform table
 	local pos = transform.pos or Vec(0, 0, 0)
 	local rot = transform.rot or Quat()
@@ -2176,15 +2175,32 @@ function AutoDrawPlane(transform, planeWidth, planeHeight, subDivisions, r, g, b
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 
 	-- Draw the grid
-	subDivisions = (subDivisions or 0) + 1
-	for i = 0, subDivisions do
-		local subH1 = VecLerp(corner1, corner2, i / subDivisions)
-		local subH2 = VecLerp(corner4, corner3, i / subDivisions)
-		local subV1 = VecLerp(corner1, corner4, i / subDivisions)
-		local subV2 = VecLerp(corner2, corner3, i / subDivisions)
+	if pattern == 0 then
+		patternstrength = (patternstrength or 0) + 1
+		for i = 0, patternstrength do
+			local subH1 = VecLerp(corner1, corner2, i / patternstrength)
+			local subH2 = VecLerp(corner4, corner3, i / patternstrength)
+			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
+			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
+	
+			DebugLine(subH1, subH2, r, g, b, a)
+			DebugLine(subV1, subV2, r, g, b, a)
+		end
+	elseif pattern == 1 then
+		patternstrength = (patternstrength or 0) + 1
+		local step = 1 / patternstrength
+		for t = step, 2, step do
+			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
+			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
 
-		DebugLine(subH1, subH2, r, g, b, a)
-		DebugLine(subV1, subV2, r, g, b, a)
+			DebugLine(p1, p2, r, g, b, a)
+			DebugLine(p3, p4, r, g, b, a)
+		end
+
+		DebugLine(corner1, corner2, r, g, b, a)
+		DebugLine(corner2, corner3, r, g, b, a)
+		DebugLine(corner3, corner4, r, g, b, a)
+		DebugLine(corner4, corner1, r, g, b, a)
 	end
 
 	-- Draw the normal line

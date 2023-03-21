@@ -1,4 +1,4 @@
--- VERSION 2.1
+-- VERSION 2.5
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 
@@ -297,7 +297,7 @@ end
 
 function AutoVecMove(a, b, t)
 	local m = VecNormalize(VecSub(a, b))
-    return {
+	return {
 		AutoMove(a[1], b[1], m[1] * t),
 		AutoMove(a[2], b[2], m[2] * t),
 		AutoMove(a[3], b[3], m[3] * t),
@@ -475,7 +475,7 @@ function AutoVecRotate(vec, axis, angle)
 end
 
 ---Return Vec v with it's x value replaced by subx
----@param v Vec
+---@param v table
 ---@param subx number
 function AutoVecSubsituteX(v, subx)
 	local new = VecCopy(v)
@@ -484,7 +484,7 @@ function AutoVecSubsituteX(v, subx)
 end
 
 ---Return Vec v with it's y value replaced by suby
----@param v Vec
+---@param v table
 ---@param suby number
 function AutoVecSubsituteY(v, suby)
 	local new = VecCopy(v)
@@ -493,12 +493,57 @@ function AutoVecSubsituteY(v, suby)
 end
 
 ---Return Vec v with it's z value replaced by subz
----@param v Vec
+---@param v table
 ---@param subz number
 function AutoVecSubsituteZ(v, subz)
 	local new = VecCopy(v)
 	new[3] = subz
 	return new
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Quat Functions-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function AutoQuatFwd(rot)
+	return QuatRotateVec(rot, Vec(0, 0, 1))
+end
+
+
+function AutoRandomQuat(angle)
+	local axis = { math.random() - 0.5, math.random() - 0.5, math.random() - 0.5 }
+	local sinHalfAngle = math.sin(math.rad(angle) / 2)
+	local cosHalfAngle = math.cos(math.rad(angle) / 2)
+	return Quat(
+		axis[1] * sinHalfAngle,
+		axis[2] * sinHalfAngle,
+		axis[3] * sinHalfAngle,
+		cosHalfAngle
+	)
+end
+
+-- Computes the conjugate of a quaternion.
+function AutoQuatConjugate(q)
+	return Quat(-q[1], -q[2], -q[3], q[4])
+end
+
+-- Computes the dot product of two quaternions.
+function AutoQuatDot(a, b)
+	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4]
+end
+
+--- Returns the inverse of the given quaternion.
+---@param quat table A table representing the quaternion to invert, with fields x, y, z, and w.
+---@return table A table representing the inverse of the given quaternion, with fields x, y, z, and w.
+function AutoQuatInverse(quat)
+	local conjugate = AutoQuatConjugate(quat)
+	local squaredLength = AutoQuatDot(quat, quat)
+	return Quat(
+		-conjugate[1] / squaredLength,
+		-conjugate[2] / squaredLength,
+		-conjugate[3] / squaredLength,
+		conjugate[4] / squaredLength
+	)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -609,9 +654,9 @@ function AutoBoundsGetCorners(aa, bb)
 end
 
 ---Get data about the size of the given Bounds
----@param aa Vec Minimum Bound Corner
----@param bb Vec Maximum Bound Corner
----@return Vector representing the size of the Bounds
+---@param aa table Minimum Bound Corner
+---@param bb table Maximum Bound Corner
+---@return table representing the size of the Bounds
 ---@return the smallest edge size of the Bounds
 ---@return the longest edge size of the Bounds
 function AutoBoundsSize(aa, bb)
@@ -980,20 +1025,22 @@ end
 
 function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
 	local sos = { value = nil }
-	for i, v in ipairs(initaltable) do
-		sos[i] = AutoCreateSOS(initaltable[i] or 0, frequency, dampening, response)
-	end
-    return setmetatable(sos, {
-        __index = function(t, k)
-            if k == 'value' then
-                local v = {}
-                for i = 1, #t do
-                    v[i] = rawget(t, i).value
-                end
 
-                return v
-            end
-        end,
+	for k, v in pairs(initaltable) do
+		sos[k] = AutoCreateSOS(v or 0, frequency, dampening, response)
+	end
+	
+	return setmetatable(sos, {
+		__index = function(t, k)
+			if k == 'value' then
+				local v = {}
+				for k2, v2 in pairs(t) do
+					v[k2] = v2.value
+				end
+
+				return v
+			end
+		end,
 		__newindex = function(t, k, v)
 			if k == 'value' then
 				for i = 1, #v do
@@ -1007,10 +1054,9 @@ function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
 end
 
 function AutoSOSUpdateBatch(sostable, desired, time)
-	time = AutoDefault(time, GetTimeStep())
-
-	for i, v in ipairs(sostable) do
-		AutoSOSUpdate(v, AutoDefault(desired[i], v.value), time)
+	for i, v in pairs(sostable) do
+		local d = type(desired) == 'table' and AutoDefault(desired[i], v.value) or (desired or v.value)
+		AutoSOSUpdate(v, d, time)
 	end
 end
 
@@ -1034,7 +1080,7 @@ function AutoTableRepeatValue(v, r)
 	local t = {}
 	for i=1,r do
 		t[#t+1] = type(v) == 'table' and AutoTableDeepCopy(v) or v
-    end
+	end
 	return t
 end
 
@@ -1280,13 +1326,13 @@ end
 ---@param inputstr string
 ---@param sep string
 ---@return table
-function AutoSplit(inputstr, sep)
+function AutoSplit(inputstr, sep, number)
 	if sep == nil then
 		sep = "%s"
 	end
 	local t = {}
 	for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
-		table.insert(t, str)
+		table.insert(t, number and tonumber(str) or str)
 	end
 	return t
 end
@@ -1413,18 +1459,25 @@ function AutoDeleteHandles(t)
 	end
 end
 
+-- Might be broken, didn't test
+function AutoSpawnScript(path, ...)
+	local f = [[<script file="%s" param0="%s" param1="%s" param2="%s" param3="%s"/>]]
+	local param = { arg[1] or '', arg[2] or '', arg[3] or '', arg[4] or '' }
+	return Spawn((f):format(path, unpack(param)), Transform())[1]
+end
+
 ---QueryRaycast with some extra features; Also puts everything into a table
 ---@param origin table
 ---@param direction table
 ---@param maxDist number
 ---@param radius number
 ---@param rejectTransparent boolean
----@return table
+---@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }
 function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	direction = direction and VecNormalize(direction) or nil
 	
 	local data = {}
-	data.hit, data.dist, data.normal, data.shape = QueryRaycast(origin, direction, maxDist, radius, rejectTransparent)
+	data.hit, data.dist, data.normal, data.shape = QueryRaycast(origin, direction, maxDist or 256, radius, rejectTransparent)
 	data.intersection = VecAdd(origin, VecScale(direction, data.dist))
 	data.dot = VecDot(direction, data.normal)
 	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
@@ -1438,28 +1491,93 @@ end
 ---@param manualDistance number
 ---@param radius number
 ---@param rejectTransparent boolean
----@return table
+---@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
-    local diff = VecSub(pointB, pointA)
-    return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
+	local diff = VecSub(pointB, pointA)
+	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
 end
 
+---@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }, table cameraTransform, table cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
-    local fwd = AutoTransformFwd(trans)
+	local fwd = AutoTransformFwd(trans)
 
-	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent)
+	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
 end
 
-function AutoRaycastPlane(startPos, direction, planePos, planeNormal)
-	local denom = VecDot(planeNormal, direction)
-	if denom < 1e-6 then -- If the dot product is too small, the ray and plane are parallel
-		local offset = VecSub(planePos, startPos)
-		local distance = VecDot(offset, planeNormal) / denom
-		local intersection = VecAdd(startPos, VecScale(direction, distance))
-		return { hit = true, intersection = intersection, distance = distance }
+function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, planeHeight, oneway)
+	-- Compute the four corners of the plane
+	local halfWidth = planeWidth / 2
+	local halfHeight = planeHeight / 2
+	local corner1 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, -halfHeight, 0)))
+	local corner2 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfWidth, -halfHeight, 0)))
+	local corner3 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfWidth, halfHeight, 0)))
+	local corner4 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, halfHeight, 0)))
+
+	-- Compute the normal of the plane
+	local normal = QuatRotateVec(planeTransform.rot, { 0, 0, -1 })
+
+	-- Compute the intersection of the ray with the plane
+	local rayDirDotNormal = VecDot(direction, normal)
+	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
+		-- Ray is parallel to plane, or wrong way; no intersection
+		return { hit = false, normal = normal, dist = 1 / 0, dot = rayDirDotNormal }
+	else
+		local rayToPlane = VecSub(startPos, planeTransform.pos)
+		local t = -VecDot(rayToPlane, normal) / rayDirDotNormal
+		local intersection = VecAdd(startPos, VecScale(direction, t))
+
+		local dist = AutoVecDist(startPos, intersection)
+
+		-- Check if the intersection is inside the plane bounds
+		local edge1 = VecSub(corner2, corner1)
+		local edge2 = VecSub(corner3, corner2)
+		local edge3 = VecSub(corner4, corner3)
+		local edge4 = VecSub(corner1, corner4)
+		local vec1 = VecSub(intersection, corner1)
+		local vec2 = VecSub(intersection, corner2)
+		local vec3 = VecSub(intersection, corner3)
+		local vec4 = VecSub(intersection, corner4)
+
+		local isInside = true
+		local function checkInsideEdge(vec, edge)
+			if VecDot(edge, vec) < 0 then
+				isInside = false
+			end
+		end
+
+		checkInsideEdge(vec1, edge1)
+		checkInsideEdge(vec2, edge2)
+		checkInsideEdge(vec3, edge3)
+		checkInsideEdge(vec4, edge4)
+
+		if isInside and t > 0 then
+			return { hit = true, intersection = intersection, normal = normal, dist = dist, dot = rayDirDotNormal }
+		else
+			return { hit = false, intersection = intersection, normal = normal, dist = dist, dot = rayDirDotNormal }
+		end
 	end
-	return { hit = false }
+end
+
+---@return { hit:boolean, point:table, normal:table, shape:number, dist:number, dir:table, dot:number, reflection:table }
+function AutoQueryClosest(origin, maxDist)
+	local data = {}
+	data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
+
+	if data.hit then
+		local diff = VecSub(data.point, origin)
+		local dir = VecNormalize(diff)
+		local dot = VecDot(dir, data.normal)
+
+		data.dist = VecLength(diff)
+		data.dir = dir
+		data.dot = dot
+		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+	else
+		data.dist = maxDist
+	end
+
+	return data
 end
 
 ---Goes through each shape on a body and adds up their voxel count
@@ -1536,8 +1654,8 @@ end
 function AutoPlayerInputDir(length)
 	return VecScale({
 		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
-		(InputDown('down') and -1 or 0) + (InputDown('up') and 1 or 0),
 		0,
+		(InputDown('down') and 1 or 0) + (InputDown('up') and -1 or 0),
 	}, length or 1)
 end
 
@@ -1691,7 +1809,7 @@ function AutoPredictPlayerPosition(time, raycast)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Environment--------------------------------------------------------------------------------------------------------------
+----------------Environment----------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Returns a table of every property of the current environment
@@ -1740,11 +1858,13 @@ function AutoGetEnvironment()
 end
 
 ---Sets every environment property of AutoGetEnvironment
----@param Environment any
+---@param Environment table
 function AutoSetEnvironment(Environment)
 	for k, v in pairs(Environment) do
 		if type(v) == "table" then
 			SetEnvironmentProperty(k, unpack(v))
+		elseif type(v) == "function" then
+			SetEnvironmentProperty(k, v())
 		else
 			SetEnvironmentProperty(k, v)
 		end
@@ -1805,8 +1925,8 @@ function AutoSolidEnvironment(pathToDDS)
 		waterhurt = { 0 },
 		fogColor = { 0, 0, 0 },
 		exposure = { 1, 1 },
-		ambience = { "outdoor/field.ogg", 1 },
-		ambientexponent = { 0.10000000149012 },
+		ambience = { "outdoor/field.ogg", 0 },
+		ambientexponent = { 10 ^ -37.9275 },
 		fogParams = { 0, 0, 0, 0 },
 		sunBrightness = { 0 },
 		ambient = { 1 },
@@ -1816,6 +1936,43 @@ function AutoSolidEnvironment(pathToDDS)
 		sunColorTint = { 0, 0, 0 },
 		sunSpread = { 0 },
 	}
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Post Processing----------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---Returns a table of every property of the current post-processing
+---@return table
+function AutoGetPostProcessing()
+	local params = {
+		'saturation',
+		'colorbalance',
+		'brightness',
+		'gamma',
+		'bloom',
+	}
+
+	local assembled = {}
+	for _, k in ipairs(params) do
+		assembled[k] = { GetPostProcessingProperty(k) }
+	end
+
+	return assembled
+end
+
+---Sets every post-processing property of AutoGetPostProcessing
+---@param PostProcessing table
+function AutoSetPostProcessing(PostProcessing)
+	for k, v in pairs(PostProcessing) do
+		if type(v) == "table" then
+			SetPostProcessingProperty(k, unpack(v))
+		elseif type(v) == "function" then
+			SetPostProcessingProperty(k, v())
+		else
+			SetPostProcessingProperty(k, v)
+		end
+	end
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1839,13 +1996,13 @@ end
 ---@param t any
 ---@param singleline_at number|nil
 ---@param indent_str string|nil
----@param round_numbers number|nil
+---@param round_numbers number|nil|false
 ---@param indents number|nil
 ---@param visited_tables table|nil
 ---@return string
 function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, indents, visited_tables)
 	local singleline_at = singleline_at or 1
-    local indent_str = indent_str or '  '
+	local indent_str = indent_str or '  '
 	local round_numbers = round_numbers or false
 	local format_keys = format_keys or false
 	local indents = indents or 0
@@ -1882,8 +2039,8 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, 
 		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, format_keys, indents + 1, visited_tables)
 		str = str .. k_str .. v_str .. ", "
 
-        if not passedSLthreshold then
-            str = str .. "\n"
+		if not passedSLthreshold then
+			str = str .. "\n"
 		end
 	end
 	str = (passedSLthreshold and str:sub(1, -3) or str) .. (passedSLthreshold and " }" or (indent_str:rep(indents) .. "}"))
@@ -1899,7 +2056,7 @@ function AutoInspect(value, singleline_at, indent_str, round_numbers)
 	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
-        local t = split[i]
+		local t = split[i]
 		if i > 20 and i == #split then
 			t = t .. ' - Some of AutoInspect has been cut off (' .. #split - 20 .. ' Lines Cut), lowering `singleline_at` may give more room'
 		end
@@ -1915,8 +2072,8 @@ end
 ---@param indent_str any
 ---@return any
 function AutoInspectConsole(value, singleline_at, indent_str, round_numbers)
-    print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
-    return value
+	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
+	return value
 end
 
 function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers)
@@ -2000,8 +2157,43 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
+function AutoDrawPlane(transform, planeWidth, planeHeight, subDivisions, r, g, b, a)
+	-- Extract position and rotation from the Transform table
+	local pos = transform.pos or Vec(0, 0, 0)
+	local rot = transform.rot or Quat()
+
+	-- Calculate the forward, right, and up vectors from the rotation
+	local forward = QuatRotateVec(rot, Vec(0, 0, 1))
+	local right = QuatRotateVec(rot, Vec(1, 0, 0))
+	local up = QuatRotateVec(rot, Vec(0, 1, 0))
+
+	-- Calculate the corners of the plane
+	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -planeWidth / 2)), VecScale(up, -planeHeight / 2))
+	local corner2 = VecAdd(VecAdd(pos, VecScale(right, planeWidth / 2)), VecScale(up, -planeHeight / 2))
+	local corner3 = VecAdd(VecAdd(pos, VecScale(right, planeWidth / 2)), VecScale(up, planeHeight / 2))
+	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -planeWidth / 2)), VecScale(up, planeHeight / 2))
+
+	r, g, b, a = r or 1, g or 1, b or 1, a or 1
+
+	-- Draw the grid
+	subDivisions = (subDivisions or 0) + 1
+	for i = 0, subDivisions do
+		local subH1 = VecLerp(corner1, corner2, i / subDivisions)
+		local subH2 = VecLerp(corner4, corner3, i / subDivisions)
+		local subV1 = VecLerp(corner1, corner4, i / subDivisions)
+		local subV2 = VecLerp(corner2, corner3, i / subDivisions)
+
+		DebugLine(subH1, subH2, r, g, b, a)
+		DebugLine(subV1, subV2, r, g, b, a)
+	end
+
+	-- Draw the normal line
+	-- local planeNormal = forward -- The forward vector is the plane normal
+	-- DebugLine(pos, VecAdd(pos, VecScale(planeNormal, math.min(planeWidth, planeHeight) / 2)), r, g, b, a)
+end
+
 function AutoDrawBox(point, halfextents, r, g, b, a)
-    local aa, bb = AutoBoundsExpandPoint(point, halfextents)
+	local aa, bb = AutoBoundsExpandPoint(point, halfextents)
 	AutoDrawBounds(aa, bb, r, g, b, a)
 	
 	return aa, bb
@@ -2158,7 +2350,7 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	sizey = AutoDefault(sizey, 64)
 
 	UiPush()
-	AutoContainer(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, nil, true)
+	UiWindow(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, true)
 
 	local minval = 0
 	local maxval = 0
@@ -2233,11 +2425,11 @@ function AutoExpandRegistryKey(key)
 		else
 			current[neatkey] = HasKey(k) and GetString(k) or nil
 		end
-    end
+	end
 	
 	for _, k in pairs(ListKeys(key)) do
 		delve(AutoKey(key, k), t)
-    end
+	end
 	
 	return t
 end
@@ -2413,6 +2605,11 @@ function AutoCenter()
 	UiAlign('center middle')
 end
 
+function AutoUiBounds(subtract)
+	subtract = subtract or 0
+	return UiWidth() - subtract, UiHeight() - subtract
+end
+
 ---The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
 ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
 function AutoSpreadDown(padding)
@@ -2507,7 +2704,7 @@ function AutoSpreadEnd()
 		if count <= 0 then
 			return unitdata
 		end
-    end
+	end
 end
 
 function AutoHandleSpread(gs, data, type, spreadpad)
@@ -2618,35 +2815,35 @@ end
 ---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
 ---@return table containerdata
 function AutoContainer(width, height, padding, clip, draw)
-    width = AutoDefault(width, 300)
-    height = AutoDefault(height, 400)
-    padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
-    clip = AutoDefault(clip, false)
-    draw = AutoDefault(draw, true)
+	width = AutoDefault(width, 300)
+	height = AutoDefault(height, 400)
+	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
+	clip = AutoDefault(clip, false)
+	draw = AutoDefault(draw, true)
 
-    local paddingwidth = math.max(width - padding * 2, padding * 2)
-    local paddingheight = math.max(height - padding * 2, padding * 2)
+	local paddingwidth = math.max(width - padding * 2, padding * 2)
+	local paddingheight = math.max(height - padding * 2, padding * 2)
 
-    UiWindow(width, height, clip)
+	UiWindow(width, height, clip)
 
-    UiAlign('left top')
-    if draw then
-        UiPush()
-        UiColor(unpack(AutoSecondaryColor))
-        UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
-        UiPop()
-    end
+	UiAlign('left top')
+	if draw then
+		UiPush()
+		UiColor(unpack(AutoSecondaryColor))
+		UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
+		UiPop()
+	end
 
-    hover = UiIsMouseInRect(UiWidth(), UiHeight())
+	hover = UiIsMouseInRect(UiWidth(), UiHeight())
 
-    UiTranslate(padding, padding)
-    UiWindow(paddingwidth, paddingheight, false)
+	UiTranslate(padding, padding)
+	UiWindow(paddingwidth, paddingheight, false)
 
-    local offset = { x = 0, y = 0 }
+	local offset = { x = 0, y = 0 }
 
-    UiTranslate(offset.x, offset.y)
+	UiTranslate(offset.x, offset.y)
 
-    return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
+	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
 end
 
 ---Creates a Button
@@ -2747,7 +2944,7 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 	spreadpad = AutoDefault(spreadpad, true)
 
 	local width = UiWidth() - paddingwidth * 2
-	local dotwidth, dotheight = UiGetImageSize("MOD/spr/slider.png")
+	local dotwidth, dotheight = UiGetImageSize("MOD/slider.png")
 
 	local screen = AutoMap(set, min, max, 0, width)
 
@@ -2762,7 +2959,7 @@ function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, s
 
 	UiTranslate(-dotwidth / 2, 0)
 
-	screen, released = UiSlider('MOD/spr/slider.png', "x", screen, 0, width)
+	screen, released = UiSlider('MOD/slider.png', "x", screen, 0, width)
 	screen = AutoMap(screen, 0, width, min, max)
 	screen = AutoRound(screen, lockincrement)
 	screen = AutoClamp(screen, min, max)

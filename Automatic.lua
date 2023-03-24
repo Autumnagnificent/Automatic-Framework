@@ -40,6 +40,33 @@ AutoColors = {
 	alert_light = { 0.74901960784314, 0.21960784313725, 0.49019607843137 },
 }
 
+---comment
+---@param baseline string
+---@return { C:number, Cs:number, D:number, Ds:number, E:number, F:number, Fs:number, G:number, Gs:number, A:number, As:number, B:number }
+function AutoNoteFrequency(baseline)
+	local f = {
+		C  = 261.63,
+		Cs = 277.18,
+		D  = 293.66,
+		Ds = 311.13,
+		E  = 329.63,
+		F  = 349.23,
+		Fs = 369.99,
+		G  = 392.00,
+		Gs = 415.30,
+		A  = 440.00,
+		As = 466.16,
+		B  = 493.88,
+	}
+
+	local tuned = {}
+	for note, freq in pairs(f) do
+		tuned[note] = freq / f[baseline]
+	end
+
+	return tuned
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -501,6 +528,13 @@ function AutoVecSubsituteZ(v, subz)
 	return new
 end
 
+---Converts the output of VecDot with normalized vectors to an angle
+---@param dot number
+---@return number
+function AutoDotToAngle(dot)
+	return math.deg(math.acos(dot))
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Quat Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -547,7 +581,7 @@ function AutoQuatInverse(quat)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Bounds Functions-----------------------------------------------------------------------------------------------------------------------
+----------------AABB Bounds Functions-----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Get the center of a body's bounds
@@ -1084,11 +1118,13 @@ function AutoTableRepeatValue(v, r)
 	return t
 end
 
+---Concats Table 2 onto the end of Table 1, does not return anything
+---@param t1 any
+---@param t2 any
 function AutoTableConcat(t1, t2)
 	for i = 1, #t2 do
 		t1[#t1 + 1] = t2[i]
 	end
-	return t1
 end
 
 function AutoTableMerge(base, overwrite)
@@ -1505,13 +1541,12 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
 end
 
-function AutoRaycastPlane(startPos, direction, planeTransform, planeWidth, planeHeight, oneway)
-	local halfWidth = planeWidth / 2
-	local halfHeight = planeHeight / 2
-	local corner1 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, -halfHeight, 0)))
-	local corner2 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfWidth, -halfHeight, 0)))
-	local corner3 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfWidth, halfHeight, 0)))
-	local corner4 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfWidth, halfHeight, 0)))
+function AutoRaycastPlane(startPos, direction, planeTransform, size, oneway)
+	local halfsize = VecScale(size, 0.5)
+	local corner1 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfsize[1], -halfsize[2], 0)))
+	local corner2 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfsize[1], -halfsize[2], 0)))
+	local corner3 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfsize[1], halfsize[2], 0)))
+	local corner4 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfsize[1], halfsize[2], 0)))
 
 	local normal = QuatRotateVec(planeTransform.rot, { 0, 0, -1 })
 
@@ -1579,6 +1614,58 @@ function AutoQueryClosest(origin, maxDist)
 	return data
 end
 
+---Gets the Corners and Transforms of a shape;s faces
+---@param shape number
+---@return { corners:{ xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }, faces:{ z:{ pos:table, rot:table, size:table }, zn:{ pos:table, rot:table, size:table }, x:{ pos:table, rot:table, size:table }, xn:{ pos:table, rot:table, size:table }, y:{ pos:table, rot:table, size:table }, yn:{ pos:table, rot:table, size:table },}, size:table }
+function AutoGetShapeGeometry(shape)
+	local transform = GetShapeWorldTransform(shape)
+	local size = VecScale(Vec(GetShapeSize(shape)), 0.1)
+
+	local corners = {}
+	corners.xyz = transform.pos
+	corners.Xyz = TransformToParentPoint(transform, Vec(size[1], 0, 0))
+	corners.xYz = TransformToParentPoint(transform, Vec(0, size[2], 0))
+	corners.xyZ = TransformToParentPoint(transform, Vec(0, 0, size[3]))
+	corners.XYz = TransformToParentPoint(transform, Vec(size[1], size[2], 0))
+	corners.XyZ = TransformToParentPoint(transform, Vec(size[1], 0, size[3]))
+	corners.xYZ = TransformToParentPoint(transform, Vec(0, size[2], size[3]))
+	corners.XYZ = TransformToParentPoint(transform, Vec(size[1], size[2], size[3]))
+
+	local faces = {}
+	faces.z = {
+		pos = VecLerp(corners.xyZ, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(180, 0, 0)),
+		size = { size[1], size[2] }
+	}
+	faces.zn = {
+		pos = VecLerp(corners.xyz, corners.XYz, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(0, 0, 0)),
+		size = { size[1], size[2] }
+	}
+	faces.x = {
+		pos = VecLerp(corners.Xyz, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(0, -90, -90)),
+		size = { size[2], size[3] }
+	}
+	faces.xn = {
+		pos = VecLerp(corners.xyz, corners.xYZ, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(0, 90, 90)),
+		size = { size[2], size[3] }
+	}
+	faces.y = {
+		pos = VecLerp(corners.xYz, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(90, 0, 0)),
+		size = { size[1], size[3] }
+	}
+	faces.yn = {
+		pos = VecLerp(corners.xyz, corners.XyZ, 0.5),
+		rot = QuatRotateQuat(transform.rot, QuatEuler(-90, 180, 0)),
+		size = { size[1], size[3] }
+	}
+
+	return { corners = corners, faces = faces, size = size }
+end
+
 ---Goes through each shape on a body and adds up their voxel count
 ---@param body any
 ---@return number
@@ -1606,24 +1693,24 @@ end
 
 ---Checks if a point is in the view using a transform acting as the "Camera"
 ---@param point Vec
----@param fromtrans Transfrom|nil The Transform acting as the camera, Default is the Player's Camera
+---@param oftrans Transfrom|nil The Transform acting as the camera, Default is the Player's Camera
 ---@param angle number|nil The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean|nil Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
 ---@return number|nil angle The Angle the point is away from the center of the looking direction
 ---@return number|nil distance The Distance from the point to fromtrans
-function AutoPointInView(point, fromtrans, angle, raycastcheck, raycasterror)
-	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
+function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
+	oftrans = AutoDefault(oftrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
 	raycastcheck = AutoDefault(raycastcheck, true)
 	raycasterror = AutoDefault(raycasterror, 0)
 
 	local useangle = not (angle < 0)
 
-	local fromtopointdir = VecNormalize(VecSub(point, fromtrans.pos))
-	local fromdir = AutoTransformFwd(fromtrans)
+	local fromtopointdir = VecNormalize(VecSub(point, oftrans.pos))
+	local fromdir = AutoTransformFwd(oftrans)
 
-	local dist = AutoVecDist(fromtrans.pos, point)
+	local dist = AutoVecDist(oftrans.pos, point)
 
 	local dot = VecDot(fromtopointdir, fromdir)
 	local dotangle = math.deg(math.acos(dot))
@@ -1633,10 +1720,10 @@ function AutoPointInView(point, fromtrans, angle, raycastcheck, raycasterror)
 
 	if seen then
 		if raycastcheck then
-			local hit, hitdist = QueryRaycast(fromtrans.pos, fromtopointdir, dist, 0, true)
+			local hit, hitdist = QueryRaycast(oftrans.pos, fromtopointdir, dist, 0, true)
 			if hit then
 				if raycasterror > 0 then
-					local hitpoint = VecAdd(fromtrans.pos, VecScale(fromtopointdir, hitdist))
+					local hitpoint = VecAdd(oftrans.pos, VecScale(fromtopointdir, hitdist))
 					if AutoVecDist(hitpoint, point) > raycasterror then
 						seen = false
 					end
@@ -1991,6 +2078,19 @@ function AutoGetCurrentLine(level)
 	return tonumber(AutoSplit(line, ':')[2])
 end
 
+--- Returns the current Line Number.
+---
+--- This function is adapted from the UMF Framework
+---
+--- https://github.com/Thomasims/TeardownUMF/blob/master/src/util/debug.lua
+---@param level number|nil Optional
+---@return string|nil
+function AutoGetStackTrace(level)
+	level = (level or 0)
+	local _, line = pcall(error, '', level + 3) -- The level + 3 is to get out of error, then out of pcall, then out of this function
+	return line
+end
+
 ---Creates a neatly formatted table of a value, including tables.
 ---@param t any
 ---@param singleline_at number|nil
@@ -2156,7 +2256,7 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
-function AutoDrawPlane(transform, planeWidth, planeHeight, pattern, patternstrength, r, g, b, a)
+function AutoDrawPlane(transform, size, pattern, patternstrength, r, g, b, a)
 	-- Extract position and rotation from the Transform table
 	local pos = transform.pos or Vec(0, 0, 0)
 	local rot = transform.rot or Quat()
@@ -2167,10 +2267,10 @@ function AutoDrawPlane(transform, planeWidth, planeHeight, pattern, patternstren
 	local up = QuatRotateVec(rot, Vec(0, 1, 0))
 
 	-- Calculate the corners of the plane
-	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -planeWidth / 2)), VecScale(up, -planeHeight / 2))
-	local corner2 = VecAdd(VecAdd(pos, VecScale(right, planeWidth / 2)), VecScale(up, -planeHeight / 2))
-	local corner3 = VecAdd(VecAdd(pos, VecScale(right, planeWidth / 2)), VecScale(up, planeHeight / 2))
-	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -planeWidth / 2)), VecScale(up, planeHeight / 2))
+	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, -size[2] / 2))
+	local corner2 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, -size[2] / 2))
+	local corner3 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, size[2] / 2))
+	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, size[2] / 2))
 
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 
@@ -2186,15 +2286,32 @@ function AutoDrawPlane(transform, planeWidth, planeHeight, pattern, patternstren
 			DebugLine(subH1, subH2, r, g, b, a)
 			DebugLine(subV1, subV2, r, g, b, a)
 		end
-	elseif pattern == 1 then
-		patternstrength = (patternstrength or 0) + 1
+	elseif pattern > 0 then
+		DebugLine(corner1, corner2, r, g, b, a)
+		DebugLine(corner2, corner3, r, g, b, a)
+		DebugLine(corner3, corner4, r, g, b, a)
+		DebugLine(corner4, corner1, r, g, b, a)
+	end
+
+	if pattern == 1 or pattern == 3 then
+		patternstrength = (patternstrength or 1)
 		local step = 1 / patternstrength
-		for t = step, 2, step do
+		for t = step, 2, step * 2 do
 			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
 			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
 
 			DebugLine(p1, p2, r, g, b, a)
-			DebugLine(p3, p4, r, g, b, a)
+		end
+	end
+	
+	if pattern == 2 or pattern == 3 then
+		patternstrength = (patternstrength or 0)
+		local step = 1 / patternstrength
+		for t = step, 2, step * 2 do
+			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
+			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
+
+			DebugLine(p1, p2, r, g, b, a)
 		end
 
 		DebugLine(corner1, corner2, r, g, b, a)
@@ -2202,10 +2319,6 @@ function AutoDrawPlane(transform, planeWidth, planeHeight, pattern, patternstren
 		DebugLine(corner3, corner4, r, g, b, a)
 		DebugLine(corner4, corner1, r, g, b, a)
 	end
-
-	-- Draw the normal line
-	-- local planeNormal = forward -- The forward vector is the plane normal
-	-- DebugLine(pos, VecAdd(pos, VecScale(planeNormal, math.min(planeWidth, planeHeight) / 2)), r, g, b, a)
 end
 
 function AutoDrawBox(point, halfextents, r, g, b, a)

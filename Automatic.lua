@@ -80,7 +80,7 @@ end
 ---@return number
 function AutoLogistic(v, max, steep, offset)
 	v = AutoDefault(v, math.random(0, 10000) / 10000)
-	return max / (1 + math.exp((v - offset) * steep))
+	return (max or 1) / (1 + math.exp((v - (offset or 0.5)) * (steep or -10)))
 end
 
 ---Logistic function followed by a mapping function, guarantees that the return value will be between 0 and 1
@@ -1489,10 +1489,27 @@ end
 
 ---Goes through a table and performs Delete() on each element
 ---@param t any
-function AutoDeleteHandles(t)
+function AutoDeleteHandles(t, CheckIfValid)
+	local list = {}
 	for k, v in pairs(t) do
-		Delete(v)
+		local valid = IsHandleValid(v)
+		list[#list+1] = { handle = v, type = GetEntityType(v), valid = valid }
+
+		if not CheckIfValid or (valid and v ~= GetWorldBody()) then
+			Delete(v)
+		end
 	end
+
+	return list
+end
+
+---@param t any
+function AutoListHandleTypes(t)
+	local nt = {}
+	for key, value in pairs(t) do
+		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or 'Invalid handle' }
+	end
+	return nt
 end
 
 -- Might be broken, didn't test
@@ -1963,7 +1980,7 @@ end
 ---@param b any
 ---@param a any
 ---@param sprite any|nil Defaults to TD's 'ui/menu/white-32.png'
-function AutoSolidBackground(r, g, b, a, sprite)
+function AutoSolidBackground(r, g, b, a, sprite, distance)
 	r = AutoDefault(r, 0)
 	g = AutoDefault(g, 0)
 	b = AutoDefault(b, 0)
@@ -1971,7 +1988,7 @@ function AutoSolidBackground(r, g, b, a, sprite)
 	sprite = AutoDefault(sprite, AutoFlatSprite)
 
 	local cam = GetCameraTransform()
-	local distance = 256
+	local distance = distance or 256
 	local overextention = 2
 	local transforms = {
 		Transform(VecAdd(cam.pos, Vec(0, 0, distance))),

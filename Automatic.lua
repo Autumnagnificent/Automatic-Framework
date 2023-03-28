@@ -1,4 +1,4 @@
--- VERSION 2.5
+-- VERSION 2.8
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 

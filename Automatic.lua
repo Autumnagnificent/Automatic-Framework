@@ -290,6 +290,14 @@ end
 ----------------Vector Functions-----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+function AutoVecEquals(a, b)
+    for i, va in pairs(a) do
+		if va ~= b[i] then return false end
+    end
+
+	return true
+end
+
 --- Return a Random Vector with an optional offset and scale
 ---@param param1 number|table
 ---@param param2 number|nil
@@ -322,13 +330,8 @@ function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
 end
 
-function AutoVecMove(a, b, t)
-	local m = VecNormalize(VecSub(a, b))
-	return {
-		AutoMove(a[1], b[1], m[1] * t),
-		AutoMove(a[2], b[2], m[2] * t),
-		AutoMove(a[3], b[3], m[3] * t),
-	}
+function AutoVecMove(vec, dir, dist)
+	return VecAdd(vec, VecScale(dir, dist))
 end
 
 ---Return the Vector Rounded to a number
@@ -788,6 +791,69 @@ function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 			DebugLine(unpack(v))
 		end
 	end
+end
+
+function AutoAABBToOBB(aa, bb)
+	local center = VecLerp(bb, aa, 0.5)
+	local size = VecSub(bb, aa)
+	return { pos = center, rot = QuatEuler(), size = size }
+end
+
+function AutoOBB(center, rot, size)
+    return {
+        pos = center or Vec(),
+        rot = rot or QuatEuler(),
+		size = type(size) == 'table' and size or AutoVecOne(size or 1)
+	}
+end
+
+function AutoGetOBBGeometry(obb)
+	local corners = {}
+
+	-- Calculate the eight corner points of the OBB based on the center, dimensions, and orientation
+	local hs = VecScale(obb.size, 0.5)
+	corners.xyz = TransformToParentPoint(obb, VecScale(hs, -1))
+	corners.Xyz = TransformToParentPoint(obb, Vec(hs[1], -hs[2], -hs[3]))
+	corners.xYz = TransformToParentPoint(obb, Vec(-hs[1], hs[2], -hs[3]))
+	corners.xyZ = TransformToParentPoint(obb, Vec(-hs[1], -hs[2], hs[3]))
+	corners.XYz = TransformToParentPoint(obb, Vec(hs[1], hs[2], -hs[3]))
+	corners.XyZ = TransformToParentPoint(obb, Vec(hs[1], -hs[2], hs[3]))
+	corners.xYZ = TransformToParentPoint(obb, Vec(-hs[1], hs[2], hs[3]))
+	corners.XYZ = TransformToParentPoint(obb, hs)
+
+	local faces = {}
+	faces.z = {
+		pos = VecLerp(corners.xyZ, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
+		size = { obb.size[1], obb.size[2] }
+	}
+	faces.zn = {
+		pos = VecLerp(corners.xyz, corners.XYz, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
+		size = { obb.size[1], obb.size[2] }
+	}
+	faces.x = {
+		pos = VecLerp(corners.Xyz, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
+		size = { obb.size[2], obb.size[3] }
+	}
+	faces.xn = {
+		pos = VecLerp(corners.xyz, corners.xYZ, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
+		size = { obb.size[2], obb.size[3] }
+	}
+	faces.y = {
+		pos = VecLerp(corners.xYz, corners.XYZ, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
+		size = { obb.size[1], obb.size[3] }
+	}
+	faces.yn = {
+		pos = VecLerp(corners.xyz, corners.XyZ, 0.5),
+		rot = QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
+		size = { obb.size[1], obb.size[3] }
+	}
+
+	return { corners = corners, faces = faces }
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -2273,7 +2339,7 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
-function AutoDrawPlane(transform, size, pattern, patternstrength, r, g, b, a)
+function AutoDrawPlane(transform, size, pattern, patternstrength, oneway, r, g, b, a)
 	-- Extract position and rotation from the Transform table
 	local pos = transform.pos or Vec(0, 0, 0)
 	local rot = transform.rot or Quat()
@@ -2291,6 +2357,10 @@ function AutoDrawPlane(transform, size, pattern, patternstrength, r, g, b, a)
 
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 
+	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
+		return
+	end
+	
 	-- Draw the grid
 	if pattern == 0 then
 		patternstrength = (patternstrength or 0) + 1

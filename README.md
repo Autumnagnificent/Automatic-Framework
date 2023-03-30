@@ -5,6 +5,6 @@
 It has every function I have ever used that I deemed worthy enough to be included, its ever growing and will contuine to be added to. 
 [**Check out the Wiki for a very outdated list if Every Single Function**](https://github.com/SpunkyTheHedgeHog/Automatic-Framework/wiki).
 
-I strongly recommend you to use this in combinination with **VScode**, the **Lua Server** Extention, and **Thomasims's Teardown API LuaDoc**.
+I strongly recommend you to use this in combinination with **VScode**, and the **Lua Server** Extention.
 You can setup the Lua-server-document (Which allows for hand documented functions, and Autocompletion) here :
 https://github.com/SpunkyTheHedgeHog/Teardown-Totally-Documented/blob/main/lua-server-docs.lua

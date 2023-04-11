@@ -1,9 +1,15 @@
 -- VERSION 2.8
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Documentation--------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }
+---@class OBB: { pos:vector, rot:quaternion, size:vector }
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Shortcuts-------------------------------------------------------------------------------------------------------------------
+----------------Shortcuts------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
@@ -323,8 +329,8 @@ function AutoVecRnd(param1, param2)
 end
 
 ---Return the Distance between Two Vectors
----@param a Vec
----@param b Vec
+---@param a vector
+---@param b vector
 ---@return number
 function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
@@ -335,28 +341,28 @@ function AutoVecMove(vec, dir, dist)
 end
 
 ---Return the Vector Rounded to a number
----@param vec Vec
+---@param vec vector
 ---@param r number
----@return Vec
+---@return vector
 function AutoVecRound(vec, r)
 	return Vec(AutoRound(vec[1], r), AutoRound(vec[2], r), AutoRound(vec[3], r))
 end
 
 ---Return a vector that has the magnitude of b, but with the direction of a
----@param a Vec
+---@param a vector
 ---@param b number
----@return Vec
+---@return vector
 function AutoVecRescale(a, b)
 	return VecScale(VecNormalize(a), b)
 end
 
 ---Maps a Vector from range a1-a2 to range b1-b2
----@param v Vec Input Vector
+---@param v vector Input Vector
 ---@param a1 number Goes from the range of number a1
 ---@param a2 number To number a2
 ---@param b1 number To the range of b1
 ---@param b2 number To number b2
----@return Vec
+---@return vector
 function AutoVecMap(v, a1, a2, b1, b2)
 	if a1 == a2 then return AutoVecRescale(v, b2) end
 	local out = {
@@ -368,10 +374,10 @@ function AutoVecMap(v, a1, a2, b1, b2)
 end
 
 ---Limits the magnitude of a vector to be between min and max
----@param v Vec The Vector to clamp
+---@param v vector The Vector to clamp
 ---@param min number|nil The minimum the magnitude can be, Default is 0
 ---@param max number|nil The maximum the magnitude can be, Default is 1
----@return Vec
+---@return vector
 function AutoVecClampMagnitude(v, min, max)
 	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
 	local l = VecLength(v)
@@ -385,10 +391,10 @@ function AutoVecClampMagnitude(v, min, max)
 end
 
 ---Limits a vector to be between min and max
----@param v Vec The Vector to clamp
+---@param v vector The Vector to clamp
 ---@param min number|nil The minimum, Default is 0
 ---@param max number|nil The maximum, Default is 1
----@return Vec
+---@return vector
 function AutoVecClamp(v, min, max)
 	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
 	return {
@@ -400,7 +406,7 @@ end
 
 ---Return Vec(1, 1, 1) scaled by length
 ---@param length number return the vector of size length, Default is 1
----@return Vec
+---@return vector
 function AutoVecOne(length)
 	return VecScale(Vec(1, 1, 1), length or 1)
 end
@@ -410,9 +416,9 @@ function AutoVecMidpoint(a, b)
 end
 
 ---Return Vec a multiplied by Vec b
----@param a Vec
----@param b Vec
----@return Vec
+---@param a vector
+---@param b vector
+---@return vector
 function AutoVecMulti(a, b)
 	return {
 		a[1] * b[1],
@@ -422,9 +428,9 @@ function AutoVecMulti(a, b)
 end
 
 ---Return Vec a divided by Vec b
----@param a Vec
----@param b Vec
----@return Vec
+---@param a vector
+---@param b vector
+---@return vector
 function AutoVecDiv(a, b)
 	return {
 		a[1] / b[1],
@@ -434,9 +440,9 @@ function AutoVecDiv(a, b)
 end
 
 ---Return Vec a to the Power of b
----@param a Vec
+---@param a vector
 ---@param b number
----@return Vec
+---@return vector
 function AutoVecPow(a, b)
 	return {
 		a[1] ^ b,
@@ -446,9 +452,9 @@ function AutoVecPow(a, b)
 end
 
 ---Return Vec a to the Power of Vec b
----@param a Vec
----@param b Vec
----@return Vec
+---@param a vector
+---@param b vector
+---@return vector
 function AutoVecPowVec(a, b)
 	return {
 		a[1] ^ b[1],
@@ -458,8 +464,8 @@ function AutoVecPowVec(a, b)
 end
 
 ---Return Vec Absolute Value
----@param v Vec
----@return Vec
+---@param v vector
+---@return vector
 function AutoVecAbs(v)
 	return {
 		math.abs(v[1]),
@@ -469,14 +475,14 @@ function AutoVecAbs(v)
 end
 
 ---Equivalent to math.min(unpack(v))
----@param v Vec
+---@param v vector
 ---@return number
 function AutoVecMin(v)
 	return math.min(unpack(v))
 end
 
 ---Equivalent to math.max(unpack(v))
----@param v Vec
+---@param v vector
 ---@return number
 function AutoVecMax(v)
 	return math.max(unpack(v))
@@ -603,200 +609,204 @@ function AutoShapeBoundsCenter(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
-function AutoBoundsExpandPoint(pos, halfextents)
-	if type(halfextents) =="number" then
-		halfextents = AutoVecOne(halfextents)
-	end
+-- function AutoBoundsExpandPoint(pos, halfextents)
+-- 	if type(halfextents) =="number" then
+-- 		halfextents = AutoVecOne(halfextents)
+-- 	end
 
-	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
-end
+-- 	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
+-- end
 
----Takes two vectors and modifys them so they can be used in other bound functions
----@param aa Vec
----@param bb Vec
----@return Vec
----@return Vec
-function AutoBoundsCorrection(aa, bb)
-	local min, max = VecCopy(aa), VecCopy(bb)
+-- ---Takes two vectors and modifys them so they can be used in other bound functions
+-- ---@param aa Vec
+-- ---@param bb Vec
+-- ---@return Vec
+-- ---@return Vec
+-- function AutoBoundsCorrection(aa, bb)
+-- 	local min, max = VecCopy(aa), VecCopy(bb)
 
-	if bb[1] < aa[1] then
-		min[1] = bb[1]
-		max[1] = aa[1]
-	end
-	if bb[2] < aa[2] then
-		min[2] = bb[2]
-		max[2] = aa[2]
-	end
-	if bb[3] < aa[3] then
-		min[3] = bb[3]
-		max[3] = aa[3]
-	end
+-- 	if bb[1] < aa[1] then
+-- 		min[1] = bb[1]
+-- 		max[1] = aa[1]
+-- 	end
+-- 	if bb[2] < aa[2] then
+-- 		min[2] = bb[2]
+-- 		max[2] = aa[2]
+-- 	end
+-- 	if bb[3] < aa[3] then
+-- 		min[3] = bb[3]
+-- 		max[3] = aa[3]
+-- 	end
 
-	return min, max
-end
+-- 	return min, max
+-- end
 
----Get a position inside or on the Input Bounds
----@param aa Vec Minimum Bound Corner
----@param bb Vec Maximum Bound Corner
----@param vec Vec|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
----@return Vec
-function AutoBoundsGetPos(aa, bb, vec)
-	vec = AutoDefault(vec, Vec(0, 0, 0))
+-- ---Get a position inside or on the Input Bounds
+-- ---@param aa Vec Minimum Bound Corner
+-- ---@param bb Vec Maximum Bound Corner
+-- ---@param vec Vec|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
+-- ---@return Vec
+-- function AutoBoundsGetPos(aa, bb, vec)
+-- 	vec = AutoDefault(vec, Vec(0, 0, 0))
 
-	vec = AutoVecMap(vec, -1, 1, 0, 1)
-	local sizevec = VecSub(bb, aa)
+-- 	vec = AutoVecMap(vec, -1, 1, 0, 1)
+-- 	local sizevec = VecSub(bb, aa)
 
-	local size = VecLength(sizevec)
-	local scaled = AutoVecMulti(vec, sizevec)
-	return VecAdd(scaled, aa)
-end
+-- 	local size = VecLength(sizevec)
+-- 	local scaled = AutoVecMulti(vec, sizevec)
+-- 	return VecAdd(scaled, aa)
+-- end
 
----Get the center of the faces of the given Bounds, as if it was a cube
----@param aa Vec Minimum Bound Corner
----@param bb Vec Maximum Bound Corner
----@return table
-function AutoBoundsGetFaceCenters(aa, bb)
-	return {
-		AutoBoundsGetPos(aa, bb, Vec(0, -1, 0)),
-		AutoBoundsGetPos(aa, bb, Vec(0, 1, 0)),
-		AutoBoundsGetPos(aa, bb, Vec(-1, 0, 0)),
-		AutoBoundsGetPos(aa, bb, Vec(1, 0, 0)),
-		AutoBoundsGetPos(aa, bb, Vec(0, 0, -1)),
-		AutoBoundsGetPos(aa, bb, Vec(0, 0, 1)),
-	}
-end
+-- ---Get the center of the faces of the given Bounds, as if it was a cube
+-- ---@param aa Vec Minimum Bound Corner
+-- ---@param bb Vec Maximum Bound Corner
+-- ---@return table
+-- function AutoBoundsGetFaceCenters(aa, bb)
+-- 	return {
+-- 		AutoBoundsGetPos(aa, bb, Vec(0, -1, 0)),
+-- 		AutoBoundsGetPos(aa, bb, Vec(0, 1, 0)),
+-- 		AutoBoundsGetPos(aa, bb, Vec(-1, 0, 0)),
+-- 		AutoBoundsGetPos(aa, bb, Vec(1, 0, 0)),
+-- 		AutoBoundsGetPos(aa, bb, Vec(0, 0, -1)),
+-- 		AutoBoundsGetPos(aa, bb, Vec(0, 0, 1)),
+-- 	}
+-- end
 
----Get the corners of the given Bounds
----@param aa Vec Minimum Bound Corner
----@param bb Vec Maximum Bound Corner
----@return table
-function AutoBoundsGetCorners(aa, bb)
-	local mid = {}
-	for i = 1, 3 do
-		mid[i] = (aa[i] + bb[i]) / 2
-	end
+-- ---Get the corners of the given Bounds
+-- ---@param aa Vec Minimum Bound Corner
+-- ---@param bb Vec Maximum Bound Corner
+-- ---@return table
+-- function AutoBoundsGetCorners(aa, bb)
+-- 	local mid = {}
+-- 	for i = 1, 3 do
+-- 		mid[i] = (aa[i] + bb[i]) / 2
+-- 	end
 
-	local corners = {
-		{ bb[1], mid[2], mid[3] },
-		{ aa[1], mid[2], mid[3] },
-		{ mid[1], bb[2], mid[3] },
-		{ mid[1], aa[2], mid[3] },
-		{ mid[1], mid[2], bb[3] },
-		{ mid[1], mid[2], aa[3] },
-		{ aa[1], bb[2], mid[3] },
-		{ bb[1], aa[2], mid[3] }
-	}
+-- 	local corners = {
+-- 		{ bb[1], mid[2], mid[3] },
+-- 		{ aa[1], mid[2], mid[3] },
+-- 		{ mid[1], bb[2], mid[3] },
+-- 		{ mid[1], aa[2], mid[3] },
+-- 		{ mid[1], mid[2], bb[3] },
+-- 		{ mid[1], mid[2], aa[3] },
+-- 		{ aa[1], bb[2], mid[3] },
+-- 		{ bb[1], aa[2], mid[3] }
+-- 	}
 
-	return corners
-end
+-- 	return corners
+-- end
 
----Get data about the size of the given Bounds
----@param aa table Minimum Bound Corner
----@param bb table Maximum Bound Corner
----@return table representing the size of the Bounds
----@return the smallest edge size of the Bounds
----@return the longest edge size of the Bounds
-function AutoBoundsSize(aa, bb)
-	local size = VecSub(bb, aa)
-	local minval = math.min(unpack(size))
-	local maxval = math.max(unpack(size))
+-- ---Get data about the size of the given Bounds
+-- ---@param aa table Minimum Bound Corner
+-- ---@param bb table Maximum Bound Corner
+-- ---@return table representing the size of the Bounds
+-- ---@return the smallest edge size of the Bounds
+-- ---@return the longest edge size of the Bounds
+-- function AutoBoundsSize(aa, bb)
+-- 	local size = VecSub(bb, aa)
+-- 	local minval = math.min(unpack(size))
+-- 	local maxval = math.max(unpack(size))
 
-	return size, minval, maxval
-end
+-- 	return size, minval, maxval
+-- end
 
-function AutoSubdivideBounds(aa, bb, levels)
-	levels = levels or 1
-	local bounds = { { aa, bb } }
+-- function AutoSubdivideBounds(aa, bb, levels)
+-- 	levels = levels or 1
+-- 	local bounds = { { aa, bb } }
 
-	for level = 1, levels do
-		local newBounds = {}
+-- 	for level = 1, levels do
+-- 		local newBounds = {}
 
-		for _, bound in ipairs(bounds) do
-			local mid = {}
-			for i = 1, 3 do
-				mid[i] = (bound[1][i] + bound[2][i]) / 2
-			end
+-- 		for _, bound in ipairs(bounds) do
+-- 			local mid = {}
+-- 			for i = 1, 3 do
+-- 				mid[i] = (bound[1][i] + bound[2][i]) / 2
+-- 			end
 
-			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
-			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
-			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
-			table.insert(newBounds, { { bound[1][1], bound[1][2], mid[3] }, { mid[1], mid[2], bound[2][3] } })
-			table.insert(newBounds, { { bound[1][1], mid[2], bound[1][3] }, { mid[1], bound[2][2], mid[3] } })
-			table.insert(newBounds, { { mid[1], mid[2], bound[1][3] }, { bound[2][1], bound[2][2], mid[3] } })
-			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
-			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
-		end
+-- 			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
+-- 			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
+-- 			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
+-- 			table.insert(newBounds, { { bound[1][1], bound[1][2], mid[3] }, { mid[1], mid[2], bound[2][3] } })
+-- 			table.insert(newBounds, { { bound[1][1], mid[2], bound[1][3] }, { mid[1], bound[2][2], mid[3] } })
+-- 			table.insert(newBounds, { { mid[1], mid[2], bound[1][3] }, { bound[2][1], bound[2][2], mid[3] } })
+-- 			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
+-- 			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
+-- 		end
 
-		bounds = newBounds
-	end
+-- 		bounds = newBounds
+-- 	end
 
-	return bounds
-end
+-- 	return bounds
+-- end
 
----Draws the world space bounds between the given bounds
----@param aa Vec Minimum Bound Corner
----@param bb Vec Maximum Bound Corner
----@param rgbcolors boolean|nil If the Minimum and Maximum corners are colorcoded representing the xyz axis colors, Default is false
----@param hue number|nil 0 to 1 representing the hue of the lines, Default is 0
----@param saturation number|nil 0 to 1 representing the saturation of the lines, Default is 0
----@param value number|nil 0 to 1 representing the value of the lines, Default is 0
----@param alpha number|nil the alpha of the lines, Default is 1
----@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
-	colorR = AutoDefault(colorR, 0)
-	colorG = AutoDefault(colorG, 0)
-	colorB = AutoDefault(colorB, 0)
-	alpha = AutoDefault(alpha, 1)
-	rgbcolors = AutoDefault(rgbcolors, false)
-	draw = AutoDefault(draw, false)
+-- ---Draws the world space bounds between the given bounds
+-- ---@param aa Vec Minimum Bound Corner
+-- ---@param bb Vec Maximum Bound Corner
+-- ---@param rgbcolors boolean|nil If the Minimum and Maximum corners are colorcoded representing the xyz axis colors, Default is false
+-- ---@param hue number|nil 0 to 1 representing the hue of the lines, Default is 0
+-- ---@param saturation number|nil 0 to 1 representing the saturation of the lines, Default is 0
+-- ---@param value number|nil 0 to 1 representing the value of the lines, Default is 0
+-- ---@param alpha number|nil the alpha of the lines, Default is 1
+-- ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
+-- function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
+-- 	colorR = AutoDefault(colorR, 0)
+-- 	colorG = AutoDefault(colorG, 0)
+-- 	colorB = AutoDefault(colorB, 0)
+-- 	alpha = AutoDefault(alpha, 1)
+-- 	rgbcolors = AutoDefault(rgbcolors, false)
+-- 	draw = AutoDefault(draw, false)
 
-	min, max = {
-		[1] = Vec(aa[1], aa[2], aa[3]),
-		[2] = Vec(bb[1], aa[2], aa[3]),
-		[3] = Vec(bb[1], aa[2], bb[3]),
-		[4] = Vec(aa[1], aa[2], bb[3]),
-	}, {
-		[1] = Vec(aa[1], bb[2], aa[3]),
-		[2] = Vec(bb[1], bb[2], aa[3]),
-		[3] = Vec(bb[1], bb[2], bb[3]),
-		[4] = Vec(aa[1], bb[2], bb[3]),
-	}
+-- 	min, max = {
+-- 		[1] = Vec(aa[1], aa[2], aa[3]),
+-- 		[2] = Vec(bb[1], aa[2], aa[3]),
+-- 		[3] = Vec(bb[1], aa[2], bb[3]),
+-- 		[4] = Vec(aa[1], aa[2], bb[3]),
+-- 	}, {
+-- 		[1] = Vec(aa[1], bb[2], aa[3]),
+-- 		[2] = Vec(bb[1], bb[2], aa[3]),
+-- 		[3] = Vec(bb[1], bb[2], bb[3]),
+-- 		[4] = Vec(aa[1], bb[2], bb[3]),
+-- 	}
 
-	-- This code made me want to give up
-	local lines = {
-		{ min[2], min[3], colorR, colorG, colorB, alpha },
-		{ min[3], min[4], colorR, colorG, colorB, alpha },
-		{ max[1], max[2], colorR, colorG, colorB, alpha },
-		{ max[4], max[1], colorR, colorG, colorB, alpha },
-		{ min[2], max[2], colorR, colorG, colorB, alpha },
-		{ min[4], max[4], colorR, colorG, colorB, alpha },
+-- 	-- This code made me want to give up
+-- 	local lines = {
+-- 		{ min[2], min[3], colorR, colorG, colorB, alpha },
+-- 		{ min[3], min[4], colorR, colorG, colorB, alpha },
+-- 		{ max[1], max[2], colorR, colorG, colorB, alpha },
+-- 		{ max[4], max[1], colorR, colorG, colorB, alpha },
+-- 		{ min[2], max[2], colorR, colorG, colorB, alpha },
+-- 		{ min[4], max[4], colorR, colorG, colorB, alpha },
 
-		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
-		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
-		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
-		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
-			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
-		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
-			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
-		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
-	}
+-- 		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+-- 		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
+-- 		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+-- 		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+-- 			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+-- 		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+-- 			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+-- 		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
+-- 	}
 
-	local DrawLine = DrawLine
-	local DebugLine = DebugLine
+-- 	local DrawLine = DrawLine
+-- 	local DebugLine = DebugLine
 
-	for i, v in ipairs(lines) do
-		if draw then
-			DrawLine(unpack(v))
-		else
-			DebugLine(unpack(v))
-		end
-	end
-end
+-- 	for i, v in ipairs(lines) do
+-- 		if draw then
+-- 			DrawLine(unpack(v))
+-- 		else
+-- 			DebugLine(unpack(v))
+-- 		end
+-- 	end
+-- end
 
+---comment
+---@param aa any
+---@param bb any
+---@return OBB
 function AutoAABBToOBB(aa, bb)
-	local center = VecLerp(bb, aa, 0.5)
-	local size = VecSub(bb, aa)
-	return { pos = center, rot = QuatEuler(), size = size }
+    local center = VecLerp(bb, aa, 0.5)
+    local size = VecSub(bb, aa)
+    return { pos = center, rot = QuatEuler(), size = size }
 end
 
 function AutoOBB(center, rot, size)
@@ -933,8 +943,8 @@ function AutoSimInstance()
 	}
 
 	---Creates a Point to be Simulated with SimInstance:CreatePoint(), you can add parameters after it is created and change existing ones, such as point.reflectivity, and point.mass
-	---@param Position Vec|nil Default is Vec(0, 0, 0)
-	---@param Velocity Vec|nil Default is Vec(0, 0, 0)
+	---@param Position vector|nil Default is Vec(0, 0, 0)
+	---@param Velocity vector|nil Default is Vec(0, 0, 0)
 	---@return table point
 	---@return number newindex
 	function t:CreatePoint(Position, Velocity)
@@ -1605,18 +1615,18 @@ function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 end
 
 ---AutoRaycast from point A to point B. The distance will default to the distance between the points, but can be set.
----@param pointA table
----@param pointB table
+---@param pointA vector
+---@param pointB vector
 ---@param manualDistance number
 ---@param radius number
 ---@param rejectTransparent boolean
----@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }
+---@return { hit:boolean, dist:number, normal:vector, shape:number, intersection:vector, dot:number, reflection:vector }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
 	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
 end
 
----@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }, table cameraTransform, table cameraForward
+---@return { hit:boolean, dist:number, normal:vector, shape:number, intersection:vector, dot:number, reflection:vector }, table cameraTransform, table cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
 	local fwd = AutoTransformFwd(trans)
@@ -1775,7 +1785,7 @@ function AutoPointToAngle(point, fromtrans)
 end
 
 ---Checks if a point is in the view using a transform acting as the "Camera"
----@param point Vec
+---@param point vector
 ---@param oftrans Transfrom|nil The Transform acting as the camera, Default is the Player's Camera
 ---@param angle number|nil The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean|nil Check to make sure that the point is not obscured, Default is true
@@ -1831,7 +1841,7 @@ end
 ---Get the last Path Query as a path of points
 ---@param precision number The Accuracy
 ---@return table
----@return Vec "Last Point"
+---@return vector "Last Point"
 function AutoRetrievePath(precision)
 	precision = AutoDefault(precision, 0.2)
 
@@ -2303,7 +2313,7 @@ function AutoDrawLines(points, huescale, offset, alpha, draw)
 end
 
 ---Draws a Transform
----@param transform Transform
+---@param transform transform|vector
 ---@param size number|nil the size in meters, Default is 0.5
 ---@param alpha number|nil Default is 1
 ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
@@ -2416,7 +2426,7 @@ function AutoDrawBox(point, halfextents, r, g, b, a)
 end
 
 ---Draws a Transform as a Cone
----@param transform Transform
+---@param transform transform
 ---@param sides number|nil the amount of sides on the cone, Default is 12
 ---@param angle number|nil how wide the cone is in degrees, Default is 25
 ---@param size number|nil the size in meters, Default is 0.5
@@ -2465,7 +2475,7 @@ end
 
 ---Draws some text at a world position.
 ---@param text string|number|nil Text Displayed, Default is 'nil'
----@param position Vec The WorldSpace Position
+---@param position vector The WorldSpace Position
 ---@param occlude boolean|nil Hides the tooltip behind walls, Default is false
 
 ---@param fontsize number|nil Fontsize, Default is 24

@@ -305,9 +305,9 @@ function AutoVecEquals(a, b)
 end
 
 --- Return a Random Vector with an optional offset and scale
----@param param1 number|table
+---@param param1 number|vector
 ---@param param2 number|nil
----@return table
+---@return vector
 function AutoVecRnd(param1, param2)
 	local offset, scale
 	if type(param1) == "table" then
@@ -501,17 +501,17 @@ function AutoVecOrthoDirection(vec, scale)
 end
 
 --- Rotates a vector around an axis by a given angle
---- @param vec table The vector to rotate
---- @param axis table The rotation axis, a unit vector
+--- @param vec vector The vector to rotate
+--- @param axis vector The rotation axis, a unit vector
 --- @param angle number The rotation angle in degrees
---- @return table vec The rotated vector
+--- @return vector vec The rotated vector
 function AutoVecRotate(vec, axis, angle)
 	local quat = QuatAxisAngle(axis, angle)
 	return QuatRotateVec(quat, vec)
 end
 
 ---Return Vec v with it's x value replaced by subx
----@param v table
+---@param v vector
 ---@param subx number
 function AutoVecSubsituteX(v, subx)
 	local new = VecCopy(v)
@@ -520,7 +520,7 @@ function AutoVecSubsituteX(v, subx)
 end
 
 ---Return Vec v with it's y value replaced by suby
----@param v table
+---@param v vector
 ---@param suby number
 function AutoVecSubsituteY(v, suby)
 	local new = VecCopy(v)
@@ -529,7 +529,7 @@ function AutoVecSubsituteY(v, suby)
 end
 
 ---Return Vec v with it's z value replaced by subz
----@param v table
+---@param v vector
 ---@param subz number
 function AutoVecSubsituteZ(v, subz)
 	local new = VecCopy(v)
@@ -548,11 +548,15 @@ end
 ----------------Quat Functions-------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---@param rot quaternion
+---@return vector
 function AutoQuatFwd(rot)
 	return QuatRotateVec(rot, Vec(0, 0, 1))
 end
 
-
+---Returns a random quaternion
+---@param angle number degrees
+---@return quaternion
 function AutoRandomQuat(angle)
 	local axis = { math.random() - 0.5, math.random() - 0.5, math.random() - 0.5 }
 	local sinHalfAngle = math.sin(math.rad(angle) / 2)
@@ -565,19 +569,24 @@ function AutoRandomQuat(angle)
 	)
 end
 
--- Computes the conjugate of a quaternion.
+-- Computes the conjugate of a quaternion
+---@param q quaternion
+---@return quaternion
 function AutoQuatConjugate(q)
 	return Quat(-q[1], -q[2], -q[3], q[4])
 end
 
 -- Computes the dot product of two quaternions.
+---@param a quaternion
+---@param b quaternion
+---@return unknown
 function AutoQuatDot(a, b)
 	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4]
 end
 
 --- Returns the inverse of the given quaternion.
----@param quat table A table representing the quaternion to invert, with fields x, y, z, and w.
----@return table A table representing the inverse of the given quaternion, with fields x, y, z, and w.
+---@param quat quaternion A table representing the quaternion to invert, with fields x, y, z, and w.
+---@return quaternion A table representing the inverse of the given quaternion, with fields x, y, z, and w.
 function AutoQuatInverse(quat)
 	local conjugate = AutoQuatConjugate(quat)
 	local squaredLength = AutoQuatDot(quat, quat)
@@ -594,214 +603,209 @@ end
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
 ---Get the center of a body's bounds
----@param body number
----@return table
+---@param body body_handle
+---@return vector
 function AutoBodyBoundsCenter(body)
 	local aa, bb = GetBodyBounds(body)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
 ---Get the center of a shapes's bounds
----@param shape number
----@return table
+---@param shape shape_handle
+---@return vector
 function AutoShapeBoundsCenter(shape)
 	local aa, bb = GetShapeBounds(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
--- function AutoBoundsExpandPoint(pos, halfextents)
--- 	if type(halfextents) =="number" then
--- 		halfextents = AutoVecOne(halfextents)
--- 	end
+---Returns a Axis ALigned Bounding Box with the center of pos
+---@param pos vector
+---@param halfextents vector|number
+---@return vector lower-bound
+---@return vector upper-bound
+function AutoAABBExpandPoint(pos, halfextents)
+	if type(halfextents) == "number" then
+		halfextents = AutoVecOne(halfextents)
+	end
 
--- 	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
--- end
+	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
+end
 
--- ---Takes two vectors and modifys them so they can be used in other bound functions
--- ---@param aa Vec
--- ---@param bb Vec
--- ---@return Vec
--- ---@return Vec
--- function AutoBoundsCorrection(aa, bb)
--- 	local min, max = VecCopy(aa), VecCopy(bb)
+---Takes two vectors and modifys them so they can be used in other bound functions
+---@param aa vector
+---@param bb vector
+---@return vector
+---@return vector
+function AutoAABBCorrection(aa, bb)
+	local min, max = VecCopy(aa), VecCopy(bb)
 
--- 	if bb[1] < aa[1] then
--- 		min[1] = bb[1]
--- 		max[1] = aa[1]
--- 	end
--- 	if bb[2] < aa[2] then
--- 		min[2] = bb[2]
--- 		max[2] = aa[2]
--- 	end
--- 	if bb[3] < aa[3] then
--- 		min[3] = bb[3]
--- 		max[3] = aa[3]
--- 	end
+	if bb[1] < aa[1] then
+		min[1] = bb[1]
+		max[1] = aa[1]
+	end
+	if bb[2] < aa[2] then
+		min[2] = bb[2]
+		max[2] = aa[2]
+	end
+	if bb[3] < aa[3] then
+		min[3] = bb[3]
+		max[3] = aa[3]
+	end
 
--- 	return min, max
--- end
+	return min, max
+end
 
--- ---Get a position inside or on the Input Bounds
--- ---@param aa Vec Minimum Bound Corner
--- ---@param bb Vec Maximum Bound Corner
--- ---@param vec Vec|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
--- ---@return Vec
--- function AutoBoundsGetPos(aa, bb, vec)
--- 	vec = AutoDefault(vec, Vec(0, 0, 0))
+---Get a position inside or on the Input Bounds
+---@param aa vector lower-bound
+---@param bb vector upper-bound
+---@param vec vector|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
+---@return vector
+function AutoAABBGetPos(aa, bb, vec)
+	vec = AutoDefault(vec, Vec(0, 0, 0))
 
--- 	vec = AutoVecMap(vec, -1, 1, 0, 1)
--- 	local sizevec = VecSub(bb, aa)
+	vec = AutoVecMap(vec, -1, 1, 0, 1)
+	local sizevec = VecSub(bb, aa)
 
--- 	local size = VecLength(sizevec)
--- 	local scaled = AutoVecMulti(vec, sizevec)
--- 	return VecAdd(scaled, aa)
--- end
+	local size = VecLength(sizevec)
+	local scaled = AutoVecMulti(vec, sizevec)
+	return VecAdd(scaled, aa)
+end
 
--- ---Get the center of the faces of the given Bounds, as if it was a cube
--- ---@param aa Vec Minimum Bound Corner
--- ---@param bb Vec Maximum Bound Corner
--- ---@return table
--- function AutoBoundsGetFaceCenters(aa, bb)
--- 	return {
--- 		AutoBoundsGetPos(aa, bb, Vec(0, -1, 0)),
--- 		AutoBoundsGetPos(aa, bb, Vec(0, 1, 0)),
--- 		AutoBoundsGetPos(aa, bb, Vec(-1, 0, 0)),
--- 		AutoBoundsGetPos(aa, bb, Vec(1, 0, 0)),
--- 		AutoBoundsGetPos(aa, bb, Vec(0, 0, -1)),
--- 		AutoBoundsGetPos(aa, bb, Vec(0, 0, 1)),
--- 	}
--- end
+---Get the corners of the given Bounds
+---@param aa vector lower-bound
+---@param bb vector upper-bound
+---@return table
+function AutoAABBGetCorners(aa, bb)
+	local mid = {}
+	for i = 1, 3 do
+		mid[i] = (aa[i] + bb[i]) / 2
+	end
 
--- ---Get the corners of the given Bounds
--- ---@param aa Vec Minimum Bound Corner
--- ---@param bb Vec Maximum Bound Corner
--- ---@return table
--- function AutoBoundsGetCorners(aa, bb)
--- 	local mid = {}
--- 	for i = 1, 3 do
--- 		mid[i] = (aa[i] + bb[i]) / 2
--- 	end
+	local corners = {
+		{ bb[1], mid[2], mid[3] },
+		{ aa[1], mid[2], mid[3] },
+		{ mid[1], bb[2], mid[3] },
+		{ mid[1], aa[2], mid[3] },
+		{ mid[1], mid[2], bb[3] },
+		{ mid[1], mid[2], aa[3] },
+		{ aa[1], bb[2], mid[3] },
+		{ bb[1], aa[2], mid[3] }
+	}
 
--- 	local corners = {
--- 		{ bb[1], mid[2], mid[3] },
--- 		{ aa[1], mid[2], mid[3] },
--- 		{ mid[1], bb[2], mid[3] },
--- 		{ mid[1], aa[2], mid[3] },
--- 		{ mid[1], mid[2], bb[3] },
--- 		{ mid[1], mid[2], aa[3] },
--- 		{ aa[1], bb[2], mid[3] },
--- 		{ bb[1], aa[2], mid[3] }
--- 	}
+	return corners
+end
 
--- 	return corners
--- end
+---Get data about the size of the given Bounds
+---@param aa vector lower-bound
+---@param bb vector upper-bound
+---@return table representing the size of the Bounds
+---@return number smallest smallest edge size of the Bounds
+---@return number longest longest edge size of the Bounds
+function AutoAABBSize(aa, bb)
+	local size = VecSub(bb, aa)
+	local minval = math.min(unpack(size))
+	local maxval = math.max(unpack(size))
 
--- ---Get data about the size of the given Bounds
--- ---@param aa table Minimum Bound Corner
--- ---@param bb table Maximum Bound Corner
--- ---@return table representing the size of the Bounds
--- ---@return the smallest edge size of the Bounds
--- ---@return the longest edge size of the Bounds
--- function AutoBoundsSize(aa, bb)
--- 	local size = VecSub(bb, aa)
--- 	local minval = math.min(unpack(size))
--- 	local maxval = math.max(unpack(size))
+	return size, minval, maxval
+end
 
--- 	return size, minval, maxval
--- end
+---Takes a given AABB and subdivides into new AABBs
+---@param aa vector lower-bound
+---@param bb vector upper-bound
+---@param levels number?
+---@return table
+function AutoSubdivideBounds(aa, bb, levels)
+	levels = levels or 1
+	local bounds = { { aa, bb } }
 
--- function AutoSubdivideBounds(aa, bb, levels)
--- 	levels = levels or 1
--- 	local bounds = { { aa, bb } }
+	for level = 1, levels do
+		local newBounds = {}
 
--- 	for level = 1, levels do
--- 		local newBounds = {}
+		for _, bound in ipairs(bounds) do
+			local mid = {}
+			for i = 1, 3 do
+				mid[i] = (bound[1][i] + bound[2][i]) / 2
+			end
 
--- 		for _, bound in ipairs(bounds) do
--- 			local mid = {}
--- 			for i = 1, 3 do
--- 				mid[i] = (bound[1][i] + bound[2][i]) / 2
--- 			end
+			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
+			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
+			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
+			table.insert(newBounds, { { bound[1][1], bound[1][2], mid[3] }, { mid[1], mid[2], bound[2][3] } })
+			table.insert(newBounds, { { bound[1][1], mid[2], bound[1][3] }, { mid[1], bound[2][2], mid[3] } })
+			table.insert(newBounds, { { mid[1], mid[2], bound[1][3] }, { bound[2][1], bound[2][2], mid[3] } })
+			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
+			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
+		end
 
--- 			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
--- 			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
--- 			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
--- 			table.insert(newBounds, { { bound[1][1], bound[1][2], mid[3] }, { mid[1], mid[2], bound[2][3] } })
--- 			table.insert(newBounds, { { bound[1][1], mid[2], bound[1][3] }, { mid[1], bound[2][2], mid[3] } })
--- 			table.insert(newBounds, { { mid[1], mid[2], bound[1][3] }, { bound[2][1], bound[2][2], mid[3] } })
--- 			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
--- 			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
--- 		end
+		bounds = newBounds
+	end
 
--- 		bounds = newBounds
--- 	end
+	return bounds
+end
 
--- 	return bounds
--- end
+---Draws a given Axis Aligned Bounding Box
+---@param aa vector lower-bound
+---@param bb vector upper-bound
+---@param colorR number
+---@param colorG number
+---@param colorB number
+---@param alpha number
+---@param rgbcolors boolean?
+---@param draw boolean?
+function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
+	colorR = AutoDefault(colorR, 0)
+	colorG = AutoDefault(colorG, 0)
+	colorB = AutoDefault(colorB, 0)
+	alpha = AutoDefault(alpha, 1)
+	rgbcolors = AutoDefault(rgbcolors, false)
+	draw = AutoDefault(draw, false)
 
--- ---Draws the world space bounds between the given bounds
--- ---@param aa Vec Minimum Bound Corner
--- ---@param bb Vec Maximum Bound Corner
--- ---@param rgbcolors boolean|nil If the Minimum and Maximum corners are colorcoded representing the xyz axis colors, Default is false
--- ---@param hue number|nil 0 to 1 representing the hue of the lines, Default is 0
--- ---@param saturation number|nil 0 to 1 representing the saturation of the lines, Default is 0
--- ---@param value number|nil 0 to 1 representing the value of the lines, Default is 0
--- ---@param alpha number|nil the alpha of the lines, Default is 1
--- ---@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
--- function AutoDrawBounds(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
--- 	colorR = AutoDefault(colorR, 0)
--- 	colorG = AutoDefault(colorG, 0)
--- 	colorB = AutoDefault(colorB, 0)
--- 	alpha = AutoDefault(alpha, 1)
--- 	rgbcolors = AutoDefault(rgbcolors, false)
--- 	draw = AutoDefault(draw, false)
+	min, max = {
+		[1] = Vec(aa[1], aa[2], aa[3]),
+		[2] = Vec(bb[1], aa[2], aa[3]),
+		[3] = Vec(bb[1], aa[2], bb[3]),
+		[4] = Vec(aa[1], aa[2], bb[3]),
+	}, {
+		[1] = Vec(aa[1], bb[2], aa[3]),
+		[2] = Vec(bb[1], bb[2], aa[3]),
+		[3] = Vec(bb[1], bb[2], bb[3]),
+		[4] = Vec(aa[1], bb[2], bb[3]),
+	}
 
--- 	min, max = {
--- 		[1] = Vec(aa[1], aa[2], aa[3]),
--- 		[2] = Vec(bb[1], aa[2], aa[3]),
--- 		[3] = Vec(bb[1], aa[2], bb[3]),
--- 		[4] = Vec(aa[1], aa[2], bb[3]),
--- 	}, {
--- 		[1] = Vec(aa[1], bb[2], aa[3]),
--- 		[2] = Vec(bb[1], bb[2], aa[3]),
--- 		[3] = Vec(bb[1], bb[2], bb[3]),
--- 		[4] = Vec(aa[1], bb[2], bb[3]),
--- 	}
+	-- This code made me want to give up
+	local lines = {
+		{ min[2], min[3], colorR, colorG, colorB, alpha },
+		{ min[3], min[4], colorR, colorG, colorB, alpha },
+		{ max[1], max[2], colorR, colorG, colorB, alpha },
+		{ max[4], max[1], colorR, colorG, colorB, alpha },
+		{ min[2], max[2], colorR, colorG, colorB, alpha },
+		{ min[4], max[4], colorR, colorG, colorB, alpha },
 
--- 	-- This code made me want to give up
--- 	local lines = {
--- 		{ min[2], min[3], colorR, colorG, colorB, alpha },
--- 		{ min[3], min[4], colorR, colorG, colorB, alpha },
--- 		{ max[1], max[2], colorR, colorG, colorB, alpha },
--- 		{ max[4], max[1], colorR, colorG, colorB, alpha },
--- 		{ min[2], max[2], colorR, colorG, colorB, alpha },
--- 		{ min[4], max[4], colorR, colorG, colorB, alpha },
+		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
+		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
+			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
+	}
 
--- 		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
--- 		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
--- 		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
--- 		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
--- 			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
--- 		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
--- 			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
--- 		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
--- 	}
+	local DrawLine = DrawLine
+	local DebugLine = DebugLine
 
--- 	local DrawLine = DrawLine
--- 	local DebugLine = DebugLine
+	for i, v in ipairs(lines) do
+		if draw then
+			DrawLine(unpack(v))
+		else
+			DebugLine(unpack(v))
+		end
+	end
+end
 
--- 	for i, v in ipairs(lines) do
--- 		if draw then
--- 			DrawLine(unpack(v))
--- 		else
--- 			DebugLine(unpack(v))
--- 		end
--- 	end
--- end
-
----comment
----@param aa any
----@param bb any
+---Converts an Axis Aligned Bounding Box to a Oriented Bounding Box
+---@param aa vector
+---@param bb vector
 ---@return OBB
 function AutoAABBToOBB(aa, bb)
     local center = VecLerp(bb, aa, 0.5)
@@ -809,6 +813,11 @@ function AutoAABBToOBB(aa, bb)
     return { pos = center, rot = QuatEuler(), size = size }
 end
 
+---Defines a Oriented Bounding Box
+---@param center vector
+---@param rot quaternion
+---@param size vector|number?
+---@return table
 function AutoOBB(center, rot, size)
     return {
         pos = center or Vec(),
@@ -817,7 +826,10 @@ function AutoOBB(center, rot, size)
 	}
 end
 
-function AutoGetOBBGeometry(obb)
+---Returns the corners of a Oriented Bounding Box
+---@param obb OBB
+---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
+function AutoGetOBBCorners(obb)
 	local corners = {}
 
 	-- Calculate the eight corner points of the OBB based on the center, dimensions, and orientation
@@ -830,6 +842,16 @@ function AutoGetOBBGeometry(obb)
 	corners.XyZ = TransformToParentPoint(obb, Vec(hs[1], -hs[2], hs[3]))
 	corners.xYZ = TransformToParentPoint(obb, Vec(-hs[1], hs[2], hs[3]))
 	corners.XYZ = TransformToParentPoint(obb, hs)
+
+	return corners
+end
+
+---Returns the corners and transforms representing the faces of a Oriented Bounding Box---@param obb OBB
+---@param obb OBB
+---@return { z:{ pos:table, rot:table, size:table }, zn:{ pos:table, rot:table, size:table }, x:{ pos:table, rot:table, size:table }, xn:{ pos:table, rot:table, size:table }, y:{ pos:table, rot:table, size:table }, yn:{ pos:table, rot:table, size:table } }
+---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
+function AutoGetOBBFaces(obb)
+	local corners = AutoGetOBBCorners(obb)
 
 	local faces = {}
 	faces.z = {
@@ -863,7 +885,38 @@ function AutoGetOBBGeometry(obb)
 		size = { obb.size[1], obb.size[3] }
 	}
 
-	return { corners = corners, faces = faces }
+	return faces, corners
+end
+
+---Draws a given Oriented Bounding Box
+---@param obb OBB
+---@param red number? Default is 0
+---@param green number? Default is 0
+---@param blue number? Default is 0
+---@param alpha number? Default is 1
+function AutoDrawOBB(obb, red, green, blue, alpha)
+	local c = AutoGetOBBCorners(obb)
+
+	local lines = {
+		{ c.xyz, c.Xyz },
+		{ c.xYz, c.XYz },
+		{ c.xyZ, c.XyZ },
+        { c.xYZ, c.XYZ },
+		
+		{ c.xyz, c.xYz },
+		{ c.Xyz, c.XYz },
+		{ c.xyZ, c.xYZ },
+		{ c.XyZ, c.XYZ },
+
+		{ c.xyz, c.xyZ },
+		{ c.Xyz, c.XyZ },
+		{ c.xYz, c.xYZ },
+		{ c.XYz, c.XYZ },
+	}
+
+	for k, l in pairs(lines) do
+		DebugLine(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
+	end
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -916,7 +969,7 @@ function AutoDrawOctree(node, layer, drawfunction)
 	if not drawfunction then
 		if node.check and (not layer or (node.layer == layer)) then
 			local c1, c2, c3 = AutoHSVToRGB(node.layer / 10, 1, 1)
-			AutoDrawBounds(node.aa, node.bb, c1, c2, c3, 1)
+			AutoDrawAABB(node.aa, node.bb, c1, c2, c3, 1)
 		end
 	elseif not layer or (node.layer == layer) then
 		drawfunction(node, layer)
@@ -1707,56 +1760,15 @@ function AutoQueryClosest(origin, maxDist)
 	return data
 end
 
----Gets the Corners and Transforms of a shape;s faces
----@param shape number
----@return { corners:{ xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }, faces:{ z:{ pos:table, rot:table, size:table }, zn:{ pos:table, rot:table, size:table }, x:{ pos:table, rot:table, size:table }, xn:{ pos:table, rot:table, size:table }, y:{ pos:table, rot:table, size:table }, yn:{ pos:table, rot:table, size:table },}, size:table }
-function AutoGetShapeGeometry(shape)
+---@param shape shape_handle
+---@return OBB
+function AutoGetShapeOBB(shape)
 	local transform = GetShapeWorldTransform(shape)
-	local size = VecScale(Vec(GetShapeSize(shape)), 0.1)
+	local x, y, z, scale = GetShapeSize(shape)
+	local size = VecScale(Vec(x, y, z), scale)
 
-	local corners = {}
-	corners.xyz = transform.pos
-	corners.Xyz = TransformToParentPoint(transform, Vec(size[1], 0, 0))
-	corners.xYz = TransformToParentPoint(transform, Vec(0, size[2], 0))
-	corners.xyZ = TransformToParentPoint(transform, Vec(0, 0, size[3]))
-	corners.XYz = TransformToParentPoint(transform, Vec(size[1], size[2], 0))
-	corners.XyZ = TransformToParentPoint(transform, Vec(size[1], 0, size[3]))
-	corners.xYZ = TransformToParentPoint(transform, Vec(0, size[2], size[3]))
-	corners.XYZ = TransformToParentPoint(transform, Vec(size[1], size[2], size[3]))
-
-	local faces = {}
-	faces.z = {
-		pos = VecLerp(corners.xyZ, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(180, 0, 0)),
-		size = { size[1], size[2] }
-	}
-	faces.zn = {
-		pos = VecLerp(corners.xyz, corners.XYz, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(0, 0, 0)),
-		size = { size[1], size[2] }
-	}
-	faces.x = {
-		pos = VecLerp(corners.Xyz, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(0, -90, -90)),
-		size = { size[2], size[3] }
-	}
-	faces.xn = {
-		pos = VecLerp(corners.xyz, corners.xYZ, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(0, 90, 90)),
-		size = { size[2], size[3] }
-	}
-	faces.y = {
-		pos = VecLerp(corners.xYz, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(90, 0, 0)),
-		size = { size[1], size[3] }
-	}
-	faces.yn = {
-		pos = VecLerp(corners.xyz, corners.XyZ, 0.5),
-		rot = QuatRotateQuat(transform.rot, QuatEuler(-90, 180, 0)),
-		size = { size[1], size[3] }
-	}
-
-	return { corners = corners, faces = faces, size = size }
+	local center = TransformToParentPoint(transform, VecScale(size, 0.5))
+	return AutoOBB(center, transform.rot, size)
 end
 
 ---Goes through each shape on a body and adds up their voxel count
@@ -2419,8 +2431,8 @@ function AutoDrawPlane(transform, size, pattern, patternstrength, oneway, r, g, 
 end
 
 function AutoDrawBox(point, halfextents, r, g, b, a)
-	local aa, bb = AutoBoundsExpandPoint(point, halfextents)
-	AutoDrawBounds(aa, bb, r, g, b, a)
+	local aa, bb = AutoAABBExpandPoint(point, halfextents)
+	AutoDrawAABB(aa, bb, r, g, b, a)
 	
 	return aa, bb
 end

@@ -569,33 +569,62 @@ function AutoRandomQuat(angle)
 	)
 end
 
--- Computes the conjugate of a quaternion
----@param q quaternion
----@return quaternion
-function AutoQuatConjugate(q)
-	return Quat(-q[1], -q[2], -q[3], q[4])
-end
-
 -- Computes the dot product of two quaternions.
 ---@param a quaternion
 ---@param b quaternion
----@return unknown
+---@return number
 function AutoQuatDot(a, b)
 	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4]
 end
 
 --- Returns the inverse of the given quaternion.
 ---@param quat quaternion A table representing the quaternion to invert, with fields x, y, z, and w.
----@return quaternion A table representing the inverse of the given quaternion, with fields x, y, z, and w.
+---@return quaternion quat A table representing the inverse of the given quaternion, with fields x, y, z, and w.
 function AutoQuatInverse(quat)
-	local conjugate = AutoQuatConjugate(quat)
-	local squaredLength = AutoQuatDot(quat, quat)
-	return Quat(
-		-conjugate[1] / squaredLength,
-		-conjugate[2] / squaredLength,
-		-conjugate[3] / squaredLength,
-		conjugate[4] / squaredLength
-	)
+	return { -quat[1], -quat[2], -quat[3], quat[4] }
+end
+
+--- Between -a and a, picks the quaternion nearest to b
+---@param a quaternion
+---@param b quaternion
+---@return quaternion
+---
+--- Thankyou to Mathias for this function
+function AutoQuatNearest(a, b)
+	return AutoQuatDot(a, b) < 0 and { -a[1], -a[2], -a[3], -a[4] } or { a[1], a[2], a[3], a[4] }
+end
+
+--- Same as QuatAxisAngle() but takes a single vector instead of a unit vector + an angle, for convenience
+--- Thankyou to Mathias for this function
+function AutoQuatFromAxisAngle(v)
+	local xyz = VecScale(v, 0.5)
+	local angle = VecLength(xyz)
+
+	if angle == 0 then
+		return Quat()
+	end
+
+	local co = math.cos(angle)
+	local si = math.sin(angle)
+	local qXYZ = VecScale(xyz, si / angle)
+	return Quat(qXYZ[1], qXYZ[2], qXYZ[3], co)
+end
+
+--- Converts a quaternion to an axis angle representation
+--- Returns a rotation vector where axis is the direction and angle is the length
+---
+--- Thankyou to Mathias for this function
+function AutoQuatToAxisAngle(q)
+	local qXYZ = Vec(q[1], q[2], q[3])
+	local co = q[4]
+	local si = VecLength(qXYZ)
+
+	if si == 0 then
+		return VecScale(qXYZ, 2.0 / co)
+	end
+
+	local angle = math.atan2(si, co)
+	return VecScale(qXYZ, 2.0 * angle / si)
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -888,21 +917,15 @@ function AutoGetOBBFaces(obb)
 	return faces, corners
 end
 
----Draws a given Oriented Bounding Box
----@param obb OBB
----@param red number? Default is 0
----@param green number? Default is 0
----@param blue number? Default is 0
----@param alpha number? Default is 1
-function AutoDrawOBB(obb, red, green, blue, alpha)
+function AutoOBBLines(obb)
 	local c = AutoGetOBBCorners(obb)
 
-	local lines = {
+	return {
 		{ c.xyz, c.Xyz },
 		{ c.xYz, c.XYz },
 		{ c.xyZ, c.XyZ },
-        { c.xYZ, c.XYZ },
-		
+		{ c.xYZ, c.XYZ },
+
 		{ c.xyz, c.xYz },
 		{ c.Xyz, c.XYz },
 		{ c.xyZ, c.xYZ },
@@ -913,6 +936,16 @@ function AutoDrawOBB(obb, red, green, blue, alpha)
 		{ c.xYz, c.xYZ },
 		{ c.XYz, c.XYZ },
 	}
+end
+
+---Draws a given Oriented Bounding Box
+---@param obb OBB
+---@param red number? Default is 0
+---@param green number? Default is 0
+---@param blue number? Default is 0
+---@param alpha number? Default is 1
+function AutoDrawOBB(obb, red, green, blue, alpha)
+	local lines = AutoOBBLines(obb)
 
 	for k, l in pairs(lines) do
 		DebugLine(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
@@ -1155,73 +1188,241 @@ function AutoSimInstance()
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Second Order System------------------------------------------------------------------------------------------------------------------------
+----------------Secondary Motion-----Previously Second Order System--------------Huge Thanks to Mathias#1325 for work on the Quaternion Functions------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
----Sets up a Second Order System, using code by t3ssel8r
----@param inital number|table The inital current value of the system
----@param frequency number The frequency in which the system will respond to input
----@param zeta number
+---Returns a table representing a Second Order System (SOS) that can be used to make secondary motion
+---@param initial number|table<number>
+---@param frequency number
+---@param dampening number
 ---@param response number
-function AutoCreateSOS(inital, frequency, zeta, response)
-	local t = {}
-	t.value = inital
-	t.last = inital
-	t.vel = 0
+---@param raw_k boolean?
+---@return { data:{ current:number, previous:number, velocity:number }|table<{ current:number, previous:number, velocity:number }>, k_values:{ [1]:number, [2]:number, [3]:number} }
+function AutoSM_Define(initial, frequency, dampening, response, raw_k)
+	local sosdata = {
+		data = {},
+		k_values = {
+			raw_k and frequency or (dampening / (math.pi * frequency)),
+			raw_k and dampening or (1 / (2 * math.pi * frequency) ^ 2),
+			raw_k and response or (response * dampening / (2 * math.pi * frequency)),
+		}
+	}
 
-	t.k1 = zeta / (math.pi * frequency)
-	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
-	t.k3 = response * zeta / (2 * math.pi * frequency)
-
-	return t
-end
-
-function AutoSOSUpdate(sos, desired, time)
-	time = AutoDefault(time, GetTimeStep())
-	local xd = (desired - sos.last) / time
-	sos.last = desired
-
-	local k2_stable = math.max(sos.k2, time ^ 2 / 2 + time * sos.k1 / 2, time * sos.k1)
-	sos.value = sos.value + time * sos.vel
-	sos.vel = sos.vel + time * (desired + sos.k3 * xd - sos.value - sos.k1 * sos.vel) / k2_stable
-end
-
-function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
-	local sos = { value = nil }
-
-	for k, v in pairs(initaltable) do
-		sos[k] = AutoCreateSOS(v or 0, frequency, dampening, response)
+	if type(initial) == 'table' then
+		for k, v in pairs(initial) do
+			sosdata.data[k] = {
+				current = v,
+				previous = v,
+				velocity = 0
+			}
+		end
+	else
+		sosdata.data = {
+			current = initial,
+			previous = initial,
+			velocity = 0
+		}
 	end
 	
-	return setmetatable(sos, {
-		__index = function(t, k)
-			if k == 'value' then
-				local v = {}
-				for k2, v2 in pairs(t) do
-					v[k2] = v2.value
-				end
 
-				return v
-			end
-		end,
-		__newindex = function(t, k, v)
-			if k == 'value' then
-				for i = 1, #v do
-					local s = rawget(t, i)
-					s.value = v[i]
-					s.last = v[i]
-				end
-			end
-		end
-	})
+	return sosdata
 end
 
-function AutoSOSUpdateBatch(sostable, desired, time)
-	for i, v in pairs(sostable) do
-		local d = type(desired) == 'table' and AutoDefault(desired[i], v.value) or (desired or v.value)
-		AutoSOSUpdate(v, d, time)
+---Updates the state of the Second Order System (SOS) towards the target value, over the specified timestep.
+---This function is used in conjunction with the AutoSM_Define
+---@param sos any
+---@param target any
+---@param timestep any
+function AutoSM_Update(sos, target, timestep)
+	timestep = timestep or GetTimeStep()
+
+	local function update(v, t)
+		local xd = (t - v.previous) / timestep
+		v.previous = t
+	
+		local k2_stable = math.max(sos.k_values[2], timestep ^ 2 / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
+		v.current = v.current + timestep * v.velocity
+		v.velocity = v.velocity + timestep * (t + sos.k_values[3] * xd - v.current - sos.k_values[1] * v.velocity) / k2_stable
+	end
+	
+	if sos.data.current then
+		update(sos, target)
+	else
+		for k, v in pairs(sos.data) do
+			update(v, target[k])
+		end
 	end
 end
+
+function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
+	local sosdata = {
+		data = {
+			current = QuatCopy(initial),
+			previous = QuatCopy(initial),
+			velocity = Vec(), -- Angular velocity as a vector
+		},
+		k_values = {
+			raw_k and frequency or (dampening / (math.pi * frequency)),
+			raw_k and dampening or (1 / ((2 * math.pi * frequency) ^ 2)),
+			raw_k and response or (dampening * response / (2 * math.pi * frequency)),
+		}
+	}
+
+	return sosdata
+end
+
+function AutoSM_UpdateQuat(sos, target, timestep)
+	timestep = timestep or GetTimeStep()
+
+	-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
+	-- Convert it to an axis-angle rotation vector
+	local q = QuatRotateQuat(AutoQuatInverse(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
+	local dx = AutoQuatToAxisAngle(q)
+	dx = VecScale(dx, 1 / timestep)
+	
+	sos.data.previous = QuatCopy(target)
+
+	-- Convert our angular velocity to a quaternion
+	local qVel = AutoQuatFromAxisAngle(VecScale(sos.data.velocity, timestep))
+	sos.data.current = QuatRotateQuat(sos.data.current, qVel) -- Rotate
+
+	-- desired - sos.data.current, in quaternion form
+	local q2 = QuatRotateQuat(AutoQuatInverse(sos.data.current), AutoQuatNearest(target, sos.data.current))
+	local s = AutoQuatToAxisAngle(q2)
+	local k2_stable = math.max(sos.k_values[2], timestep * timestep / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
+
+	--- "wtf" - Autumn
+	sos.data.velocity = VecAdd(sos.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sos.k_values[3]), VecScale(sos.data.velocity, sos.k_values[1]))), timestep), 1 / k2_stable))
+end
+
+---Just gets the current value of a Second Order System
+function AutoSM_Get(sos)
+	if sos.data.current then
+		return sos.data.current
+	else
+		local values = {}
+		for k, v in pairs(sos.data) do
+			values[k] = v.current
+		end
+
+		return values
+	end
+end
+
+function AutoSM_GetVelocity(sos)
+	if sos.data.current then
+		return sos.data.velocity
+	else
+		return AutoTableSubi(sos.data, 'velocity')
+	end
+end
+
+function AutoSM_Set(sos, target, keep_velocity)
+	if sos.data.current then
+		sos.data.current = target
+		sos.data.previous = target
+		if keep_velocity then sos.data.velocity = 0 end
+	else
+		for k, v in pairs(sos.data) do
+			v.current = target[k]
+			v.previous = target[k]
+			if keep_velocity then v.velocity = 0 end
+		end
+	end
+end
+
+function AutoSM_SetVelocity(sos, velocity)
+	if sos.data.current then
+		sos.data.velocity = velocity
+	else
+		for k, v in pairs(sos.data) do
+			v.velocity = velocity[k]
+		end
+	end
+end
+
+function AutoSM_AddVelocity(sos, velocity)
+	if sos.data.current then
+		sos.data.velocity = sos.data.velocity + velocity
+	else
+		for k, v in pairs(sos.data) do
+			v.velocity = v.velocity + velocity[k]
+		end
+	end
+end
+
+function AutoSM_RecalculateK(sos, frequency, dampening, response, raw_k)
+	sos.k_values = {
+		raw_k and frequency or (dampening / (math.pi * frequency)),
+		raw_k and dampening or (1 / (2 * math.pi * frequency) ^ 2),
+		raw_k and response or (response * dampening / (2 * math.pi * frequency)),
+	}
+end
+
+-- ---Sets up a Second Order System, using code by t3ssel8r
+-- ---@param inital number|table The inital current value of the system
+-- ---@param frequency number The frequency in which the system will respond to input
+-- ---@param zeta number
+-- ---@param response number
+-- function AutoCreateSOS(inital, frequency, zeta, response)
+-- 	local t = {}
+-- 	t.value = inital
+-- 	t.last = inital
+-- 	t.vel = 0
+
+-- 	t.k1 = zeta / (math.pi * frequency)
+-- 	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
+-- 	t.k3 = response * zeta / (2 * math.pi * frequency)
+
+-- 	return t
+-- end
+
+-- function AutoSOSUpdate(sos, desired, time)
+-- 	time = AutoDefault(time, GetTimeStep())
+-- 	local xd = (desired - sos.last) / time
+-- 	sos.last = desired
+
+-- 	local k2_stable = math.max(sos.k2, time ^ 2 / 2 + time * sos.k1 / 2, time * sos.k1)
+-- 	sos.value = sos.value + time * sos.vel
+-- 	sos.vel = sos.vel + time * (desired + sos.k3 * xd - sos.value - sos.k1 * sos.vel) / k2_stable
+-- end
+
+-- function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
+-- 	local sos = { value = nil }
+
+-- 	for k, v in pairs(initaltable) do
+-- 		sos[k] = AutoCreateSOS(v or 0, frequency, dampening, response)
+-- 	end
+	
+-- 	return setmetatable(sos, {
+-- 		__index = function(t, k)
+-- 			if k == 'value' then
+-- 				local v = {}
+-- 				for k2, v2 in pairs(t) do
+-- 					v[k2] = v2.value
+-- 				end
+
+-- 				return v
+-- 			end
+-- 		end,
+-- 		__newindex = function(t, k, v)
+-- 			if k == 'value' then
+-- 				for i = 1, #v do
+-- 					local s = rawget(t, i)
+-- 					s.value = v[i]
+-- 					s.last = v[i]
+-- 				end
+-- 			end
+-- 		end
+-- 	})
+-- end
+
+-- function AutoSOSUpdateBatch(sostable, desired, time)
+-- 	for i, v in pairs(sostable) do
+-- 		local d = type(desired) == 'table' and AutoDefault(desired[i], v.value) or (desired or v.value)
+-- 		AutoSOSUpdate(v, d, time)
+-- 	end
+-- end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Table Functions------------------------------------------------------------------------------------------------------------------------
@@ -1335,7 +1536,7 @@ end
 
 ---Copy a Table Recursivly Stolen from http://lua-users.org/wiki/CopyTable
 ---@param orig table
----@param copies table
+---@param copies table?
 ---@return table
 function AutoTableDeepCopy(orig, copies)
 	copies = copies or {}
@@ -1652,9 +1853,9 @@ end
 ---@param origin table
 ---@param direction table
 ---@param maxDist number
----@param radius number
----@param rejectTransparent boolean
----@return { hit:boolean, dist:number, normal:table, shape:number, intersection:table, dot:number, reflection:table }
+---@param radius number?
+---@param rejectTransparent boolean?
+---@return { hit:boolean, dist:number, normal:table, shape:shape_handle, intersection:table, dot:number, reflection:table }
 function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	direction = direction and VecNormalize(direction) or nil
 	
@@ -1670,16 +1871,16 @@ end
 ---AutoRaycast from point A to point B. The distance will default to the distance between the points, but can be set.
 ---@param pointA vector
 ---@param pointB vector
----@param manualDistance number
----@param radius number
----@param rejectTransparent boolean
----@return { hit:boolean, dist:number, normal:vector, shape:number, intersection:vector, dot:number, reflection:vector }
+---@param manualDistance number?
+---@param radius number?
+---@param rejectTransparent boolean?
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
 	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
 end
 
----@return { hit:boolean, dist:number, normal:vector, shape:number, intersection:vector, dot:number, reflection:vector }, table cameraTransform, table cameraForward
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }, table cameraTransform, table cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
 	local fwd = AutoTransformFwd(trans)
@@ -1739,7 +1940,7 @@ function AutoRaycastPlane(startPos, direction, planeTransform, size, oneway)
 	end
 end
 
----@return { hit:boolean, point:table, normal:table, shape:number, dist:number, dir:table, dot:number, reflection:table }
+---@return { hit:boolean, point:table, normal:table, shape:shape_handle, dist:number, dir:table, dot:number, reflection:table }
 function AutoQueryClosest(origin, maxDist)
 	local data = {}
 	data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
@@ -1780,6 +1981,20 @@ function AutoGetBodyVoxels(body)
 		v = v + GetShapeVoxelCount(s)
 	end
 	return v
+end
+
+function AutoScaleBodyVelocity(body, scale)
+    local current = GetBodyVelocity(body)
+    local scaled = VecScale(current, scale)
+	SetBodyVelocity(body, scaled)
+	return scaled, current
+end
+
+function AutoScaleBodyAngularVelocity(body, scale)
+	local current = GetBodyAngularVelocity(body)
+	local scaled = VecScale(current, scale)
+	SetBodyAngularVelocity(body, scaled)
+	return scaled, current
 end
 
 ---Gets the angle from a point to the forward direction of a transform
@@ -1921,7 +2136,7 @@ function AutoWorldCenterOfMass(body)
 end
 
 ---Get the Total Speed of a body
----@param body number
+---@param body body_handle
 ---@return number
 function AutoSpeed(body)
 	return VecLength(GetBodyVelocity(body)) + VecLength(GetBodyAngularVelocity(body))
@@ -2198,11 +2413,11 @@ end
 
 ---Creates a neatly formatted table of a value, including tables.
 ---@param t any
----@param singleline_at number|nil
----@param indent_str string|nil
----@param round_numbers number|nil|false
----@param indents number|nil
----@param visited_tables table|nil
+---@param singleline_at number?
+---@param indent_str string?
+---@param round_numbers number|false?
+---@param indents number?
+---@param visited_tables table?
 ---@return string
 function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, indents, visited_tables)
 	local singleline_at = singleline_at or 1

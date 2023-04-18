@@ -1,4 +1,4 @@
--- VERSION 2.8
+-- VERSION 2.85
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1342,8 +1342,12 @@ function AutoSM_SetVelocity(sos, velocity)
 end
 
 function AutoSM_AddVelocity(sos, velocity)
-	if sos.data.current then
-		sos.data.velocity = sos.data.velocity + velocity
+    if sos.data.current then
+		if type(sos.data.velocity) == 'table' then
+			sos.data.velocity = VecAdd(sos.data.velocity, velocity)
+		else
+			sos.data.velocity = sos.data.velocity + velocity
+		end
 	else
 		for k, v in pairs(sos.data) do
 			v.velocity = v.velocity + velocity[k]

@@ -1,4 +1,4 @@
--- VERSION 2.85
+-- VERSION 2.92
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1200,6 +1200,7 @@ end
 ---@return { data:{ current:number, previous:number, velocity:number }|table<{ current:number, previous:number, velocity:number }>, k_values:{ [1]:number, [2]:number, [3]:number} }
 function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 	local sosdata = {
+		type = type(initial) == 'table' and 'table' or 'single',
 		data = {},
 		k_values = {
 			raw_k and frequency or (dampening / (math.pi * frequency)),
@@ -1208,7 +1209,7 @@ function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 		}
 	}
 
-	if type(initial) == 'table' then
+	if sosdata.type ~= 'single' then
 		for k, v in pairs(initial) do
 			sosdata.data[k] = {
 				current = v,
@@ -1228,34 +1229,9 @@ function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 	return sosdata
 end
 
----Updates the state of the Second Order System (SOS) towards the target value, over the specified timestep.
----This function is used in conjunction with the AutoSM_Define
----@param sos any
----@param target any
----@param timestep any
-function AutoSM_Update(sos, target, timestep)
-	timestep = timestep or GetTimeStep()
-
-	local function update(v, t)
-		local xd = (t - v.previous) / timestep
-		v.previous = t
-	
-		local k2_stable = math.max(sos.k_values[2], timestep ^ 2 / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
-		v.current = v.current + timestep * v.velocity
-		v.velocity = v.velocity + timestep * (t + sos.k_values[3] * xd - v.current - sos.k_values[1] * v.velocity) / k2_stable
-	end
-	
-	if sos.data.current then
-		update(sos, target)
-	else
-		for k, v in pairs(sos.data) do
-			update(v, target[k])
-		end
-	end
-end
-
 function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
-	local sosdata = {
+    local sosdata = {
+		type = 'quaternion',
 		data = {
 			current = QuatCopy(initial),
 			previous = QuatCopy(initial),
@@ -1271,33 +1247,60 @@ function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
 	return sosdata
 end
 
-function AutoSM_UpdateQuat(sos, target, timestep)
-	timestep = timestep or GetTimeStep()
+---Updates the state of the Second Order System (SOS) towards the target value, over the specified timestep.
+---This function is used in conjunction with the AutoSM_Define
+---@param sos any
+---@param target any
+---@param timestep any
+function AutoSM_Update(sos, target, timestep)
+    timestep = timestep or GetTimeStep()
 
-	-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
-	-- Convert it to an axis-angle rotation vector
-	local q = QuatRotateQuat(AutoQuatInverse(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
-	local dx = AutoQuatToAxisAngle(q)
-	dx = VecScale(dx, 1 / timestep)
-	
-	sos.data.previous = QuatCopy(target)
+    if sos.type ~= 'quaternion' then
+        local function update(v, t)
+            local xd = (t - v.previous) / timestep
+            v.previous = t
 
-	-- Convert our angular velocity to a quaternion
-	local qVel = AutoQuatFromAxisAngle(VecScale(sos.data.velocity, timestep))
-	sos.data.current = QuatRotateQuat(sos.data.current, qVel) -- Rotate
+            local k2_stable = math.max(sos.k_values[2], timestep ^ 2 / 2 + timestep * sos.k_values[1] / 2,
+            timestep * sos.k_values[1])
+            v.current = v.current + timestep * v.velocity
+            v.velocity = v.velocity +
+            timestep * (t + sos.k_values[3] * xd - v.current - sos.k_values[1] * v.velocity) / k2_stable
+        end
 
-	-- desired - sos.data.current, in quaternion form
-	local q2 = QuatRotateQuat(AutoQuatInverse(sos.data.current), AutoQuatNearest(target, sos.data.current))
-	local s = AutoQuatToAxisAngle(q2)
-	local k2_stable = math.max(sos.k_values[2], timestep * timestep / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
+        if sos.type == 'single' then
+            update(sos.data, target)
+        else
+            for k, v in pairs(sos.data) do
+                update(v, target[k])
+            end
+        end
+    else
+		-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
+		-- Convert it to an axis-angle rotation vector
+		local q = QuatRotateQuat(AutoQuatInverse(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
+		local dx = AutoQuatToAxisAngle(q)
+		dx = VecScale(dx, 1 / timestep)
+		
+		sos.data.previous = QuatCopy(target)
 
-	--- "wtf" - Autumn
-	sos.data.velocity = VecAdd(sos.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sos.k_values[3]), VecScale(sos.data.velocity, sos.k_values[1]))), timestep), 1 / k2_stable))
+		-- Convert our angular velocity to a quaternion
+		local qVel = AutoQuatFromAxisAngle(VecScale(sos.data.velocity, timestep))
+		sos.data.current = QuatRotateQuat(sos.data.current, qVel) -- Rotate
+
+		-- desired - sos.data.current, in quaternion form
+		local q2 = QuatRotateQuat(AutoQuatInverse(sos.data.current), AutoQuatNearest(target, sos.data.current))
+		local s = AutoQuatToAxisAngle(q2)
+		local k2_stable = math.max(sos.k_values[2], timestep * timestep / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
+
+		--- "wtf" - Autumn
+		sos.data.velocity = VecAdd(sos.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sos.k_values[3]), VecScale(sos.data.velocity, sos.k_values[1]))), timestep), 1 / k2_stable))
+    end
 end
 
 ---Just gets the current value of a Second Order System
+---@return number|table|quaternion
 function AutoSM_Get(sos)
-	if sos.data.current then
+	if sos.type ~= 'table' then
 		return sos.data.current
 	else
 		local values = {}
@@ -1310,7 +1313,7 @@ function AutoSM_Get(sos)
 end
 
 function AutoSM_GetVelocity(sos)
-	if sos.data.current then
+	if sos.type ~= 'table' then
 		return sos.data.velocity
 	else
 		return AutoTableSubi(sos.data, 'velocity')
@@ -1318,7 +1321,7 @@ function AutoSM_GetVelocity(sos)
 end
 
 function AutoSM_Set(sos, target, keep_velocity)
-	if sos.data.current then
+	if sos.type ~= 'table' then
 		sos.data.current = target
 		sos.data.previous = target
 		if keep_velocity then sos.data.velocity = 0 end
@@ -1332,7 +1335,7 @@ function AutoSM_Set(sos, target, keep_velocity)
 end
 
 function AutoSM_SetVelocity(sos, velocity)
-	if sos.data.current then
+	if sos.type ~= 'table' then
 		sos.data.velocity = velocity
 	else
 		for k, v in pairs(sos.data) do
@@ -1342,12 +1345,10 @@ function AutoSM_SetVelocity(sos, velocity)
 end
 
 function AutoSM_AddVelocity(sos, velocity)
-    if sos.data.current then
-		if type(sos.data.velocity) == 'table' then
-			sos.data.velocity = VecAdd(sos.data.velocity, velocity)
-		else
-			sos.data.velocity = sos.data.velocity + velocity
-		end
+	if sos.type == 'single' then
+		sos.data.velocity = sos.data.velocity + velocity
+	elseif sos.type == 'quaternion' then
+		sos.data.velocity = VecAdd(sos.data.velocity, AutoEulerTable(velocity))
 	else
 		for k, v in pairs(sos.data) do
 			v.velocity = v.velocity + velocity[k]

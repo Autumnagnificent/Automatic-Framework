@@ -1,4 +1,4 @@
--- VERSION 2.92
+-- VERSION 2.95
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -292,6 +292,21 @@ function AutoBias(...)
 	end
 end
 
+---Rebuilds a table in a given order
+---@param vec any
+---@param swizzle any
+---@return table
+function AutoSwizzle(vec, swizzle)
+	local swizzleMap = { x = 1, y = 2, z = 3, w = 4, r = 1, g = 2, b = 3, a = 4 }
+	local built = {}
+	for i = 1, #swizzle do
+        local axis = swizzle:sub(i, i)
+		local asnum = tonumber(axis)
+		built[i] = vec[asnum or swizzleMap[axis]]
+	end
+	return built
+end
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Vector Functions-----------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -577,11 +592,20 @@ function AutoQuatDot(a, b)
 	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4]
 end
 
---- Returns the inverse of the given quaternion.
----@param quat quaternion A table representing the quaternion to invert, with fields x, y, z, and w.
----@return quaternion quat A table representing the inverse of the given quaternion, with fields x, y, z, and w.
+--- Returns the Conjugate of the given quaternion.
+---@param quat quaternion
+---@return quaternion quat
+function AutoQuatConjugate(quat)
+    return { -quat[1], -quat[2], -quat[3], quat[4] }
+end
+
+--- Returns the Inverse of the given quaternion.
+---@param quat quaternion
+---@return quaternion quat
 function AutoQuatInverse(quat)
-	return { -quat[1], -quat[2], -quat[3], quat[4] }
+	local norm = quat[1] ^ 2 + quat[2] ^ 2 + quat[3] ^ 2 + quat[4] ^ 2
+	local inverse = { -quat[1] / norm, -quat[2] / norm, -quat[3] / norm, quat[4] / norm }
+	return inverse
 end
 
 --- Between -a and a, picks the quaternion nearest to b
@@ -1277,7 +1301,7 @@ function AutoSM_Update(sos, target, timestep)
     else
 		-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
 		-- Convert it to an axis-angle rotation vector
-		local q = QuatRotateQuat(AutoQuatInverse(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
+		local q = QuatRotateQuat(AutoQuatConjugate(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
 		local dx = AutoQuatToAxisAngle(q)
 		dx = VecScale(dx, 1 / timestep)
 		
@@ -1288,7 +1312,7 @@ function AutoSM_Update(sos, target, timestep)
 		sos.data.current = QuatRotateQuat(sos.data.current, qVel) -- Rotate
 
 		-- desired - sos.data.current, in quaternion form
-		local q2 = QuatRotateQuat(AutoQuatInverse(sos.data.current), AutoQuatNearest(target, sos.data.current))
+		local q2 = QuatRotateQuat(AutoQuatConjugate(sos.data.current), AutoQuatNearest(target, sos.data.current))
 		local s = AutoQuatToAxisAngle(q2)
 		local k2_stable = math.max(sos.k_values[2], timestep * timestep / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
 

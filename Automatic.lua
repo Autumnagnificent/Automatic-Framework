@@ -1,4 +1,4 @@
--- VERSION 2.95
+-- VERSION 2.85
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1347,13 +1347,19 @@ end
 function AutoSM_Set(sos, target, keep_velocity)
 	if sos.type ~= 'table' then
 		sos.data.current = target
-		sos.data.previous = target
-		if keep_velocity then sos.data.velocity = 0 end
+		if not keep_velocity then
+			sos.data.velocity = 0
+		else
+			sos.data.previous = target
+		end
 	else
 		for k, v in pairs(sos.data) do
 			v.current = target[k]
-			v.previous = target[k]
-			if keep_velocity then v.velocity = 0 end
+			if not keep_velocity then
+				v.velocity = 0
+			else
+				v.previous = target[k]
+			end
 		end
 	end
 end
@@ -2605,6 +2611,15 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
+---@param transform transform
+---@param size { [1]:number, [2]:number }
+---@param pattern 0|1|2|3
+---@param patternstrength any
+---@param oneway any
+---@param r any
+---@param g any
+---@param b any
+---@param a any
 function AutoDrawPlane(transform, size, pattern, patternstrength, oneway, r, g, b, a)
 	-- Extract position and rotation from the Transform table
 	local pos = transform.pos or Vec(0, 0, 0)
@@ -2622,6 +2637,7 @@ function AutoDrawPlane(transform, size, pattern, patternstrength, oneway, r, g, 
 	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, size[2] / 2))
 
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
+	pattern = pattern or 0
 
 	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
 		return

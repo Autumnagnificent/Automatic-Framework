@@ -5,8 +5,8 @@
 ----------------Documentation--------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 
----@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }
----@class OBB: { pos:vector, rot:quaternion, size:vector }
+---@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }|transform
+---@class OBB: { pos:vector, rot:quaternion, size:vector }|transform
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 ----------------Shortcuts------------------------------------------------------------------------------------------------------------------------------
@@ -899,44 +899,44 @@ function AutoGetOBBCorners(obb)
 	return corners
 end
 
----Returns the corners and transforms representing the faces of a Oriented Bounding Box---@param obb OBB
+---Returns the planes and corners representing the faces of a Oriented Bounding Box---@param obb OBB
 ---@param obb OBB
----@return { z:{ pos:table, rot:table, size:table }, zn:{ pos:table, rot:table, size:table }, x:{ pos:table, rot:table, size:table }, xn:{ pos:table, rot:table, size:table }, y:{ pos:table, rot:table, size:table }, yn:{ pos:table, rot:table, size:table } }
+---@return { z:plane, zn:plane, x:plane, xn:plane, y:plane, yn:plane }
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
 function AutoGetOBBFaces(obb)
 	local corners = AutoGetOBBCorners(obb)
 
 	local faces = {}
-	faces.z = {
-		pos = VecLerp(corners.xyZ, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
-		size = { obb.size[1], obb.size[2] }
-	}
-	faces.zn = {
-		pos = VecLerp(corners.xyz, corners.XYz, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
-		size = { obb.size[1], obb.size[2] }
-	}
-	faces.x = {
-		pos = VecLerp(corners.Xyz, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
-		size = { obb.size[2], obb.size[3] }
-	}
-	faces.xn = {
-		pos = VecLerp(corners.xyz, corners.xYZ, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
-		size = { obb.size[2], obb.size[3] }
-	}
-	faces.y = {
-		pos = VecLerp(corners.xYz, corners.XYZ, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
-		size = { obb.size[1], obb.size[3] }
-	}
-	faces.yn = {
-		pos = VecLerp(corners.xyz, corners.XyZ, 0.5),
-		rot = QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
-		size = { obb.size[1], obb.size[3] }
-	}
+	faces.z = AutoPlane(
+		VecLerp(corners.xyZ, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
+		{ obb.size[1], obb.size[2] }
+	)
+	faces.zn = AutoPlane(
+		VecLerp(corners.xyz, corners.XYz, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
+		{ obb.size[1], obb.size[2] }
+	)
+	faces.x = AutoPlane(
+		VecLerp(corners.Xyz, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
+		{ obb.size[2], obb.size[3] }
+	)
+	faces.xn = AutoPlane(
+		VecLerp(corners.xyz, corners.xYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
+		{ obb.size[2], obb.size[3] }
+	)
+	faces.y = AutoPlane(
+		VecLerp(corners.xYz, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
+		{ obb.size[1], obb.size[3] }
+	)
+	faces.yn = AutoPlane(
+		VecLerp(corners.xyz, corners.XyZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
+		{ obb.size[1], obb.size[3] }
+	)
 
 	return faces, corners
 end
@@ -974,6 +974,37 @@ function AutoDrawOBB(obb, red, green, blue, alpha)
 	for k, l in pairs(lines) do
 		DebugLine(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
 	end
+end
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------Plane stuff that isn't complete-----------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+---@param pos any
+---@param rot any
+---@param size any
+---@return plane
+function AutoPlane(pos, rot, size)
+	return { pos = pos or Vec(), rot = rot or Quat(), size = size or { 1, 1 } }
+end
+
+---@param plane plane
+---@return { [1]:vector, [2]:vector, [3]:vector, [4]:vector }
+function AutoGetPlaneCorners(plane)
+	local size = VecScale(plane.size, 0.5)
+
+	local corner1 = Vec(-size[1], -size[2])
+	local corner2 = Vec(size[1], -size[2])
+	local corner3 = Vec(size[1], size[2])
+	local corner4 = Vec(-size[1], size[2])
+
+	-- Rotate corners using the quaternion rotation from the plane object
+	corner1 = TransformToParentPoint(plane, corner1)
+	corner2 = TransformToParentPoint(plane, corner2)
+	corner3 = TransformToParentPoint(plane, corner3)
+	corner4 = TransformToParentPoint(plane, corner4)
+
+	return { corner1, corner2, corner3, corner4 }
 end
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1923,21 +1954,30 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
 end
 
-function AutoRaycastPlane(startPos, direction, planeTransform, size, oneway)
+---@param plane plane
+---@param startPos vector
+---@param direction vector
+---@param oneway boolean?
+---@return { hit:boolean, intersection:vector, normal:vector, dist:number, dot:number }
+function AutoRaycastPlane(plane, startPos, direction, oneway)
+	local pos = plane.pos or Vec(0, 0, 0)
+	local rot = plane.rot or Quat()
+	local size = plane.size or Vec(1, 1, 1)
+	
 	local halfsize = VecScale(size, 0.5)
-	local corner1 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfsize[1], -halfsize[2], 0)))
-	local corner2 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfsize[1], -halfsize[2], 0)))
-	local corner3 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(halfsize[1], halfsize[2], 0)))
-	local corner4 = VecAdd(planeTransform.pos, QuatRotateVec(planeTransform.rot, Vec(-halfsize[1], halfsize[2], 0)))
+	local corner1 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], -halfsize[2], 0)))
+	local corner2 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], -halfsize[2], 0)))
+	local corner3 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], halfsize[2], 0)))
+	local corner4 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], halfsize[2], 0)))
 
-	local normal = QuatRotateVec(planeTransform.rot, { 0, 0, -1 })
+	local normal = QuatRotateVec(rot, { 0, 0, -1 })
 
 	local rayDirDotNormal = VecDot(direction, normal)
 	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
 		-- Ray is parallel to plane, or wrong way; no intersection
 		return { hit = false, normal = normal, dist = 1 / 0, dot = rayDirDotNormal }
 	else
-		local rayToPlane = VecSub(startPos, planeTransform.pos)
+		local rayToPlane = VecSub(startPos, pos)
 		local t = -VecDot(rayToPlane, normal) / rayDirDotNormal
 		local intersection = VecAdd(startPos, VecScale(direction, t))
 
@@ -2611,8 +2651,7 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
----@param transform transform
----@param size { [1]:number, [2]:number }
+---@param plane plane
 ---@param pattern 0|1|2|3
 ---@param patternstrength any
 ---@param oneway any
@@ -2620,10 +2659,10 @@ end
 ---@param g any
 ---@param b any
 ---@param a any
-function AutoDrawPlane(transform, size, pattern, patternstrength, oneway, r, g, b, a)
-	-- Extract position and rotation from the Transform table
-	local pos = transform.pos or Vec(0, 0, 0)
-	local rot = transform.rot or Quat()
+function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
+	local pos = plane.pos or Vec(0, 0, 0)
+	local rot = plane.rot or Quat()
+	local size = plane.size or Vec(1, 1, 1)
 
 	-- Calculate the forward, right, and up vectors from the rotation
 	local forward = QuatRotateVec(rot, Vec(0, 0, 1))

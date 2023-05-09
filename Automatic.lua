@@ -1,16 +1,13 @@
 -- VERSION 2.999
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Documentation--------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#region Documentation
 
 ---@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }|transform
 ---@class OBB: { pos:vector, rot:quaternion, size:vector }|transform
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Shortcuts------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Shortcuts
 
 AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
 AutoColors = {
@@ -46,7 +43,6 @@ AutoColors = {
 	alert_light = { 0.74901960784314, 0.21960784313725, 0.49019607843137 },
 }
 
----comment
 ---@param baseline string
 ---@return { C:number, Cs:number, D:number, Ds:number, E:number, F:number, Fs:number, G:number, Gs:number, A:number, As:number, B:number }
 function AutoNoteFrequency(baseline)
@@ -73,9 +69,8 @@ function AutoNoteFrequency(baseline)
 	return tuned
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Arithmetic Functions-------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Arithmetic
 
 ---Logistic function, Can be used for juicy UI and smooth easing among other things.
 ---https://www.desmos.com/calculator/cmmwrjtyit?invertedColors
@@ -307,9 +302,8 @@ function AutoSwizzle(vec, swizzle)
 	return built
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Vector Functions-----------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Vector Functions
 
 function AutoVecEquals(a, b)
     for i, va in pairs(a) do
@@ -559,9 +553,8 @@ function AutoDotToAngle(dot)
 	return math.deg(math.acos(dot))
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Quat Functions-------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Quat Functions
 
 ---@param rot quaternion
 ---@return vector
@@ -651,9 +644,8 @@ function AutoQuatToAxisAngle(q)
 	return VecScale(qXYZ, 2.0 * angle / si)
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------AABB Bounds Functions-----------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region AABB Bounds Functions
 
 ---Get the center of a body's bounds
 ---@param body body_handle
@@ -976,9 +968,8 @@ function AutoDrawOBB(obb, red, green, blue, alpha)
 	end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Plane stuff that isn't complete-----------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Plane Functions
 
 ---@param pos any
 ---@param rot any
@@ -1007,9 +998,147 @@ function AutoGetPlaneCorners(plane)
 	return { corner1, corner2, corner3, corner4 }
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Octree Functions-----------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+---@param plane plane
+---@param startPos vector
+---@param direction vector
+---@param oneway boolean?
+---@return { hit:boolean, intersection:vector, normal:vector, dist:number, dot:number }
+function AutoRaycastPlane(plane, startPos, direction, oneway)
+	local pos = plane.pos or Vec(0, 0, 0)
+	local rot = plane.rot or Quat()
+	local size = plane.size or Vec(1, 1, 1)
+
+	local halfsize = VecScale(size, 0.5)
+	local corner1 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], -halfsize[2], 0)))
+	local corner2 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], -halfsize[2], 0)))
+	local corner3 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], halfsize[2], 0)))
+	local corner4 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], halfsize[2], 0)))
+
+	local normal = QuatRotateVec(rot, { 0, 0, -1 })
+
+	local rayDirDotNormal = VecDot(direction, normal)
+	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
+		-- Ray is parallel to plane, or wrong way; no intersection
+		return { hit = false, normal = normal, dist = 1 / 0, dot = rayDirDotNormal }
+	else
+		local rayToPlane = VecSub(startPos, pos)
+		local t = -VecDot(rayToPlane, normal) / rayDirDotNormal
+		local intersection = VecAdd(startPos, VecScale(direction, t))
+
+		local dist = AutoVecDist(startPos, intersection)
+
+		-- Check if the intersection is inside the plane's bounds
+		local edge1 = VecSub(corner2, corner1)
+		local edge2 = VecSub(corner3, corner2)
+		local edge3 = VecSub(corner4, corner3)
+		local edge4 = VecSub(corner1, corner4)
+		local vec1 = VecSub(intersection, corner1)
+		local vec2 = VecSub(intersection, corner2)
+		local vec3 = VecSub(intersection, corner3)
+		local vec4 = VecSub(intersection, corner4)
+
+		local isInside = true
+		local function checkInsideEdge(vec, edge)
+			if VecDot(edge, vec) < 0 then
+				isInside = false
+			end
+		end
+
+		checkInsideEdge(vec1, edge1)
+		checkInsideEdge(vec2, edge2)
+		checkInsideEdge(vec3, edge3)
+		checkInsideEdge(vec4, edge4)
+
+		return {
+			hit = isInside and t > 0,
+			intersection = intersection,
+			normal = normal,
+			dist = dist,
+			dot = rayDirDotNormal,
+		}
+	end
+end
+
+---@param plane plane
+---@param pattern 0|1|2|3
+---@param patternstrength any
+---@param oneway any
+---@param r any
+---@param g any
+---@param b any
+---@param a any
+function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
+	local pos = plane.pos or Vec(0, 0, 0)
+	local rot = plane.rot or Quat()
+	local size = plane.size or Vec(1, 1, 1)
+
+	-- Calculate the forward, right, and up vectors from the rotation
+	local forward = QuatRotateVec(rot, Vec(0, 0, 1))
+	local right = QuatRotateVec(rot, Vec(1, 0, 0))
+	local up = QuatRotateVec(rot, Vec(0, 1, 0))
+
+	-- Calculate the corners of the plane
+	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, -size[2] / 2))
+	local corner2 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, -size[2] / 2))
+	local corner3 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, size[2] / 2))
+	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, size[2] / 2))
+
+	r, g, b, a = r or 1, g or 1, b or 1, a or 1
+	pattern = pattern or 0
+
+	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
+		return
+	end
+
+	-- Draw the grid
+	if pattern == 0 then
+		patternstrength = (patternstrength or 0) + 1
+		for i = 0, patternstrength do
+			local subH1 = VecLerp(corner1, corner2, i / patternstrength)
+			local subH2 = VecLerp(corner4, corner3, i / patternstrength)
+			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
+			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
+
+			DebugLine(subH1, subH2, r, g, b, a)
+			DebugLine(subV1, subV2, r, g, b, a)
+		end
+	elseif pattern > 0 then
+		DebugLine(corner1, corner2, r, g, b, a)
+		DebugLine(corner2, corner3, r, g, b, a)
+		DebugLine(corner3, corner4, r, g, b, a)
+		DebugLine(corner4, corner1, r, g, b, a)
+	end
+
+	if pattern == 1 or pattern == 3 then
+		patternstrength = (patternstrength or 1)
+		local step = 1 / patternstrength
+		for t = step, 2, step * 2 do
+			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
+			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
+
+			DebugLine(p1, p2, r, g, b, a)
+		end
+	end
+
+	if pattern == 2 or pattern == 3 then
+		patternstrength = (patternstrength or 0)
+		local step = 1 / patternstrength
+		for t = step, 2, step * 2 do
+			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
+			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
+
+			DebugLine(p1, p2, r, g, b, a)
+		end
+
+		DebugLine(corner1, corner2, r, g, b, a)
+		DebugLine(corner2, corner3, r, g, b, a)
+		DebugLine(corner3, corner4, r, g, b, a)
+		DebugLine(corner4, corner1, r, g, b, a)
+	end
+end
+
+--#endregion
+--#region Octree Functions
 
 function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _layer)
 	_layer = _layer or 1
@@ -1068,9 +1197,8 @@ function AutoDrawOctree(node, layer, drawfunction)
 	end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Point Physics------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Point Physics
 
 function AutoSimInstance()
 	local t = {
@@ -1242,9 +1370,11 @@ function AutoSimInstance()
 	return t
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Secondary Motion-----Previously Second Order System--------------Huge Thanks to Mathias#1325 for work on the Quaternion Functions------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Secondary Motion
+
+--Previously Second Order System
+--Huge Thanks to Mathias#1325 for work on the Quaternion Functions
 
 ---Returns a table representing a Second Order System (SOS) that can be used to make secondary motion
 ---@param initial number|table<number>
@@ -1490,9 +1620,8 @@ end
 -- 	end
 -- end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Table Functions------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Table Functions
 
 ---Returns the amount of elements in the given list.
 ---@param t table
@@ -1625,9 +1754,8 @@ function AutoTableDeepCopy(orig, copies)
 	return copy
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Utility Functions------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Utility Functions
 
 ---If val is nil, return default instead
 ---@param v any
@@ -1863,9 +1991,8 @@ function AutoByteTableToString(t)
 	return str
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Game Functions-------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Game Functions
 
 ---Usually, the Primary Menu Button only is suppose to work in the mod's level, this is a work around to have it work in any level.
 ---@param title any
@@ -1952,67 +2079,6 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local fwd = AutoTransformFwd(trans)
 
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
-end
-
----@param plane plane
----@param startPos vector
----@param direction vector
----@param oneway boolean?
----@return { hit:boolean, intersection:vector, normal:vector, dist:number, dot:number }
-function AutoRaycastPlane(plane, startPos, direction, oneway)
-	local pos = plane.pos or Vec(0, 0, 0)
-	local rot = plane.rot or Quat()
-	local size = plane.size or Vec(1, 1, 1)
-	
-	local halfsize = VecScale(size, 0.5)
-	local corner1 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], -halfsize[2], 0)))
-	local corner2 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], -halfsize[2], 0)))
-	local corner3 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], halfsize[2], 0)))
-	local corner4 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], halfsize[2], 0)))
-
-	local normal = QuatRotateVec(rot, { 0, 0, -1 })
-
-	local rayDirDotNormal = VecDot(direction, normal)
-	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
-		-- Ray is parallel to plane, or wrong way; no intersection
-		return { hit = false, normal = normal, dist = 1 / 0, dot = rayDirDotNormal }
-	else
-		local rayToPlane = VecSub(startPos, pos)
-		local t = -VecDot(rayToPlane, normal) / rayDirDotNormal
-		local intersection = VecAdd(startPos, VecScale(direction, t))
-
-		local dist = AutoVecDist(startPos, intersection)
-
-		-- Check if the intersection is inside the plane's bounds
-		local edge1 = VecSub(corner2, corner1)
-		local edge2 = VecSub(corner3, corner2)
-		local edge3 = VecSub(corner4, corner3)
-		local edge4 = VecSub(corner1, corner4)
-		local vec1 = VecSub(intersection, corner1)
-		local vec2 = VecSub(intersection, corner2)
-		local vec3 = VecSub(intersection, corner3)
-		local vec4 = VecSub(intersection, corner4)
-
-		local isInside = true
-		local function checkInsideEdge(vec, edge)
-			if VecDot(edge, vec) < 0 then
-				isInside = false
-			end
-		end
-
-		checkInsideEdge(vec1, edge1)
-		checkInsideEdge(vec2, edge2)
-		checkInsideEdge(vec3, edge3)
-		checkInsideEdge(vec4, edge4)
-
-		return {
-            hit = isInside and t > 0,
-            intersection = intersection,
-            normal = normal,
-            dist = dist,
-            dot = rayDirDotNormal,
-		}
-	end
 end
 
 ---@return { hit:boolean, point:table, normal:table, shape:shape_handle, dist:number, dir:table, dot:number, reflection:table }
@@ -2289,9 +2355,8 @@ function AutoPredictPlayerPosition(time, raycast)
 	return log, vel, normal
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Environment----------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Environment
 
 ---Returns a table of every property of the current environment
 ---@return table
@@ -2419,9 +2484,8 @@ function AutoSolidEnvironment(pathToDDS)
 	}
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Post Processing----------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Post Processing
 
 ---Returns a table of every property of the current post-processing
 ---@return table
@@ -2456,9 +2520,8 @@ function AutoSetPostProcessing(PostProcessing)
 	end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Showing Debug--------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Debug
 
 --- Returns the current Line Number.
 ---
@@ -2580,10 +2643,6 @@ function AutoClearConsole()
 	for i = 1, 24 do DebugPrint('') end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Drawing Stuff--------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
-
 ---Draws a table of
 ---@param points any
 ---@param huescale number|nil A multipler to the hue change, Default is 1
@@ -2649,84 +2708,6 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	end
 
 	return transform
-end
-
----@param plane plane
----@param pattern 0|1|2|3
----@param patternstrength any
----@param oneway any
----@param r any
----@param g any
----@param b any
----@param a any
-function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
-	local pos = plane.pos or Vec(0, 0, 0)
-	local rot = plane.rot or Quat()
-	local size = plane.size or Vec(1, 1, 1)
-
-	-- Calculate the forward, right, and up vectors from the rotation
-	local forward = QuatRotateVec(rot, Vec(0, 0, 1))
-	local right = QuatRotateVec(rot, Vec(1, 0, 0))
-	local up = QuatRotateVec(rot, Vec(0, 1, 0))
-
-	-- Calculate the corners of the plane
-	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, -size[2] / 2))
-	local corner2 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, -size[2] / 2))
-	local corner3 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, size[2] / 2))
-	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, size[2] / 2))
-
-	r, g, b, a = r or 1, g or 1, b or 1, a or 1
-	pattern = pattern or 0
-
-	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
-		return
-	end
-	
-	-- Draw the grid
-	if pattern == 0 then
-		patternstrength = (patternstrength or 0) + 1
-		for i = 0, patternstrength do
-			local subH1 = VecLerp(corner1, corner2, i / patternstrength)
-			local subH2 = VecLerp(corner4, corner3, i / patternstrength)
-			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
-			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
-	
-			DebugLine(subH1, subH2, r, g, b, a)
-			DebugLine(subV1, subV2, r, g, b, a)
-		end
-	elseif pattern > 0 then
-		DebugLine(corner1, corner2, r, g, b, a)
-		DebugLine(corner2, corner3, r, g, b, a)
-		DebugLine(corner3, corner4, r, g, b, a)
-		DebugLine(corner4, corner1, r, g, b, a)
-	end
-
-	if pattern == 1 or pattern == 3 then
-		patternstrength = (patternstrength or 1)
-		local step = 1 / patternstrength
-		for t = step, 2, step * 2 do
-			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
-			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
-
-			DebugLine(p1, p2, r, g, b, a)
-		end
-	end
-	
-	if pattern == 2 or pattern == 3 then
-		patternstrength = (patternstrength or 0)
-		local step = 1 / patternstrength
-		for t = step, 2, step * 2 do
-			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
-			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
-
-			DebugLine(p1, p2, r, g, b, a)
-		end
-
-		DebugLine(corner1, corner2, r, g, b, a)
-		DebugLine(corner2, corner3, r, g, b, a)
-		DebugLine(corner3, corner4, r, g, b, a)
-		DebugLine(corner4, corner1, r, g, b, a)
-	end
 end
 
 function AutoDrawBox(point, halfextents, r, g, b, a)
@@ -2822,9 +2803,8 @@ function AutoTooltip(text, position, occlude, fontsize, alpha)
 	end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Graphing-------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Graphing
 
 AutoGraphs = {}
 
@@ -2932,9 +2912,8 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	AutoHandleSpread(AutoGetSpread(), data, 'draw')
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Registry-------------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+--#endregion
+--#region Registry
 
 function AutoKey(...)
 	local s = ''
@@ -2969,21 +2948,6 @@ function AutoExpandRegistryKey(key)
 	end
 	
 	return t
-end
-
-function delve(key, current)
-	local subkeys = ListKeys(key)
-	local splitkey = AutoSplit(key, '.')
-	local neatkey = splitkey[#splitkey]
-	if #subkeys > 0 then
-		current[neatkey] = {}
-
-		for _, subkey in ipairs(subkeys) do
-			delve(AutoKey(key, subkey), current[neatkey])
-		end
-	else
-		current[neatkey] = HasKey(key) and GetString(key) or nil
-	end
 end
 
 function AutoKeyDefaultInt(path, default)
@@ -3026,9 +2990,32 @@ function AutoKeyDefaultBool(path, default)
 	end
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------Registry Binded Table------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
+function AutoCMD_Pipe(path, luastr)
+	local keys = ListKeys(path)
+	local newkey = AutoKey(path, #keys + 1)
+
+	SetString(newkey, luastr)
+end
+
+function AutoCMD_Parse(path)
+	local results = {}
+	for index = 1, #ListKeys(path) do
+		local key = AutoKey(path, index)
+		local cmd = GetString(key)
+		local success, func = pcall(loadstring, cmd)
+
+		if success and func then -- if it fails, then the cmd is discarded and we do not try to fix it
+			results[#results + 1] = {
+				cmd = cmd,
+				result = func()
+			}
+		end
+
+		ClearKey(key)
+	end
+
+	return results
+end
 
 local RegistryTableMeta = {
 	__index = function(self, key)
@@ -3110,431 +3097,18 @@ function AutoRegistryBindedTable(path)
 	return t
 end
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------User Interface-------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
-
-AutoPad = { none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128 }
-
-AutoPrimaryColor = { 0.95, 0.95, 0.95, 1 }
-AutoSpecialColor = { 1, 1, 0.55, 1 }
-AutoSecondaryColor = { 0, 0, 0, 0.55 }
-AutoFont = 'regular.ttf'
-local SpreadStack = {}
-
----Takes an alignment and returns a Vector representation.
----@param alignment string
----@return table
-function AutoAlignmentToPos(alignment)
-	str, y = 0, 0
-	if string.find(alignment, 'left') then str = -1 end
-	if string.find(alignment, 'center') then str = 0 end
-	if string.find(alignment, 'right') then str = 1 end
-	if string.find(alignment, 'bottom') then y = -1 end
-	if string.find(alignment, 'middle') then y = 0 end
-	if string.find(alignment, 'top') then y = 1 end
-	return { x = str, y = y }
-end
+--#endregion
+--#region User Interface
 
 ---UiTranslate and UiAlign to the Center
-function AutoCenter()
+function AutoUiCenter()
 	UiTranslate(UiCenter(), UiMiddle())
 	UiAlign('center middle')
 end
 
 function AutoUiBounds(subtract)
-	subtract = subtract or 0
-	return UiWidth() - subtract, UiHeight() - subtract
-end
-
----The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
----@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
-function AutoSpreadDown(padding)
-	table.insert(SpreadStack, { type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin) })
-	UiPush()
-end
-
----The next Auto Ui functions will be spread Up until AutoSpreadEnd() is called
----@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
-function AutoSpreadUp(padding)
-	table.insert(SpreadStack, { type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin) })
-	UiPush()
-end
-
----The next Auto Ui functions will be spread Right until AutoSpreadEnd() is called
----@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
-function AutoSpreadRight(padding)
-	table.insert(SpreadStack, { type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin) })
-	UiPush()
-end
-
----The next Auto Ui functions will be spread Left until AutoSpreadEnd() is called
----@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
-function AutoSpreadLeft(padding)
-	table.insert(SpreadStack, { type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin) })
-	UiPush()
-end
-
----The next Auto Ui functions will be spread Verticlely across the Height of the Bounds until AutoSpreadEnd() is called
----@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
-function AutoSpreadVerticle(count)
-	table.insert(SpreadStack, { type = 'spread', direction = 'verticle', length = UiHeight(), count = count })
-	UiPush()
-end
-
----The next Auto Ui functions will be spread Horizontally across the Width of the Bounds until AutoSpreadEnd() is called
----@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
-function AutoSpreadHorizontal(count)
-	table.insert(SpreadStack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
-	UiPush()
-end
-
-function AutoGetSpread()
-	local _l = 0
-	local count = AutoTableCount(SpreadStack)
-	if count <= 0 then return nil end
-	for i = count, 1, -1 do
-		if SpreadStack[i].type == 'spread' then
-			_l = _l + 1
-			if _l >= 1 then
-				return SpreadStack[i], _l
-			end
-		end
-	end
-	return nil
-end
-
-function AutoSetSpread(Spread)
-	local count = AutoTableCount(SpreadStack)
-	for i = count, 1, -1 do
-		if SpreadStack[i].type == 'spread' then
-			str = SpreadStack[i]
-		end
-	end
-
-	str = Spread
-end
-
----Stop the last known Spread
----@return table a table with information about the transformations used
-function AutoSpreadEnd()
-	local unitdata = { comb = { w = 0, h = 0 }, max = { w = 0, h = 0 } }
-	-- local _, LastSpread = AutoGetSpread(1)
-
-	while true do
-		local count = #SpreadStack
-
-		if SpreadStack[count].type ~= 'spread' then
-			if SpreadStack[count].data.rect then
-				local rect = SpreadStack[count].data.rect
-				unitdata.comb.w, unitdata.comb.h = unitdata.comb.w + rect.w, unitdata.comb.h + rect.h
-				unitdata.max.w, unitdata.max.h = math.max(unitdata.max.w, rect.w), math.max(unitdata.max.h, rect.h)
-			end
-
-			table.remove(SpreadStack, count)
-		else
-			UiPop()
-			table.remove(SpreadStack, count)
-
-			return unitdata
-		end
-		if count <= 0 then
-			return unitdata
-		end
-	end
-end
-
-function AutoHandleSpread(gs, data, type, spreadpad)
-	spreadpad = AutoDefault(spreadpad, false)
-
-	if not AutoGetSpread() then return end
-
-	if gs ~= nil then
-		if not spreadpad then pad = 0 else pad = gs.padding end
-		if gs.direction == 'down' then
-			UiTranslate(0, data.rect.h + pad)
-		elseif gs.direction == 'up' then
-			UiTranslate(0, -(data.rect.h + pad))
-		elseif gs.direction == 'right' then
-			UiTranslate(data.rect.w + pad, 0)
-		elseif gs.direction == 'left' then
-			UiTranslate(-(data.rect.w + pad), 0)
-		elseif gs.direction == 'verticle' then
-			UiTranslate(0, gs.length / gs.count * 1.5 + gs.length / gs.count)
-		elseif gs.direction == 'horizontal' then
-			UiTranslate(gs.length / gs.count, 0)
-		end
-	end
-
-	if type ~= nil then
-		table.insert(SpreadStack, { type = type, data = data })
-	end
-end
-
----Given the current string, will return a modified string based on the input of the user. It's basically just a text box. Has a few options.
----@param current any
----@param maxlength any
----@param allowlowercase any
----@param allowspecial any
----@param forcekey any
----@return any
----@return any
----@return boolean
-function AutoTextInput(current, maxlength, allowlowercase, allowspecial, forcekey)
-	current = AutoDefault(current, '')
-	maxlength = AutoDefault(maxlength, 1 / 0)
-	allowlowercase = AutoDefault(allowlowercase, true)
-	allowspecial = AutoDefault(allowspecial, true)
-	forcekey = AutoDefault(forcekey, nil)
-
-	local modified = current
-
-	local special = {
-		['1'] = '!',
-		['2'] = '@',
-		['3'] = '#',
-		['4'] = '$',
-		['5'] = '%',
-		['6'] = '^',
-		['7'] = '&',
-		['8'] = '*',
-		['9'] = '(',
-		['0'] = ')',
-	}
-	local lpk = forcekey or InputLastPressedKey()
-
-	if lpk == 'backspace' then
-		modified = modified:sub(1, #modified - 1)
-	elseif lpk == 'delete' then
-		modified = ''
-	elseif #modified < maxlength then
-		if lpk == 'space' then
-			modified = modified .. ' '
-		elseif #lpk == 1 then
-			if not InputDown('shift') then
-				if allowlowercase then
-					lpk = lpk:lower()
-				end
-			else
-				if allowspecial and special[lpk] then
-					lpk = special[lpk]
-				end
-			end
-
-			modified = modified .. lpk
-		end
-	end
-
-	return modified, lpk ~= '' and lpk or nil, modified ~= current
-end
-
--- local keys = {
--- 	"lmb", "mmb", "rmb", -- mouse
--- 	"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", -- numerical
--- 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
--- 	"y", "z", -- alphabatical
--- 	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", -- function key
--- 	"uparrow", "downarrow", "leftarrow", "rightarrow", -- arrow key
--- 	"backspace", "alt", "delete", "home", "end", "pgup", "pgdown", "insert", "return", "space", "shift", "ctrl", "tab",
--- 	"esc", --random key
--- 	",", ".", "-", "+", -- undocumented key (yes, '=' key is '+' key)
--- }
-
--------------------------------------------------------------------------------------------------------------------------------------------------------
-----------------User Interface Creation Functions------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------------------------------
-
----Create a Container with new bounds
----@param width number
----@param height number
----@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
----@param clip boolean|nil Whether  to clip stuff outside of the container, Default is false
----@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
----@return table containerdata
-function AutoContainer(width, height, padding, clip, draw)
-	width = AutoDefault(width, 300)
-	height = AutoDefault(height, 400)
-	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
-	clip = AutoDefault(clip, false)
-	draw = AutoDefault(draw, true)
-
-	local paddingwidth = math.max(width - padding * 2, padding * 2)
-	local paddingheight = math.max(height - padding * 2, padding * 2)
-
-	UiWindow(width, height, clip)
-
-	UiAlign('left top')
-	if draw then
-		UiPush()
-		UiColor(unpack(AutoSecondaryColor))
-		UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
-		UiPop()
-	end
-
-	hover = UiIsMouseInRect(UiWidth(), UiHeight())
-
-	UiTranslate(padding, padding)
-	UiWindow(paddingwidth, paddingheight, false)
-
-	local offset = { x = 0, y = 0 }
-
-	UiTranslate(offset.x, offset.y)
-
-	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
-end
-
----Creates a Button
----@param name string
----@param fontsize number
----@param paddingwidth number Amount of padding used Horizontally
----@param paddingheight number Amount of padding used Vertically
----@param draw boolean Draws the Button
----@param spreadpad boolean Adds padding when used with AutoSpread...()
----@return boolean Pressed
----@return table ButtonData
-function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, spreadpad)
-	fontsize = AutoDefault(fontsize, 28)
-	color = AutoDefault(color, AutoPrimaryColor)
-	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
-	paddingheight = AutoDefault(paddingheight, AutoPad.thin)
-	draw = AutoDefault(draw, true)
-	spreadpad = AutoDefault(spreadpad, true)
-
-	UiPush()
-	UiWordWrap(UiWidth() - AutoPad.thick)
-	UiFont(AutoFont, fontsize)
-	UiButtonHoverColor(unpack(AutoSpecialColor))
-	UiButtonPressColor(0.75, 0.75, 0.75, 1)
-	UiButtonPressDist(0.25)
-
-	UiColor(0, 0, 0, 0)
-	local rw, rh = UiText(name)
-	local padrw, padrh = rw + paddingwidth * 2, rh + paddingheight * 2
-
-	if draw then
-		hover = UiIsMouseInRect(padrw, padrh)
-		UiColor(unpack(color))
-
-		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(color))
-		pressed = UiTextButton(name, padrw, padrh)
-	end
-	UiPop()
-
-	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
-	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
-
-	return pressed, data
-end
-
----Draws some Text
----@param name string
----@param fontsize number
----@param draw boolean Draws the Text
----@param spread boolean Adds padding when used with AutoSpread...()
----@return table TextData
-function AutoText(name, fontsize, color, draw, spread)
-	fontsize = AutoDefault(fontsize, 28)
-	draw = AutoDefault(draw, true)
-	spread = AutoDefault(spread, true)
-
-	UiPush()
-	UiWordWrap(UiWidth() - AutoPad.thick)
-	UiFont(AutoFont, fontsize)
-
-	UiColor(0, 0, 0, 0)
-	local rw, rh = UiText(name)
-
-	if draw then
-		UiPush()
-		UiWindow(rw, rh)
-		AutoCenter()
-
-		UiColor(unpack(color or AutoPrimaryColor))
-		UiText(name)
-		UiPop()
-	end
-	UiPop()
-
-	local data = { rect = { w = rw, h = rh }, hover = UiIsMouseInRect(rw, rh) }
-	if spread then AutoHandleSpread(AutoGetSpread(), data, 'draw', true) end
-
-	return data
-end
-
----Creates a Slider
----@param set number The Current Value
----@param min number The Minimum
----@param max number The Maximum
----@param lockincrement number The increment
----@param paddingwidth Amount of padding used Horizontally
----@param paddingheight Amount of padding used Vertically
----@param spreadpad boolean Adds padding when used with AutoSpread...()
----@return number NewValue
----@return table SliderData
-function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
-	min = AutoDefault(min, 0)
-	max = AutoDefault(max, 1)
-	set = AutoDefault(set, min)
-	lockincrement = AutoDefault(lockincrement, 0)
-	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
-	paddingheight = AutoDefault(paddingheight, AutoPad.micro)
-	spreadpad = AutoDefault(spreadpad, true)
-
-	local width = UiWidth() - paddingwidth * 2
-	local dotwidth, dotheight = UiGetImageSize("MOD/slider.png")
-
-	local screen = AutoMap(set, min, max, 0, width)
-
-	UiPush()
-	UiTranslate(paddingwidth, paddingheight)
-	UiColor(unpack(AutoSpecialColor))
-
-	UiPush()
-	UiTranslate(0, dotheight / 2)
-	UiRect(width, 2)
-	UiPop()
-
-	UiTranslate(-dotwidth / 2, 0)
-
-	screen, released = UiSlider('MOD/slider.png', "x", screen, 0, width)
-	screen = AutoMap(screen, 0, width, min, max)
-	screen = AutoRound(screen, lockincrement)
-	screen = AutoClamp(screen, min, max)
-	set = screen
-	UiPop()
-
-	local data = { value = set, released = released, rect = { w = width, h = paddingheight * 2 + dotheight } }
-	AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
-
-	return set, data
-end
-
----Draws an Image
----@param path string
----@param width number
----@param height number
----@param alpha number
----@param draw boolean Draws the Image
----@param spreadpad boolean Adds padding when used with AutoSpread...()
----@return table ImageData
-function AutoImage(path, width, height, border, spreadpad)
-	local w, h = UiGetImageSize(path)
-	width = AutoDefault(width, (height == nil and UiWidth() or (height * (w / h))))
-	height = AutoDefault(height, width * (h / w))
-	border = AutoDefault(border, 0)
-	draw = AutoDefault(draw, true)
-	spreadpad = AutoDefault(spreadpad, true)
-
-	UiPush()
-	UiImageBox(path, width, height, border, border)
-	UiPop()
-
-	local hover = UiIsMouseInRect(width, height)
-
-	local data = { hover = hover, rect = { w = width, h = height } }
-	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
-
-	return data
+    subtract = subtract or 0
+    return UiWidth() - subtract, UiHeight() - subtract
 end
 
 function AutoUiLine(p1, p2, width)
@@ -3543,22 +3117,440 @@ function AutoUiLine(p1, p2, width)
 	local distance = AutoVecDist(p1, p2)
 
 	UiPush()
-		UiTranslate(p1[1] - width / 2, p1[2] - width / 2)
-		UiRotate(angle)
+	UiTranslate(p1[1] - width / 2, p1[2] - width / 2)
+	UiRotate(angle)
 
-		UiAlign('center top')
-		UiRect(width, distance + 1)
+	UiAlign('center top')
+	UiRect(width, distance + 1)
 	UiPop()
 end
 
----Creates a handy little marker, doesnt effect anything, purely visual
----@param size number, Default is 1
-function AutoMarker(size)
-	size = AutoDefault(size, 1) / 2
-	UiPush()
-	UiAlign('center middle')
-	UiScale(size, size)
-	UiColor(unpack(AutoSpecialColor))
-	UiImage('ui/common/dot.png')
-	UiPop()
-end
+---OLD
+---UI
+---FUNCTIONS
+
+-- AutoPad = { none = 0, atom = 4, micro = 6, thin = 12, thick = 24, heavy = 48, beefy = 128 }
+
+-- AutoPrimaryColor = { 0.95, 0.95, 0.95, 1 }
+-- AutoSpecialColor = { 1, 1, 0.55, 1 }
+-- AutoSecondaryColor = { 0, 0, 0, 0.55 }
+-- AutoFont = 'regular.ttf'
+-- local SpreadStack = {}
+
+-- ---Takes an alignment and returns a Vector representation.
+-- ---@param alignment string
+-- ---@return table
+-- function AutoAlignmentToPos(alignment)
+-- 	str, y = 0, 0
+-- 	if string.find(alignment, 'left') then str = -1 end
+-- 	if string.find(alignment, 'center') then str = 0 end
+-- 	if string.find(alignment, 'right') then str = 1 end
+-- 	if string.find(alignment, 'bottom') then y = -1 end
+-- 	if string.find(alignment, 'middle') then y = 0 end
+-- 	if string.find(alignment, 'top') then y = 1 end
+-- 	return { x = str, y = y }
+-- end
+
+-- ---The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
+-- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- function AutoSpreadDown(padding)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin) })
+-- 	UiPush()
+-- end
+
+-- ---The next Auto Ui functions will be spread Up until AutoSpreadEnd() is called
+-- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- function AutoSpreadUp(padding)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin) })
+-- 	UiPush()
+-- end
+
+-- ---The next Auto Ui functions will be spread Right until AutoSpreadEnd() is called
+-- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- function AutoSpreadRight(padding)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin) })
+-- 	UiPush()
+-- end
+
+-- ---The next Auto Ui functions will be spread Left until AutoSpreadEnd() is called
+-- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- function AutoSpreadLeft(padding)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin) })
+-- 	UiPush()
+-- end
+
+-- ---The next Auto Ui functions will be spread Verticlely across the Height of the Bounds until AutoSpreadEnd() is called
+-- ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
+-- function AutoSpreadVerticle(count)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'verticle', length = UiHeight(), count = count })
+-- 	UiPush()
+-- end
+
+-- ---The next Auto Ui functions will be spread Horizontally across the Width of the Bounds until AutoSpreadEnd() is called
+-- ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
+-- function AutoSpreadHorizontal(count)
+-- 	table.insert(SpreadStack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
+-- 	UiPush()
+-- end
+
+-- function AutoGetSpread()
+-- 	local _l = 0
+-- 	local count = AutoTableCount(SpreadStack)
+-- 	if count <= 0 then return nil end
+-- 	for i = count, 1, -1 do
+-- 		if SpreadStack[i].type == 'spread' then
+-- 			_l = _l + 1
+-- 			if _l >= 1 then
+-- 				return SpreadStack[i], _l
+-- 			end
+-- 		end
+-- 	end
+-- 	return nil
+-- end
+
+-- function AutoSetSpread(Spread)
+-- 	local count = AutoTableCount(SpreadStack)
+-- 	for i = count, 1, -1 do
+-- 		if SpreadStack[i].type == 'spread' then
+-- 			str = SpreadStack[i]
+-- 		end
+-- 	end
+
+-- 	str = Spread
+-- end
+
+-- ---Stop the last known Spread
+-- ---@return table a table with information about the transformations used
+-- function AutoSpreadEnd()
+-- 	local unitdata = { comb = { w = 0, h = 0 }, max = { w = 0, h = 0 } }
+-- 	-- local _, LastSpread = AutoGetSpread(1)
+
+-- 	while true do
+-- 		local count = #SpreadStack
+
+-- 		if SpreadStack[count].type ~= 'spread' then
+-- 			if SpreadStack[count].data.rect then
+-- 				local rect = SpreadStack[count].data.rect
+-- 				unitdata.comb.w, unitdata.comb.h = unitdata.comb.w + rect.w, unitdata.comb.h + rect.h
+-- 				unitdata.max.w, unitdata.max.h = math.max(unitdata.max.w, rect.w), math.max(unitdata.max.h, rect.h)
+-- 			end
+
+-- 			table.remove(SpreadStack, count)
+-- 		else
+-- 			UiPop()
+-- 			table.remove(SpreadStack, count)
+
+-- 			return unitdata
+-- 		end
+-- 		if count <= 0 then
+-- 			return unitdata
+-- 		end
+-- 	end
+-- end
+
+-- function AutoHandleSpread(gs, data, type, spreadpad)
+-- 	spreadpad = AutoDefault(spreadpad, false)
+
+-- 	if not AutoGetSpread() then return end
+
+-- 	if gs ~= nil then
+-- 		if not spreadpad then pad = 0 else pad = gs.padding end
+-- 		if gs.direction == 'down' then
+-- 			UiTranslate(0, data.rect.h + pad)
+-- 		elseif gs.direction == 'up' then
+-- 			UiTranslate(0, -(data.rect.h + pad))
+-- 		elseif gs.direction == 'right' then
+-- 			UiTranslate(data.rect.w + pad, 0)
+-- 		elseif gs.direction == 'left' then
+-- 			UiTranslate(-(data.rect.w + pad), 0)
+-- 		elseif gs.direction == 'verticle' then
+-- 			UiTranslate(0, gs.length / gs.count * 1.5 + gs.length / gs.count)
+-- 		elseif gs.direction == 'horizontal' then
+-- 			UiTranslate(gs.length / gs.count, 0)
+-- 		end
+-- 	end
+
+-- 	if type ~= nil then
+-- 		table.insert(SpreadStack, { type = type, data = data })
+-- 	end
+-- end
+
+-- ---Given the current string, will return a modified string based on the input of the user. It's basically just a text box. Has a few options.
+-- ---@param current any
+-- ---@param maxlength any
+-- ---@param allowlowercase any
+-- ---@param allowspecial any
+-- ---@param forcekey any
+-- ---@return any
+-- ---@return any
+-- ---@return boolean
+-- function AutoTextInput(current, maxlength, allowlowercase, allowspecial, forcekey)
+-- 	current = AutoDefault(current, '')
+-- 	maxlength = AutoDefault(maxlength, 1 / 0)
+-- 	allowlowercase = AutoDefault(allowlowercase, true)
+-- 	allowspecial = AutoDefault(allowspecial, true)
+-- 	forcekey = AutoDefault(forcekey, nil)
+
+-- 	local modified = current
+
+-- 	local special = {
+-- 		['1'] = '!',
+-- 		['2'] = '@',
+-- 		['3'] = '#',
+-- 		['4'] = '$',
+-- 		['5'] = '%',
+-- 		['6'] = '^',
+-- 		['7'] = '&',
+-- 		['8'] = '*',
+-- 		['9'] = '(',
+-- 		['0'] = ')',
+-- 	}
+-- 	local lpk = forcekey or InputLastPressedKey()
+
+-- 	if lpk == 'backspace' then
+-- 		modified = modified:sub(1, #modified - 1)
+-- 	elseif lpk == 'delete' then
+-- 		modified = ''
+-- 	elseif #modified < maxlength then
+-- 		if lpk == 'space' then
+-- 			modified = modified .. ' '
+-- 		elseif #lpk == 1 then
+-- 			if not InputDown('shift') then
+-- 				if allowlowercase then
+-- 					lpk = lpk:lower()
+-- 				end
+-- 			else
+-- 				if allowspecial and special[lpk] then
+-- 					lpk = special[lpk]
+-- 				end
+-- 			end
+
+-- 			modified = modified .. lpk
+-- 		end
+-- 	end
+
+-- 	return modified, lpk ~= '' and lpk or nil, modified ~= current
+-- end
+
+-- -- local keys = {
+-- -- 	"lmb", "mmb", "rmb", -- mouse
+-- -- 	"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", -- numerical
+-- -- 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+-- -- 	"y", "z", -- alphabatical
+-- -- 	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", -- function key
+-- -- 	"uparrow", "downarrow", "leftarrow", "rightarrow", -- arrow key
+-- -- 	"backspace", "alt", "delete", "home", "end", "pgup", "pgdown", "insert", "return", "space", "shift", "ctrl", "tab",
+-- -- 	"esc", --random key
+-- -- 	",", ".", "-", "+", -- undocumented key (yes, '=' key is '+' key)
+-- -- }
+
+-- -------------------------------------------------------------------------------------------------------------------------------------------------------
+-- ----------------User Interface Creation Functions------------------------------------------------------------------------------------------------------
+-- -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- ---Create a Container with new bounds
+-- ---@param width number
+-- ---@param height number
+-- ---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
+-- ---@param clip boolean|nil Whether  to clip stuff outside of the container, Default is false
+-- ---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
+-- ---@return table containerdata
+-- function AutoContainer(width, height, padding, clip, draw)
+-- 	width = AutoDefault(width, 300)
+-- 	height = AutoDefault(height, 400)
+-- 	padding = math.max(AutoDefault(padding, AutoPad.micro), 0)
+-- 	clip = AutoDefault(clip, false)
+-- 	draw = AutoDefault(draw, true)
+
+-- 	local paddingwidth = math.max(width - padding * 2, padding * 2)
+-- 	local paddingheight = math.max(height - padding * 2, padding * 2)
+
+-- 	UiWindow(width, height, clip)
+
+-- 	UiAlign('left top')
+-- 	if draw then
+-- 		UiPush()
+-- 		UiColor(unpack(AutoSecondaryColor))
+-- 		UiImageBox("ui/common/box-solid-10.png", UiWidth(), UiHeight(), 10, 10)
+-- 		UiPop()
+-- 	end
+
+-- 	hover = UiIsMouseInRect(UiWidth(), UiHeight())
+
+-- 	UiTranslate(padding, padding)
+-- 	UiWindow(paddingwidth, paddingheight, false)
+
+-- 	local offset = { x = 0, y = 0 }
+
+-- 	UiTranslate(offset.x, offset.y)
+
+-- 	return { rect = { w = paddingwidth, h = paddingheight }, hover = hover }
+-- end
+
+-- ---Creates a Button
+-- ---@param name string
+-- ---@param fontsize number
+-- ---@param paddingwidth number Amount of padding used Horizontally
+-- ---@param paddingheight number Amount of padding used Vertically
+-- ---@param draw boolean Draws the Button
+-- ---@param spreadpad boolean Adds padding when used with AutoSpread...()
+-- ---@return boolean Pressed
+-- ---@return table ButtonData
+-- function AutoButton(name, fontsize, color, paddingwidth, paddingheight, draw, spreadpad)
+-- 	fontsize = AutoDefault(fontsize, 28)
+-- 	color = AutoDefault(color, AutoPrimaryColor)
+-- 	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
+-- 	paddingheight = AutoDefault(paddingheight, AutoPad.thin)
+-- 	draw = AutoDefault(draw, true)
+-- 	spreadpad = AutoDefault(spreadpad, true)
+
+-- 	UiPush()
+-- 	UiWordWrap(UiWidth() - AutoPad.thick)
+-- 	UiFont(AutoFont, fontsize)
+-- 	UiButtonHoverColor(unpack(AutoSpecialColor))
+-- 	UiButtonPressColor(0.75, 0.75, 0.75, 1)
+-- 	UiButtonPressDist(0.25)
+
+-- 	UiColor(0, 0, 0, 0)
+-- 	local rw, rh = UiText(name)
+-- 	local padrw, padrh = rw + paddingwidth * 2, rh + paddingheight * 2
+
+-- 	if draw then
+-- 		hover = UiIsMouseInRect(padrw, padrh)
+-- 		UiColor(unpack(color))
+
+-- 		UiButtonImageBox('ui/common/box-outline-6.png', 6, 6, unpack(color))
+-- 		pressed = UiTextButton(name, padrw, padrh)
+-- 	end
+-- 	UiPop()
+
+-- 	local data = { pressed = pressed, hover = hover, rect = { w = padrw, h = padrh } }
+-- 	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+
+-- 	return pressed, data
+-- end
+
+-- ---Draws some Text
+-- ---@param name string
+-- ---@param fontsize number
+-- ---@param draw boolean Draws the Text
+-- ---@param spread boolean Adds padding when used with AutoSpread...()
+-- ---@return table TextData
+-- function AutoText(name, fontsize, color, draw, spread)
+-- 	fontsize = AutoDefault(fontsize, 28)
+-- 	draw = AutoDefault(draw, true)
+-- 	spread = AutoDefault(spread, true)
+
+-- 	UiPush()
+-- 	UiWordWrap(UiWidth() - AutoPad.thick)
+-- 	UiFont(AutoFont, fontsize)
+
+-- 	UiColor(0, 0, 0, 0)
+-- 	local rw, rh = UiText(name)
+
+-- 	if draw then
+-- 		UiPush()
+-- 		UiWindow(rw, rh)
+-- 		AutoCenter()
+
+-- 		UiColor(unpack(color or AutoPrimaryColor))
+-- 		UiText(name)
+-- 		UiPop()
+-- 	end
+-- 	UiPop()
+
+-- 	local data = { rect = { w = rw, h = rh }, hover = UiIsMouseInRect(rw, rh) }
+-- 	if spread then AutoHandleSpread(AutoGetSpread(), data, 'draw', true) end
+
+-- 	return data
+-- end
+
+-- ---Creates a Slider
+-- ---@param set number The Current Value
+-- ---@param min number The Minimum
+-- ---@param max number The Maximum
+-- ---@param lockincrement number The increment
+-- ---@param paddingwidth Amount of padding used Horizontally
+-- ---@param paddingheight Amount of padding used Vertically
+-- ---@param spreadpad boolean Adds padding when used with AutoSpread...()
+-- ---@return number NewValue
+-- ---@return table SliderData
+-- function AutoSlider(set, min, max, lockincrement, paddingwidth, paddingheight, spreadpad)
+-- 	min = AutoDefault(min, 0)
+-- 	max = AutoDefault(max, 1)
+-- 	set = AutoDefault(set, min)
+-- 	lockincrement = AutoDefault(lockincrement, 0)
+-- 	paddingwidth = AutoDefault(paddingwidth, AutoPad.thick)
+-- 	paddingheight = AutoDefault(paddingheight, AutoPad.micro)
+-- 	spreadpad = AutoDefault(spreadpad, true)
+
+-- 	local width = UiWidth() - paddingwidth * 2
+-- 	local dotwidth, dotheight = UiGetImageSize("MOD/slider.png")
+
+-- 	local screen = AutoMap(set, min, max, 0, width)
+
+-- 	UiPush()
+-- 	UiTranslate(paddingwidth, paddingheight)
+-- 	UiColor(unpack(AutoSpecialColor))
+
+-- 	UiPush()
+-- 	UiTranslate(0, dotheight / 2)
+-- 	UiRect(width, 2)
+-- 	UiPop()
+
+-- 	UiTranslate(-dotwidth / 2, 0)
+
+-- 	screen, released = UiSlider('MOD/slider.png', "x", screen, 0, width)
+-- 	screen = AutoMap(screen, 0, width, min, max)
+-- 	screen = AutoRound(screen, lockincrement)
+-- 	screen = AutoClamp(screen, min, max)
+-- 	set = screen
+-- 	UiPop()
+
+-- 	local data = { value = set, released = released, rect = { w = width, h = paddingheight * 2 + dotheight } }
+-- 	AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad)
+
+-- 	return set, data
+-- end
+
+-- ---Draws an Image
+-- ---@param path string
+-- ---@param width number
+-- ---@param height number
+-- ---@param alpha number
+-- ---@param draw boolean Draws the Image
+-- ---@param spreadpad boolean Adds padding when used with AutoSpread...()
+-- ---@return table ImageData
+-- function AutoImage(path, width, height, border, spreadpad)
+-- 	local w, h = UiGetImageSize(path)
+-- 	width = AutoDefault(width, (height == nil and UiWidth() or (height * (w / h))))
+-- 	height = AutoDefault(height, width * (h / w))
+-- 	border = AutoDefault(border, 0)
+-- 	draw = AutoDefault(draw, true)
+-- 	spreadpad = AutoDefault(spreadpad, true)
+
+-- 	UiPush()
+-- 	UiImageBox(path, width, height, border, border)
+-- 	UiPop()
+
+-- 	local hover = UiIsMouseInRect(width, height)
+
+-- 	local data = { hover = hover, rect = { w = width, h = height } }
+-- 	if draw then AutoHandleSpread(AutoGetSpread(), data, 'draw', spreadpad) end
+
+-- 	return data
+-- end
+
+-- ---Creates a handy little marker, doesnt effect anything, purely visual
+-- ---@param size number, Default is 1
+-- function AutoMarker(size)
+-- 	size = AutoDefault(size, 1) / 2
+-- 	UiPush()
+-- 	UiAlign('center middle')
+-- 	UiScale(size, size)
+-- 	UiColor(unpack(AutoSpecialColor))
+-- 	UiImage('ui/common/dot.png')
+-- 	UiPop()
+-- end
+
+--#endregion

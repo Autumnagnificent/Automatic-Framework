@@ -1506,7 +1506,7 @@ end
 ---This function is used in conjunction with the AutoSM_Define
 ---@param sm Secondary_Motion_Data
 ---@param target number|table<number>
----@param timestep number
+---@param timestep number?
 function AutoSM_Update(sm, target, timestep)
     timestep = timestep or GetTimeStep()
 
@@ -2519,13 +2519,13 @@ function AutoSetEnvironment(Environment)
 	end
 end
 
----Draws Sprites around the camera to provide the illusion of a solid background
+---Draws Sprites around the camera to provide the illusion of a flat background
 ---@param r number
 ---@param g number
 ---@param b number
 ---@param a number
 ---@param sprite sprite_handle? Defaults to TD's 'ui/menu/white-32.png'
-function AutoSolidBackground(r, g, b, a, sprite, distance)
+function AutoFlatBackground(r, g, b, a, sprite, distance)
 	r = AutoDefault(r, 0)
 	g = AutoDefault(g, 0)
 	b = AutoDefault(b, 0)
@@ -2550,44 +2550,44 @@ function AutoSolidBackground(r, g, b, a, sprite, distance)
 	end
 end
 
----Returns and environemnt that eliminates as much lighting as possible.
+---Returns and environemnt that eliminates as much lighting as possible, making colors look flat.
 ---
----Requires a solid DDS file.
+---Requires a flat DDS file.
 ---@param pathToDDS td_path
 ---@return table
-function AutoSolidEnvironment(pathToDDS)
+function AutoFlatEnvironment(pathToDDS)
 	return {
-		skybox = { pathToDDS },
-		wind = { 0, 0, 0 },
-		sunFogScale = { 0 },
-		puddleamount = { 0 },
-		skyboxbrightness = { 1 },
-		wetness = { 0 },
-		snowonground = {},
-		sunDir = { 0, 0, 0 },
-		nightlight = { true },
-		fogscale = { 0 },
-		constant = { 0, 0, 0 },
-		slippery = { 0 },
-		brightness = { 1 },
-		snowdir = { 0, 0, 1, 0 },
-		snowamount = { 0, 0 },
-		skyboxtint = { 1, 1, 1 },
-		sunLength = { 0 },
-		sunGlare = { 0 },
-		waterhurt = { 0 },
-		fogColor = { 0, 0, 0 },
-		exposure = { 1, 1 },
 		ambience = { "outdoor/field.ogg", 0 },
-		ambientexponent = { 10 ^ -37.9275 },
-		fogParams = { 0, 0, 0, 0 },
-		sunBrightness = { 0 },
 		ambient = { 1 },
-		skyboxrot = { 0 },
+		ambientexponent = { 10 ^ -37.9275 },
+		brightness = { 1 },
+		constant = { 0, 0, 0 },
+		exposure = { 1, 1 },
+		fogColor = { 0, 0, 0 },
+		fogParams = { 0, 0, 0, 0 },
+		fogscale = { 0 },
+		nightlight = { true },
+		puddleamount = { 0 },
 		puddlesize = { 0 },
 		rain = { 0 },
+		skybox = { pathToDDS },
+		skyboxbrightness = { 1 },
+		skyboxrot = { 0 },
+		skyboxtint = { 1, 1, 1 },
+		slippery = { 0 },
+		snowamount = { 0, 0 },
+		snowdir = { 0, 0, 1, 0 },
+		snowonground = {},
+		sunBrightness = { 0 },
 		sunColorTint = { 0, 0, 0 },
+		sunDir = { 0, 0, 0 },
+		sunFogScale = { 0 },
+		sunGlare = { 0 },
+		sunLength = { 0 },
 		sunSpread = { 0 },
+		waterhurt = { 0 },
+		wetness = { 0 },
+		wind = { 0, 0, 0 },
 	}
 end
 

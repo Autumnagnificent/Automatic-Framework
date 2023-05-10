@@ -1,10 +1,9 @@
--- VERSION 2.999
+-- VERSION 3.0
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
 
----@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }|transform
----@class OBB: { pos:vector, rot:quaternion, size:vector }|transform
+---Documentation Assumes that TDTD's library is in the environemnt
 
 --#endregion
 --#region Shortcuts
@@ -43,6 +42,7 @@ AutoColors = {
 	alert_light = { 0.74901960784314, 0.21960784313725, 0.49019607843137 },
 }
 
+---Creates pitch frequencies for UiSound
 ---@param baseline string
 ---@return { C:number, Cs:number, D:number, Ds:number, E:number, F:number, Fs:number, G:number, Gs:number, A:number, As:number, B:number }
 function AutoNoteFrequency(baseline)
@@ -72,37 +72,24 @@ end
 --#endregion
 --#region Arithmetic
 
----Logistic function, Can be used for juicy UI and smooth easing among other things.
+---Sigmoid function, Can be used for juicy UI and smooth easing among other things.
+---
 ---https://www.desmos.com/calculator/cmmwrjtyit?invertedColors
----@param v number|nil Input number, if nil then it will be a Random number between 0 and 1
+---@param v number? Input number, if nil then it will be a Random number between 0 and 1
 ---@param max number The Maximum value
 ---@param steep number How steep the curve is
 ---@param offset number The horizontal offset of the middle of the curve
 ---@return number
-function AutoLogistic(v, max, steep, offset)
+function AutoSigmoid(v, max, steep, offset)
 	v = AutoDefault(v, math.random(0, 10000) / 10000)
 	return (max or 1) / (1 + math.exp((v - (offset or 0.5)) * (steep or -10)))
 end
 
----Logistic function followed by a mapping function, guarantees that the return value will be between 0 and 1
----@param v number|nil Random number between 0 and 1
----@param max number The Maximum value
----@param steep number How steep the curve is
----@param offset number The horizontal offset of the middle of the curve
----@param rangemin number Maps this number to 0
----@param rangemax number Maps this number to 1
----@return number
-function AutoLogisticScaled(v, max, steep, offset, rangemin, rangemax)
-	v = AutoLogistic(v, max, steep, offset)
-	local a = AutoLogistic(rangemin, max, steep, offset)
-	local b = AutoLogistic(rangemax, max, steep, offset)
-	local mapped = AutoMap(v, a, b, 0, 1)
-	return AutoClamp(mapped, 0, 1)
-end
-
+---Rounds a number.
+---
 ---This was a Challenge by @TallTim and @1ssnl to make the smallest rounding function, but I expanded it to make it easier to read and a little more efficent
 ---@param v number Input number
----@param increment number|nil The lowest increment. A Step of 1 will round the number to 1, A step of 5 will round it to the closest increment of 5, A step of 0.1 will round to the tenth. Default is 1
+---@param increment number? The lowest increment. A Step of 1 will round the number to 1, A step of 5 will round it to the closest increment of 5, A step of 0.1 will round to the tenth. Default is 1
 ---@return number
 function AutoRound(v, increment)
 	increment = AutoDefault(increment, 1)
@@ -117,7 +104,7 @@ end
 ---@param a2 number To number a2
 ---@param b1 number To the range of b1
 ---@param b2 number To number b2
----@param clamp boolean|nil Clamp the number between b1 and b2, Default is false
+---@param clamp boolean? Clamp the number between b1 and b2, Default is false
 ---@return number
 function AutoMap(v, a1, a2, b1, b2, clamp)
 	clamp = AutoDefault(clamp, false)
@@ -128,8 +115,8 @@ end
 
 ---Limits a value from going below the min and above the max
 ---@param v number The number to clamp
----@param min number|nil The minimum the number can be, Default is 0
----@param max number|nil The maximum the number can be, Default is 1
+---@param min number? The minimum the number can be, Default is 0
+---@param max number? The maximum the number can be, Default is 1
 ---@return number
 function AutoClamp(v, min, max)
 	min = AutoDefault(min, 0)
@@ -139,7 +126,7 @@ end
 
 ---Limits a value from going below the min and above the max
 ---@param v number The number to clamp
----@param max number|nil The maximum the length of the number can be, Default is 1
+---@param max number? The maximum the length of the number can be, Default is 1
 ---@return number
 function AutoClampLength(v, max)
 	max = AutoDefault(max, 1)
@@ -154,8 +141,8 @@ end
 
 ---Wraps a value inbetween a range, Thank you iaobardar for the Optimization
 ---@param v number The number to wrap
----@param min number|nil The minimum range
----@param max number|nil The maximum range
+---@param min number? The minimum range
+---@param max number? The maximum range
 ---@return number
 function AutoWrap(v, min, max)
 	min = AutoDefault(min, 0)
@@ -164,7 +151,9 @@ function AutoWrap(v, min, max)
 	return (v - min) % ((max + 1) - min) + min
 end
 
----Lerp function, If t is above 1 then it will 'overshoot'
+---Linerarly Iterpolates between `a` and `b` by fraction `t`
+---
+---Does not clamp
 ---@param a number Goes from number A
 ---@param b number To number B
 ---@param t number Interpolated by T
@@ -173,6 +162,14 @@ function AutoLerp(a, b, t)
 	return (1 - t) * a + t * b
 end
 
+---Spherically Iterpolates between `a` and `b` by fraction `t`.
+---
+---Basically Lerp but with wrapping
+---@param a number Goes from number A
+---@param b number To number B
+---@param t number Interpolated by T
+---@param w number Wraps at
+---@return number
 function AutoLerpWrap(a, b, t, w)
 	local m = w
 	local da = (b - a) % m
@@ -180,7 +177,9 @@ function AutoLerpWrap(a, b, t, w)
 	return a + n * t
 end
 
----Moves a towards b by t
+---Moves `a` towards `b` by amount `t`
+---
+---Will clamp as to not overshoot
 ---@param a number Goes from number A
 ---@param b number To number B
 ---@param t number Moved by T
@@ -198,7 +197,7 @@ function AutoMove(a, b, t)
 	return output
 end
 
----Return the Distance between the numbers a and b
+---Return the Distance between the numbers `a` and `b`
 ---@param a number
 ---@param b number
 ---@return number
@@ -207,8 +206,8 @@ function AutoDist(a, b)
 end
 
 ---Normalizes all values in a table to have a magnitude of 1 - Scales every number to still represent the same "direction"
----@param t table { 1, 2, 3, 4 }
----@param scale number Defualt 1
+---@param t table<number>
+---@param scale number?
 ---@return table
 function AutoNormalize(t, scale)
 	local norm = {}
@@ -219,7 +218,7 @@ function AutoNormalize(t, scale)
 	end
 
 	for i = 1, #t do
-		norm[i] = t[i] / maxabs * AutoDefault(scale, 1)
+		norm[i] = t[i] / maxabs * (scale or 1)
 	end
 	return norm
 end
@@ -227,9 +226,9 @@ end
 ---Takes a table of weights, like {1, 2, 0.5, 0.5}, and produces a table of how much space each weight would take up if it were to span over a given length.
 ---If given the weights {1, 2, 0.5, 0.5}, with a span length of 100, the resulting table would be = {25, 50, 12.5, 12.5}.
 ---A padding parameter can also be added which can be used to make Ui easier. Iterate through the resulting table, after each UiRect, move the width + the padding parameter
----@param weights table|number weights
+---@param weights table<number>|number weights
 ---@param span number
----@param padding number
+---@param padding number?
 ---@return table
 function AutoFlex(weights, span, padding)
 	local istable = type(weights) == "table"
@@ -260,17 +259,17 @@ function AutoFlex(weights, span, padding)
 	return flexxed
 end
 
----Takes in a variable number of arguments which are considered as weights. It returns a number, the index of the selected weight using a bias based on the weight values. Good for Biased Randomness.
----@param ... weights
+---Returns index of the selected weight using a bias based on the weight values. Good for Biased Randomness
+---@param weights table<number>
 ---@return number selected
-function AutoBias(...)
+function AutoBias(weights)
 	local T = {}
 	local max = 0
-	for i = 1, #arg do
-		max = max + arg[i]
+	for i = 1, #weights do
+		max = max + weights[i]
 		T[i] = {}
 		T[i].i = i
-		T[i].w = arg[i]
+		T[i].w = weights[i]
 	end
 
 	table.sort(T, function(a, b)
@@ -286,10 +285,26 @@ function AutoBias(...)
 		end
 	end
 end
+--#endregion
+--#region Vector Functions
 
----Rebuilds a table in a given order
----@param vec any
----@param swizzle any
+---Rebuilds a table in a given order, also known as Swizzling
+---
+---| Swizzle | Result |
+---| --- | --- |
+---| `xyz` | { x, y, z } |
+---| `zxy` | { z, x, y } |
+---| `xy` | { x, y } |
+---| `xz` | { x, z } |
+---| `xxx` | { x, x, x } |
+---| `xyzw` | { x, y, z, w } |
+---| `wxyz` | { w, x, y, z } |
+---| `rgba` | { r, g, b, a } |
+---| `bgra` | { b, g, r, a } |
+---| `aaaa` | { a, a, a, a } |
+---
+---@param vec vector|table
+---@param swizzle string
 ---@return table
 function AutoSwizzle(vec, swizzle)
 	local swizzleMap = { x = 1, y = 2, z = 3, w = 4, r = 1, g = 2, b = 3, a = 4 }
@@ -302,9 +317,10 @@ function AutoSwizzle(vec, swizzle)
 	return built
 end
 
---#endregion
---#region Vector Functions
-
+---Returns true if each axis of vector `a` is equal to each axis of vector `b`
+---@param a vector
+---@param b vector
+---@return boolean
 function AutoVecEquals(a, b)
     for i, va in pairs(a) do
 		if va ~= b[i] then return false end
@@ -313,9 +329,9 @@ function AutoVecEquals(a, b)
 	return true
 end
 
---- Return a Random Vector with an optional offset and scale
+---Return a Random Vector with an optional offset and scale
 ---@param param1 number|vector
----@param param2 number|nil
+---@param param2 number?
 ---@return vector
 function AutoVecRnd(param1, param2)
 	local offset, scale
@@ -345,19 +361,28 @@ function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
 end
 
+---Moves a vector in a direction by a given amount
+---
+---Equivalent to `VecAdd(vec, VecScale(dir, dist))`
+---@param vec any
+---@param dir any
+---@param dist any
+---@return vector
 function AutoVecMove(vec, dir, dist)
 	return VecAdd(vec, VecScale(dir, dist))
 end
 
 ---Return the Vector Rounded to a number
 ---@param vec vector
----@param r number
+---@param r number?
 ---@return vector
 function AutoVecRound(vec, r)
 	return Vec(AutoRound(vec[1], r), AutoRound(vec[2], r), AutoRound(vec[3], r))
 end
 
----Return a vector that has the magnitude of b, but with the direction of a
+---Return a vector that has the magnitude of `b`, but with the direction of `a`
+---
+---Equivalent to `VecScale(VecNormalize(a), b)`
 ---@param a vector
 ---@param b number
 ---@return vector
@@ -384,8 +409,8 @@ end
 
 ---Limits the magnitude of a vector to be between min and max
 ---@param v vector The Vector to clamp
----@param min number|nil The minimum the magnitude can be, Default is 0
----@param max number|nil The maximum the magnitude can be, Default is 1
+---@param min number? The minimum the magnitude can be, Default is 0
+---@param max number? The maximum the magnitude can be, Default is 1
 ---@return vector
 function AutoVecClampMagnitude(v, min, max)
 	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
@@ -401,8 +426,8 @@ end
 
 ---Limits a vector to be between min and max
 ---@param v vector The Vector to clamp
----@param min number|nil The minimum, Default is 0
----@param max number|nil The maximum, Default is 1
+---@param min number? The minimum, Default is 0
+---@param max number? The maximum, Default is 1
 ---@return vector
 function AutoVecClamp(v, min, max)
 	min, max = AutoDefault(min, 0), AutoDefault(max, 1)
@@ -420,11 +445,17 @@ function AutoVecOne(length)
 	return VecScale(Vec(1, 1, 1), length or 1)
 end
 
+---Returns the midpoint between two vectors
+---
+---Equivalent to `VecScale(VecAdd(a, b), 0.5)`
+---@param a any
+---@param b any
+---@return vector
 function AutoVecMidpoint(a, b)
 	return VecScale(VecAdd(a, b), 0.5)
 end
 
----Return Vec a multiplied by Vec b
+---Return Vec `a` multiplied by Vec `b`
 ---@param a vector
 ---@param b vector
 ---@return vector
@@ -436,7 +467,7 @@ function AutoVecMulti(a, b)
 	}
 end
 
----Return Vec a divided by Vec b
+---Return Vec `a` divided by Vec `b`
 ---@param a vector
 ---@param b vector
 ---@return vector
@@ -448,7 +479,7 @@ function AutoVecDiv(a, b)
 	}
 end
 
----Return Vec a to the Power of b
+---Return Vec `a` to the Power of `b`
 ---@param a vector
 ---@param b number
 ---@return vector
@@ -460,7 +491,7 @@ function AutoVecPow(a, b)
 	}
 end
 
----Return Vec a to the Power of Vec b
+---Return Vec `a` to the Power of Vec `b`
 ---@param a vector
 ---@param b vector
 ---@return vector
@@ -472,7 +503,7 @@ function AutoVecPowVec(a, b)
 	}
 end
 
----Return Vec Absolute Value
+---Returns the absolute value of an vector
 ---@param v vector
 ---@return vector
 function AutoVecAbs(v)
@@ -483,30 +514,18 @@ function AutoVecAbs(v)
 	}
 end
 
----Equivalent to math.min(unpack(v))
+---Equivalent to `math.min(unpack(v))`
 ---@param v vector
 ---@return number
 function AutoVecMin(v)
 	return math.min(unpack(v))
 end
 
----Equivalent to math.max(unpack(v))
+---Equivalent to `math.max(unpack(v))`
 ---@param v vector
 ---@return number
 function AutoVecMax(v)
 	return math.max(unpack(v))
-end
-
-function AutoVecOrthoDirection(vec, scale)
-	local maxValue = math.max(math.abs(vec[1]), math.abs(vec[2]), math.abs(vec[3]))
-
-	if maxValue == math.abs(vec[1]) then
-		return vec[1] > 0 and { (scale or 1), 0, 0 } or { -(scale or 1), 0, 0 }
-	elseif maxValue == math.abs(vec[2]) then
-		return vec[2] > 0 and { 0, (scale or 1), 0 } or { 0, -(scale or 1), 0 }
-	else
-		return vec[3] > 0 and { 0, 0, (scale or 1) } or { 0, 0, -(scale or 1) }
-	end
 end
 
 --- Rotates a vector around an axis by a given angle
@@ -519,7 +538,7 @@ function AutoVecRotate(vec, axis, angle)
 	return QuatRotateVec(quat, vec)
 end
 
----Return Vec v with it's x value replaced by subx
+---Return `v` with it's `x` value replaced by `subx`
 ---@param v vector
 ---@param subx number
 function AutoVecSubsituteX(v, subx)
@@ -528,7 +547,7 @@ function AutoVecSubsituteX(v, subx)
 	return new
 end
 
----Return Vec v with it's y value replaced by suby
+---Return `v` with it's `y` value replaced by `suby`
 ---@param v vector
 ---@param suby number
 function AutoVecSubsituteY(v, suby)
@@ -537,7 +556,7 @@ function AutoVecSubsituteY(v, suby)
 	return new
 end
 
----Return Vec v with it's z value replaced by subz
+---Return `v` with it's `z` value replaced by `subz`
 ---@param v vector
 ---@param subz number
 function AutoVecSubsituteZ(v, subz)
@@ -556,6 +575,7 @@ end
 --#endregion
 --#region Quat Functions
 
+---Equivalent to `QuatRotateVec(rot, Vec(0, 0, 1))`
 ---@param rot quaternion
 ---@return vector
 function AutoQuatFwd(rot)
@@ -577,7 +597,7 @@ function AutoRandomQuat(angle)
 	)
 end
 
--- Computes the dot product of two quaternions.
+---Computes the dot product of two quaternions.
 ---@param a quaternion
 ---@param b quaternion
 ---@return number
@@ -585,14 +605,14 @@ function AutoQuatDot(a, b)
 	return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4]
 end
 
---- Returns the Conjugate of the given quaternion.
+---Returns the Conjugate of the given quaternion.
 ---@param quat quaternion
 ---@return quaternion quat
 function AutoQuatConjugate(quat)
     return { -quat[1], -quat[2], -quat[3], quat[4] }
 end
 
---- Returns the Inverse of the given quaternion.
+---Returns the Inverse of the given quaternion.
 ---@param quat quaternion
 ---@return quaternion quat
 function AutoQuatInverse(quat)
@@ -601,18 +621,21 @@ function AutoQuatInverse(quat)
 	return inverse
 end
 
---- Between -a and a, picks the quaternion nearest to b
+---Between -a and a, picks the quaternion nearest to b
 ---@param a quaternion
 ---@param b quaternion
 ---@return quaternion
 ---
---- Thankyou to Mathias for this function
+---Thankyou to Mathias for this function
 function AutoQuatNearest(a, b)
 	return AutoQuatDot(a, b) < 0 and { -a[1], -a[2], -a[3], -a[4] } or { a[1], a[2], a[3], a[4] }
 end
 
---- Same as QuatAxisAngle() but takes a single vector instead of a unit vector + an angle, for convenience
---- Thankyou to Mathias for this function
+---Same as `QuatAxisAngle()` but takes a single vector instead of a unit vector + an angle, for convenience
+---
+---Thankyou to Mathias for this function
+---@param v any
+---@return quaternion
 function AutoQuatFromAxisAngle(v)
 	local xyz = VecScale(v, 0.5)
 	local angle = VecLength(xyz)
@@ -627,10 +650,10 @@ function AutoQuatFromAxisAngle(v)
 	return Quat(qXYZ[1], qXYZ[2], qXYZ[3], co)
 end
 
---- Converts a quaternion to an axis angle representation
---- Returns a rotation vector where axis is the direction and angle is the length
+---Converts a quaternion to an axis angle representation
+---Returns a rotation vector where axis is the direction and angle is the length
 ---
---- Thankyou to Mathias for this function
+---Thankyou to Mathias for this function
 function AutoQuatToAxisAngle(q)
 	local qXYZ = Vec(q[1], q[2], q[3])
 	local co = q[4]
@@ -650,7 +673,7 @@ end
 ---Get the center of a body's bounds
 ---@param body body_handle
 ---@return vector
-function AutoBodyBoundsCenter(body)
+function AutoBodyCenter(body)
 	local aa, bb = GetBodyBounds(body)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
@@ -658,7 +681,7 @@ end
 ---Get the center of a shapes's bounds
 ---@param shape shape_handle
 ---@return vector
-function AutoShapeBoundsCenter(shape)
+function AutoShapeCenter(shape)
 	local aa, bb = GetShapeBounds(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
@@ -703,7 +726,7 @@ end
 ---Get a position inside or on the Input Bounds
 ---@param aa vector lower-bound
 ---@param bb vector upper-bound
----@param vec vector|nil A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
+---@param vec vector? A normalized Vector pointing towards the position that should be retrieved, Default is Vec(0, 0, 0)
 ---@return vector
 function AutoAABBGetPos(aa, bb, vec)
 	vec = AutoDefault(vec, Vec(0, 0, 0))
@@ -848,6 +871,11 @@ function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 	end
 end
 
+--#endregion
+--#region OBB Bounds Functions
+
+---@class OBB: { pos:vector, rot:quaternion, size:vector }|transform
+
 ---Converts an Axis Aligned Bounding Box to a Oriented Bounding Box
 ---@param aa vector
 ---@param bb vector
@@ -891,7 +919,7 @@ function AutoGetOBBCorners(obb)
 	return corners
 end
 
----Returns the planes and corners representing the faces of a Oriented Bounding Box---@param obb OBB
+---Returns the planes and corners representing the faces of a Oriented Bounding Box
 ---@param obb OBB
 ---@return { z:plane, zn:plane, x:plane, xn:plane, y:plane, yn:plane }
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
@@ -933,6 +961,9 @@ function AutoGetOBBFaces(obb)
 	return faces, corners
 end
 
+---Returns a table representing the lines connecting the sides of a Oriented Bounding Box
+---@param obb OBB
+---@return table<{ [1]:vector, [2]:vector }>
 function AutoOBBLines(obb)
 	local c = AutoGetOBBCorners(obb)
 
@@ -954,6 +985,17 @@ function AutoOBBLines(obb)
 	}
 end
 
+---@param shape shape_handle
+---@return OBB
+function AutoGetShapeOBB(shape)
+	local transform = GetShapeWorldTransform(shape)
+	local x, y, z, scale = GetShapeSize(shape)
+	local size = VecScale(Vec(x, y, z), scale)
+
+	local center = TransformToParentPoint(transform, VecScale(size, 0.5))
+	return AutoOBB(center, transform.rot, size)
+end
+
 ---Draws a given Oriented Bounding Box
 ---@param obb OBB
 ---@param red number? Default is 0
@@ -971,9 +1013,11 @@ end
 --#endregion
 --#region Plane Functions
 
----@param pos any
----@param rot any
----@param size any
+---@class plane: { pos:vector, rot:quaternion, size:{ [1]:number, [2]:number } }|transform
+
+---@param pos vector
+---@param rot quaternion
+---@param size { [1]:number, [2]:number }
 ---@return plane
 function AutoPlane(pos, rot, size)
 	return { pos = pos or Vec(), rot = rot or Quat(), size = size or { 1, 1 } }
@@ -1061,12 +1105,12 @@ end
 
 ---@param plane plane
 ---@param pattern 0|1|2|3
----@param patternstrength any
----@param oneway any
----@param r any
----@param g any
----@param b any
----@param a any
+---@param patternstrength number
+---@param oneway boolean?
+---@param r number?
+---@param g number?
+---@param b number?
+---@param a number?
 function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 	local pos = plane.pos or Vec(0, 0, 0)
 	local rot = plane.rot or Quat()
@@ -1140,6 +1184,13 @@ end
 --#endregion
 --#region Octree Functions
 
+---Undocumented
+---@param BoundsAA vector
+---@param BoundsBB vector
+---@param Layers number
+---@param conditionalFuction function
+---@param _layer number?
+---@return table
 function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _layer)
 	_layer = _layer or 1
 	if _layer >= (Layers or 5) + 1 then return end
@@ -1166,6 +1217,11 @@ function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _laye
 	return node
 end
 
+---Undocumented
+---@param aa vector
+---@param bb vector
+---@return boolean
+---@return table
 function AutoQueryBoundsForBody(aa, bb)
 	QueryRequire('physical large')
 	local mid = VecLerp(aa, bb, 0.5)
@@ -1174,6 +1230,10 @@ function AutoQueryBoundsForBody(aa, bb)
 	return hit, { pos = point, normal = normal, shape }
 end
 
+---Draws the Octree from AutoProcessOctree
+---@param node table
+---@param layer number
+---@param drawfunction function?
 function AutoDrawOctree(node, layer, drawfunction)
 	if node == nil then return end
 
@@ -1200,6 +1260,7 @@ end
 --#endregion
 --#region Point Physics
 
+---Creates a Point Physics Simulation Instance
 function AutoSimInstance()
 	local t = {
 		Points = {
@@ -1212,8 +1273,8 @@ function AutoSimInstance()
 	}
 
 	---Creates a Point to be Simulated with SimInstance:CreatePoint(), you can add parameters after it is created and change existing ones, such as point.reflectivity, and point.mass
-	---@param Position vector|nil Default is Vec(0, 0, 0)
-	---@param Velocity vector|nil Default is Vec(0, 0, 0)
+	---@param Position vector? Default is Vec(0, 0, 0)
+	---@param Velocity vector? Default is Vec(0, 0, 0)
 	---@return table point
 	---@return number newindex
 	function t:CreatePoint(Position, Velocity)
@@ -1331,9 +1392,9 @@ function AutoSimInstance()
 	end
 
 	---Draw every point in which point.draw is not false (by default, point.draw is true), calling p.draw at the end if it is a function
-	---@param Image string|false|nil A image that is drawn in the position of the points, Default is 'ui/common/dot.png', if set to false, then draws a Transform at the position instead
-	---@param SizeMultiplier number|nil a multipler for the size of the drawn image, Default is 3.5
-	---@param Occlude boolean|nil Whether to hide points that are obscured by walls, Default is true
+	---@param Image string|false? A image that is drawn in the position of the points, Default is 'ui/common/dot.png', if set to false, then draws a Transform at the position instead
+	---@param SizeMultiplier number? a multipler for the size of the drawn image, Default is 3.5
+	---@param Occlude boolean? Whether to hide points that are obscured by walls, Default is true
 	function t:Draw(Image, SizeMultiplier, Occlude)
 		Image = AutoDefault(Image, 'ui/common/dot.png')
 		SizeMultiplier = AutoDefault(SizeMultiplier, 3.5)
@@ -1373,8 +1434,10 @@ end
 --#endregion
 --#region Secondary Motion
 
---Previously Second Order System
+--Previously known as Second Order System
 --Huge Thanks to Mathias#1325 for work on the Quaternion Functions
+
+---@class Secondary_Motion_Data: table
 
 ---Returns a table representing a Second Order System (SOS) that can be used to make secondary motion
 ---@param initial number|table<number>
@@ -1382,7 +1445,7 @@ end
 ---@param dampening number
 ---@param response number
 ---@param raw_k boolean?
----@return { data:{ current:number, previous:number, velocity:number }|table<{ current:number, previous:number, velocity:number }>, k_values:{ [1]:number, [2]:number, [3]:number} }
+---@return Secondary_Motion_Data
 function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 	local sosdata = {
 		type = type(initial) == 'table' and 'table' or 'single',
@@ -1414,6 +1477,13 @@ function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 	return sosdata
 end
 
+---Returns a table representing a Second Order System (SOS) that can be used to make secondary motion
+---@param initial number|table<number>
+---@param frequency number
+---@param dampening number
+---@param response number
+---@param raw_k boolean?
+---@return Secondary_Motion_Data
 function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
     local sosdata = {
 		type = 'quaternion',
@@ -1434,62 +1504,63 @@ end
 
 ---Updates the state of the Second Order System (SOS) towards the target value, over the specified timestep.
 ---This function is used in conjunction with the AutoSM_Define
----@param sos any
----@param target any
----@param timestep any
-function AutoSM_Update(sos, target, timestep)
+---@param sm Secondary_Motion_Data
+---@param target number|table<number>
+---@param timestep number
+function AutoSM_Update(sm, target, timestep)
     timestep = timestep or GetTimeStep()
 
-    if sos.type ~= 'quaternion' then
+    if sm.type ~= 'quaternion' then
         local function update(v, t)
             local xd = (t - v.previous) / timestep
             v.previous = t
 
-            local k2_stable = math.max(sos.k_values[2], timestep ^ 2 / 2 + timestep * sos.k_values[1] / 2,
-            timestep * sos.k_values[1])
+            local k2_stable = math.max(sm.k_values[2], timestep ^ 2 / 2 + timestep * sm.k_values[1] / 2,
+            timestep * sm.k_values[1])
             v.current = v.current + timestep * v.velocity
             v.velocity = v.velocity +
-            timestep * (t + sos.k_values[3] * xd - v.current - sos.k_values[1] * v.velocity) / k2_stable
+            timestep * (t + sm.k_values[3] * xd - v.current - sm.k_values[1] * v.velocity) / k2_stable
         end
 
-        if sos.type == 'single' then
-            update(sos.data, target)
+        if sm.type == 'single' then
+            update(sm.data, target)
         else
-            for k, v in pairs(sos.data) do
+            for k, v in pairs(sm.data) do
                 update(v, target[k])
             end
         end
     else
 		-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
 		-- Convert it to an axis-angle rotation vector
-		local q = QuatRotateQuat(AutoQuatConjugate(sos.data.previous), AutoQuatNearest(target, sos.data.previous))
+		local q = QuatRotateQuat(AutoQuatConjugate(sm.data.previous), AutoQuatNearest(target, sm.data.previous))
 		local dx = AutoQuatToAxisAngle(q)
 		dx = VecScale(dx, 1 / timestep)
 		
-		sos.data.previous = QuatCopy(target)
+		sm.data.previous = QuatCopy(target)
 
 		-- Convert our angular velocity to a quaternion
-		local qVel = AutoQuatFromAxisAngle(VecScale(sos.data.velocity, timestep))
-		sos.data.current = QuatRotateQuat(sos.data.current, qVel) -- Rotate
+		local qVel = AutoQuatFromAxisAngle(VecScale(sm.data.velocity, timestep))
+		sm.data.current = QuatRotateQuat(sm.data.current, qVel) -- Rotate
 
 		-- desired - sos.data.current, in quaternion form
-		local q2 = QuatRotateQuat(AutoQuatConjugate(sos.data.current), AutoQuatNearest(target, sos.data.current))
+		local q2 = QuatRotateQuat(AutoQuatConjugate(sm.data.current), AutoQuatNearest(target, sm.data.current))
 		local s = AutoQuatToAxisAngle(q2)
-		local k2_stable = math.max(sos.k_values[2], timestep * timestep / 2 + timestep * sos.k_values[1] / 2, timestep * sos.k_values[1])
+		local k2_stable = math.max(sm.k_values[2], timestep * timestep / 2 + timestep * sm.k_values[1] / 2, timestep * sm.k_values[1])
 
 		--- "wtf" - Autumn
-		sos.data.velocity = VecAdd(sos.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sos.k_values[3]), VecScale(sos.data.velocity, sos.k_values[1]))), timestep), 1 / k2_stable))
+		sm.data.velocity = VecAdd(sm.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sm.k_values[3]), VecScale(sm.data.velocity, sm.k_values[1]))), timestep), 1 / k2_stable))
     end
 end
 
----Just gets the current value of a Second Order System
----@return number|table|quaternion
-function AutoSM_Get(sos)
-	if sos.type ~= 'table' then
-		return sos.data.current
+---Returns the current value of a Second Order System
+---@param sm Secondary_Motion_Data
+---@return number|table<number>|quaternion
+function AutoSM_Get(sm)
+	if sm.type ~= 'table' then
+		return sm.data.current
 	else
 		local values = {}
-		for k, v in pairs(sos.data) do
+		for k, v in pairs(sm.data) do
 			values[k] = v.current
 		end
 
@@ -1497,24 +1568,31 @@ function AutoSM_Get(sos)
 	end
 end
 
-function AutoSM_GetVelocity(sos)
-	if sos.type ~= 'table' then
-		return sos.data.velocity
+---Returns the current velocity of a Second Order System
+---@param sm Secondary_Motion_Data
+---@return number|table<number>
+function AutoSM_GetVelocity(sm)
+	if sm.type ~= 'table' then
+		return sm.data.velocity
 	else
-		return AutoTableSubi(sos.data, 'velocity')
+		return AutoTableSubi(sm.data, 'velocity')
 	end
 end
 
-function AutoSM_Set(sos, target, keep_velocity)
-	if sos.type ~= 'table' then
-		sos.data.current = target
+---Sets the current values of a Second Order System
+---@param sm Secondary_Motion_Data
+---@param target number|table<number>|quaternion
+---@param keep_velocity boolean?
+function AutoSM_Set(sm, target, keep_velocity)
+	if sm.type ~= 'table' then
+		sm.data.current = target
 		if not keep_velocity then
-			sos.data.velocity = 0
+			sm.data.velocity = 0
 		else
-			sos.data.previous = target
+			sm.data.previous = target
 		end
 	else
-		for k, v in pairs(sos.data) do
+		for k, v in pairs(sm.data) do
 			v.current = target[k]
 			if not keep_velocity then
 				v.velocity = 0
@@ -1525,100 +1603,47 @@ function AutoSM_Set(sos, target, keep_velocity)
 	end
 end
 
-function AutoSM_SetVelocity(sos, velocity)
-	if sos.type ~= 'table' then
-		sos.data.velocity = velocity
+---Sets the current velocity of a Second Order System
+---@param sm Secondary_Motion_Data
+---@param velocity number|table<number>
+function AutoSM_SetVelocity(sm, velocity)
+	if sm.type ~= 'table' then
+		sm.data.velocity = velocity
 	else
-		for k, v in pairs(sos.data) do
+		for k, v in pairs(sm.data) do
 			v.velocity = velocity[k]
 		end
 	end
 end
 
-function AutoSM_AddVelocity(sos, velocity)
-	if sos.type == 'single' then
-		sos.data.velocity = sos.data.velocity + velocity
-	elseif sos.type == 'quaternion' then
-		sos.data.velocity = VecAdd(sos.data.velocity, AutoEulerTable(velocity))
+---Adds a amount to the current velocity of a Second Order System
+---@param sm Secondary_Motion_Data
+---@param velocity number|table<number>
+function AutoSM_AddVelocity(sm, velocity)
+	if sm.type == 'single' then
+		sm.data.velocity = sm.data.velocity + velocity
+	elseif sm.type == 'quaternion' then
+		sm.data.velocity = VecAdd(sm.data.velocity, AutoEulerTable(velocity))
 	else
-		for k, v in pairs(sos.data) do
+		for k, v in pairs(sm.data) do
 			v.velocity = v.velocity + velocity[k]
 		end
 	end
 end
 
-function AutoSM_RecalculateK(sos, frequency, dampening, response, raw_k)
-	sos.k_values = {
+---Recalculates The K values for a Second Order System
+---@param sm Secondary_Motion_Data
+---@param frequency number
+---@param dampening number
+---@param response number
+---@param raw_k boolean?
+function AutoSM_RecalculateK(sm, frequency, dampening, response, raw_k)
+	sm.k_values = {
 		raw_k and frequency or (dampening / (math.pi * frequency)),
 		raw_k and dampening or (1 / (2 * math.pi * frequency) ^ 2),
 		raw_k and response or (response * dampening / (2 * math.pi * frequency)),
 	}
 end
-
--- ---Sets up a Second Order System, using code by t3ssel8r
--- ---@param inital number|table The inital current value of the system
--- ---@param frequency number The frequency in which the system will respond to input
--- ---@param zeta number
--- ---@param response number
--- function AutoCreateSOS(inital, frequency, zeta, response)
--- 	local t = {}
--- 	t.value = inital
--- 	t.last = inital
--- 	t.vel = 0
-
--- 	t.k1 = zeta / (math.pi * frequency)
--- 	t.k2 = 1 / ((2 * math.pi * frequency) ^ 1)
--- 	t.k3 = response * zeta / (2 * math.pi * frequency)
-
--- 	return t
--- end
-
--- function AutoSOSUpdate(sos, desired, time)
--- 	time = AutoDefault(time, GetTimeStep())
--- 	local xd = (desired - sos.last) / time
--- 	sos.last = desired
-
--- 	local k2_stable = math.max(sos.k2, time ^ 2 / 2 + time * sos.k1 / 2, time * sos.k1)
--- 	sos.value = sos.value + time * sos.vel
--- 	sos.vel = sos.vel + time * (desired + sos.k3 * xd - sos.value - sos.k1 * sos.vel) / k2_stable
--- end
-
--- function AutoCreateSOSBatch(initaltable, frequency, dampening, response)
--- 	local sos = { value = nil }
-
--- 	for k, v in pairs(initaltable) do
--- 		sos[k] = AutoCreateSOS(v or 0, frequency, dampening, response)
--- 	end
-	
--- 	return setmetatable(sos, {
--- 		__index = function(t, k)
--- 			if k == 'value' then
--- 				local v = {}
--- 				for k2, v2 in pairs(t) do
--- 					v[k2] = v2.value
--- 				end
-
--- 				return v
--- 			end
--- 		end,
--- 		__newindex = function(t, k, v)
--- 			if k == 'value' then
--- 				for i = 1, #v do
--- 					local s = rawget(t, i)
--- 					s.value = v[i]
--- 					s.last = v[i]
--- 				end
--- 			end
--- 		end
--- 	})
--- end
-
--- function AutoSOSUpdateBatch(sostable, desired, time)
--- 	for i, v in pairs(sostable) do
--- 		local d = type(desired) == 'table' and AutoDefault(desired[i], v.value) or (desired or v.value)
--- 		AutoSOSUpdate(v, d, time)
--- 	end
--- end
 
 --#endregion
 --#region Table Functions
@@ -1635,6 +1660,10 @@ function AutoTableCount(t)
 	return c
 end
 
+---Repeats a value `v`, `r` amount of times
+---@param v any
+---@param r integer
+---@return table
 function AutoTableRepeatValue(v, r)
 	local t = {}
 	for i=1,r do
@@ -1644,14 +1673,17 @@ function AutoTableRepeatValue(v, r)
 end
 
 ---Concats Table 2 onto the end of Table 1, does not return anything
----@param t1 any
----@param t2 any
+---@param t1 table
+---@param t2 table
 function AutoTableConcat(t1, t2)
 	for i = 1, #t2 do
 		t1[#t1 + 1] = t2[i]
 	end
 end
 
+---Merges two tables together, does not return anything
+---@param base table
+---@param overwrite table
 function AutoTableMerge(base, overwrite)
 	for k, v in pairs(overwrite) do
 		if type(v) == "table" then
@@ -1664,9 +1696,12 @@ function AutoTableMerge(base, overwrite)
 			base[k] = v
 		end
 	end
-	return base
 end
 
+---A lambda like function for returning a table's key's values.
+---@param t table
+---@param key any
+---@return table
 function AutoTableSub(t, key)
 	local _t = {}
 	for i, v in pairs(t) do
@@ -1675,8 +1710,9 @@ function AutoTableSub(t, key)
 	return _t
 end
 
+---A lambda like function for returning a table's key's values.
 ---Same as AutoTableSub, but uses ipairs instead
----@param t any
+---@param t table
 ---@param key any
 ---@return table
 function AutoTableSubi(t, key)
@@ -1687,14 +1723,9 @@ function AutoTableSubi(t, key)
 	return _t
 end
 
-function AutoTableListKeys(t)
-	local _t = {}
-	for k, _ in pairs(t) do
-		_t[#_t+1] = k
-	end
-	return _t
-end
-
+---Swaps the keys and the values of a table
+---@param t table
+---@return table
 function AutoTableSwapKeysAndValues(t)
 	local _t = {}
 	for k, v in pairs(t) do
@@ -1703,6 +1734,15 @@ function AutoTableSwapKeysAndValues(t)
 	return _t
 end
 
+---Equivalent to
+---```
+---for i, v in pairs(t) do
+---    v[key] = tset[i]
+---end
+---```
+---@param t table
+---@param key any
+---@param tset table
 function AutoTableAppend(t, key, tset)
 	for i, v in pairs(t) do
 		v[key] = tset[i]
@@ -1723,8 +1763,8 @@ function AutoTableContains(t, v)
 end
 
 ---Returns the Last item of a given list
----@param t any
----@return unknown
+---@param t table
+---@return any
 function AutoTableLast(t)
 	return t[AutoTableCount(t)]
 end
@@ -1765,6 +1805,9 @@ function AutoDefault(v, default)
 	if v == nil then return default else return v end
 end
 
+---Calls function or table of functions `f` and gives `...` as input parameters
+---@param f function|table<function>
+---@vararg any
 function AutoExecute(f, ...)
 	if not f then return end
 
@@ -1805,20 +1848,11 @@ function AutoTableLerp(a, b, t)
 	return c
 end
 
-function AutoXmlToNumbers(xmlString)
-	local st = AutoSplit(xmlString, ' ')
-	local t = {}
-	for i, v in ipairs(st) do
-		t[i] = tonumber(v)
-	end
-	return t
-end
-
 ---Returns a Linear Interpolated Transform, Interpolated by t.
----@param a Transformation
----@param b Transformation
+---@param a transform
+---@param b transform
 ---@param t number
----@param t2 number|nil
+---@param t2 number?
 ---@return table
 function AutoTransformLerp(a, b, t, t2)
 	if t2 == nil then
@@ -1830,35 +1864,43 @@ function AutoTransformLerp(a, b, t, t2)
 	)
 end
 
+---Equivalent to `QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))`
+---@param t transform
+---@param scale number?
+---@return vector
 function AutoTransformFwd(t, scale)
-	scale = AutoDefault(scale, 1)
-	return QuatRotateVec(t.rot, Vec(0, 0, -scale))
+	return QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))
 end
 
+---Equivalent to `QuatRotateVec(t.rot, Vec(0, scale or 1))`
+---@param t transform
+---@param scale number?
+---@return vector
 function AutoTransformUp(t, scale)
-	scale = AutoDefault(scale, 1)
-	return QuatRotateVec(t.rot, Vec(0, scale))
+	return QuatRotateVec(t.rot, Vec(0, scale or 1))
 end
 
+---Equivalent to `QuatRotateVec(t.rot, Vec(scale or 1))`
+---@param t transform
+---@param scale number?
+---@return vector
 function AutoTransformRight(t, scale)
-	scale = AutoDefault(scale, 1)
-	return QuatRotateVec(t.rot, Vec(scale))
+	return QuatRotateVec(t.rot, Vec(scale or 1))
 end
 
+---Equivalent to `Transform(TransformToParentPoint(t, offset), t.rot)`
+---@param t transform
+---@param offset vector
+---@return vector
 function AutoTransformOffset(t, offset)
 	return Transform(TransformToParentPoint(t, offset), t.rot)
 end
 
+---Equivalent to `{ GetQuatEuler(quat) }`
+---@param quat quaternion
+---@return vector
 function AutoEulerTable(quat)
-	local x, y, z = GetQuatEuler(quat)
-	return Vec(x, y, z)
-end
-
-function AutoEulerTransform(eulerTransform)
-	return {
-		pos = VecCopy(eulerTransform.pos),
-		rot = QuatEuler(unpack(eulerTransform.rot))
-	}
+	return { GetQuatEuler(quat) }
 end
 
 ---Returns a Vector for easy use when put into a parameter for xml
@@ -1868,18 +1910,6 @@ end
 function AutoVecToXML(vec, round)
 	round = AutoDefault(round, 0)
 	return AutoRound(vec[1], round) .. ' ' .. AutoRound(vec[2], round) .. ' ' .. AutoRound(vec[3], round)
-end
-
----A workaround to making a table readonly, don't use, it most likely is bugged in someway
----@param t table
----@return table
-function AutoSetReadOnly(t)
-	return setmetatable({}, {
-		__index = t,
-		__newindex = function(t, key, value)
-			error("attempting to change constant " .. tostring(key) .. " to " .. tostring(value), 2)
-		end
-	})
 end
 
 ---Splits a string by a separator
@@ -1897,15 +1927,18 @@ function AutoSplit(inputstr, sep, number)
 	return t
 end
 
+---Converts a string to be capitalized following the Camel Case pattern
+---@param str string
+---@return string
 function AutoCamelCase(str)
 	local subbed = str:gsub('_', ' ')
 	return string.gsub(" " .. subbed, "%W%l", string.upper):sub(2)
 end
 
 ---Returns 3 values from HSV color space from RGB color space
----@param hue number|nil The hue from 0 to 1
----@param sat number|nil The saturation from 0 to 1
----@param val number|nil The value from 0 to 1
+---@param hue number? The hue from 0 to 1
+---@param sat number? The saturation from 0 to 1
+---@param val number? The value from 0 to 1
 ---@return number, number, number Returns the red, green, blue of the given hue, saturation, value
 function AutoHSVToRGB(hue, sat, val)
 	local r, g, b
@@ -1930,9 +1963,9 @@ function AutoHSVToRGB(hue, sat, val)
 end
 
 ---Returns 3 values from RGB color space from HSV color space
----@param r number|nil The red from 0 to 1
----@param g number|nil The green from 0 to 1
----@param b number|nil The blue from 0 to 1
+---@param r number? The red from 0 to 1
+---@param g number? The green from 0 to 1
+---@param b number? The blue from 0 to 1
 ---@return number, number, number Returns the hue, the saturation, and the value
 function AutoRGBToHSV(r, g, b)
 	r, g, b = r, g, b
@@ -1958,6 +1991,9 @@ function AutoRGBToHSV(r, g, b)
 	return h, s, v
 end
 
+---Converts a hex code or a table of hex codes to RGB color space
+---@param hex string|table<string>
+---@return number|table
 function AutoHEXtoRGB(hex)
 	local function f(x, p)
 		x = x:gsub("#", "")
@@ -1975,6 +2011,9 @@ function AutoHEXtoRGB(hex)
 	end
 end
 
+---Performs `:byte()` on each character of a given string
+---@param str string
+---@return table<number>
 function AutoStringToByteTable(str)
 	local t = {}
 	for i = 1, #str do
@@ -1983,6 +2022,11 @@ function AutoStringToByteTable(str)
 	return t
 end
 
+---Performs `:char()` on each number of a given table, returning a string
+---
+---The inverse of AutoStringToByteTable
+---@param t table<number>
+---@return string
 function AutoByteTableToString(t)
 	local str = ''
 	for i, b in ipairs(t) do
@@ -1995,7 +2039,7 @@ end
 --#region Game Functions
 
 ---Usually, the Primary Menu Button only is suppose to work in the mod's level, this is a work around to have it work in any level.
----@param title any
+---@param title string
 ---@return boolean
 function AutoPrimaryMenuButton(title)
 	local value = PauseMenuButton(title, true)
@@ -2011,7 +2055,9 @@ function AutoPrimaryMenuButton(title)
 end
 
 ---Goes through a table and performs Delete() on each element
----@param t any
+---@param t table<entity_handle>
+---@param CheckIfValid boolean?
+---@return table<{handle:entity_handle, type:entity_type, valid:boolean}>
 function AutoDeleteHandles(t, CheckIfValid)
 	local list = {}
 	for k, v in pairs(t) do
@@ -2026,29 +2072,34 @@ function AutoDeleteHandles(t, CheckIfValid)
 	return list
 end
 
----@param t any
+---Creates a list from a table of entity handles, containing the handle and it's type. If the handle is invalid then the type will be false.
+---@param t table<entity_handle>
+---@return table<{handle:entity_handle, type:entity_type}>
 function AutoListHandleTypes(t)
 	local nt = {}
 	for key, value in pairs(t) do
-		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or 'Invalid handle' }
+		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or false }
 	end
 	return nt
 end
 
--- Might be broken, didn't test
+---Spawn in a script node in the game world.
+---@param path td_path
+---@param ... string|number?
+---@return script_handle
 function AutoSpawnScript(path, ...)
 	local f = [[<script file="%s" param0="%s" param1="%s" param2="%s" param3="%s"/>]]
 	local param = { arg[1] or '', arg[2] or '', arg[3] or '', arg[4] or '' }
 	return Spawn((f):format(path, unpack(param)), Transform())[1]
 end
 
----QueryRaycast with some extra features; Also puts everything into a table
----@param origin table
----@param direction table
+---A Wrapper for QueryRaycast; comes with some extra features.
+---@param origin vector
+---@param direction vector
 ---@param maxDist number
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:table, shape:shape_handle, intersection:table, dot:number, reflection:table }
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
 function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	direction = direction and VecNormalize(direction) or nil
 	
@@ -2073,7 +2124,14 @@ function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent
 	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
 end
 
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }, table cameraTransform, table cameraForward
+---AutoRaycast using the camera or player camera as the origin and direction
+---@param usePlayerCamera boolean
+---@param maxDist number
+---@param radius number?
+---@param rejectTransparent boolean?
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
+---@return transform cameraTransform
+---@return vector cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
 	local fwd = AutoTransformFwd(trans)
@@ -2081,7 +2139,10 @@ function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
 end
 
----@return { hit:boolean, point:table, normal:table, shape:shape_handle, dist:number, dir:table, dot:number, reflection:table }
+---A Wrapper for QueryClosestPoint; comes with some extra features.
+---@param origin vector
+---@param maxDist number
+---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, dist:number, dir:vector, dot:number, reflection:vector }
 function AutoQueryClosest(origin, maxDist)
 	local data = {}
 	data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
@@ -2102,20 +2163,9 @@ function AutoQueryClosest(origin, maxDist)
 	return data
 end
 
----@param shape shape_handle
----@return OBB
-function AutoGetShapeOBB(shape)
-	local transform = GetShapeWorldTransform(shape)
-	local x, y, z, scale = GetShapeSize(shape)
-	local size = VecScale(Vec(x, y, z), scale)
-
-	local center = TransformToParentPoint(transform, VecScale(size, 0.5))
-	return AutoOBB(center, transform.rot, size)
-end
-
 ---Goes through each shape on a body and adds up their voxel count
----@param body any
----@return number
+---@param body body_handle
+---@return integer
 function AutoGetBodyVoxels(body)
 	local v = 0
 	for _, s in pairs(GetBodyShapes(body)) do
@@ -2124,13 +2174,23 @@ function AutoGetBodyVoxels(body)
 	return v
 end
 
+---Scales the velocity of a body by `scale`
+---@param body body_handle
+---@param scale number
+---@return vector scaled
+---@return vector orginal
 function AutoScaleBodyVelocity(body, scale)
-    local current = GetBodyVelocity(body)
-    local scaled = VecScale(current, scale)
+    local orginal = GetBodyVelocity(body)
+    local scaled = VecScale(orginal, scale)
 	SetBodyVelocity(body, scaled)
-	return scaled, current
+	return scaled, orginal
 end
 
+---Scales the angular velocity of a body by `scale`
+---@param body body_handle
+---@param scale number
+---@return vector scaled
+---@return vector orginal
 function AutoScaleBodyAngularVelocity(body, scale)
 	local current = GetBodyAngularVelocity(body)
 	local scaled = VecScale(current, scale)
@@ -2139,8 +2199,8 @@ function AutoScaleBodyAngularVelocity(body, scale)
 end
 
 ---Gets the angle from a point to the forward direction of a transform
----@param point any
----@param fromtrans any
+---@param point vector
+---@param fromtrans transform
 ---@return number
 function AutoPointToAngle(point, fromtrans)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
@@ -2154,12 +2214,12 @@ end
 
 ---Checks if a point is in the view using a transform acting as the "Camera"
 ---@param point vector
----@param oftrans Transfrom|nil The Transform acting as the camera, Default is the Player's Camera
----@param angle number|nil The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
----@param raycastcheck boolean|nil Check to make sure that the point is not obscured, Default is true
+---@param oftrans transform? The Transform acting as the camera, Default is the Player's Camera
+---@param angle number? The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
+---@param raycastcheck boolean? Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
----@return number|nil angle The Angle the point is away from the center of the looking direction
----@return number|nil distance The Distance from the point to fromtrans
+---@return number? angle The Angle the point is away from the center of the looking direction
+---@return number? distance The Distance from the point to fromtrans
 function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 	oftrans = AutoDefault(oftrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
@@ -2198,6 +2258,11 @@ function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 	return seen, dotangle, dist
 end
 
+---Gets the direction the player is inputting and creates a vector.
+---
+---`{ horizontal, 0, -vertical }`
+---@param length number?
+---@return vector
 function AutoPlayerInputDir(length)
 	return VecScale({
 		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
@@ -2208,7 +2273,7 @@ end
 
 ---Get the last Path Query as a path of points
 ---@param precision number The Accuracy
----@return table
+---@return table<vector>
 ---@return vector "Last Point"
 function AutoRetrievePath(precision)
 	precision = AutoDefault(precision, 0.2)
@@ -2225,7 +2290,7 @@ function AutoRetrievePath(precision)
 end
 
 ---Reject a table of bodies for the next Query
----@param bodies table
+---@param bodies table<body_handle>
 function AutoQueryRejectBodies(bodies)
 	for _, h in pairs(bodies) do
 		if h then
@@ -2235,7 +2300,7 @@ function AutoQueryRejectBodies(bodies)
 end
 
 ---Reject a table of shapes for the next Query
----@param shapes table
+---@param shapes table<shape_handle>
 function AutoQueryRejectShapes(shapes)
 	for _, h in pairs(shapes) do
 		if h then
@@ -2244,6 +2309,8 @@ function AutoQueryRejectShapes(shapes)
 	end
 end
 
+---Finds and rejects all shapes that do not have a given tag
+---@param tag string
 function AutoRejectShapesWithoutTag(tag)
 	local all = FindShapes(nil, true)
 	local keep = {}
@@ -2257,7 +2324,7 @@ function AutoRejectShapesWithoutTag(tag)
 end
 
 ---Set the collision filter for the shapes owned by a body
----@param body number
+---@param body body_handle
 ---@param layer number
 ---@param masknummber number bitmask
 function AutoSetBodyCollisionFilter(body, layer, masknummber)
@@ -2268,15 +2335,15 @@ function AutoSetBodyCollisionFilter(body, layer, masknummber)
 end
 
 ---Get the Center of Mass of a body in World space
----@param body any
----@return table
+---@param body body_handle
+---@return vector
 function AutoWorldCenterOfMass(body)
 	local trans = GetBodyTransform(body)
 	local pos = TransformToParentPoint(trans, GetBodyCenterOfMass(body))
 	return pos
 end
 
----Get the Total Speed of a body
+---Adds the velocity and angualr velocity of a body
 ---@param body body_handle
 ---@return number
 function AutoSpeed(body)
@@ -2284,13 +2351,13 @@ function AutoSpeed(body)
 end
 
 ---Attempt to predict the position of a body in time
----@param body number
+---@param body body_handle
 ---@param time number
----@param raycast boolean|nil Check and Halt on Collision, Default is false
----@param funcbefore function|nil
----@return table log
----@return table vel
----@return table normal
+---@param raycast boolean? Check and Halt on Collision, Default is false
+---@param funcbefore function?
+---@return table<vector> log
+---@return vector vel
+---@return vector normal
 function AutoPredictPosition(body, time, raycast, funcbefore)
 	raycast = AutoDefault(raycast, false)
 	local point = {
@@ -2326,10 +2393,10 @@ end
 
 ---Attempt to predict the position of the player in time
 ---@param time number
----@param raycast boolean|nil Check and Halt on Collision, Default is false
----@return table log
----@return table vel
----@return table normal
+---@param raycast boolean? Check and Halt on Collision, Default is false
+---@return table<vector> log
+---@return vector vel
+---@return vector normal
 function AutoPredictPlayerPosition(time, raycast)
 	raycast = AutoDefault(raycast, false)
 	local player = GetPlayerTransform(true)
@@ -2358,41 +2425,76 @@ end
 --#endregion
 --#region Environment
 
+---@class environment
+---@field ambience { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field ambient { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field ambientexponent { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field brightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field constant { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field exposure { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field fogcolor { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field fogparams { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field fogscale { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field nightlight { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field puddleamount { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field puddlesize { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field rain { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field skybox { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field skyboxbrightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field skyboxrot { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field skyboxtint { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field slippery { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field snowamount { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field snowdir { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field snowonground { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sunbrightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field suncolortint { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sundir { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sunfogscale { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sunglare { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sunlength { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field sunspread { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field waterhurt { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field wetness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field wind { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+
+---@type environment_property
+
 ---Returns a table of every property of the current environment
----@return table
+---@return environment
 function AutoGetEnvironment()
 	local params = {
-		'skybox',
-		'skyboxtint',
-		'skyboxbrightness',
-		'skyboxrot',
-		'constant',
-		'ambient',
-		'ambientexponent',
-		'fogColor',
-		'fogParams',
-		'sunBrightness',
-		'sunColorTint',
-		'sunDir',
-		'sunSpread',
-		'sunLength',
-		'sunFogScale',
-		'sunGlare',
-		'exposure',
-		'brightness',
-		'wetness',
-		'puddleamount',
-		'puddlesize',
-		'rain',
-		'nightlight',
-		'ambience',
-		'fogscale',
-		'slippery',
-		'waterhurt',
-		'snowdir',
-		'snowamount',
-		'snowonground',
-		'wind',
+		"ambience",
+		"ambient",
+		"ambientexponent",
+		"brightness",
+		"constant",
+		"exposure",
+		"fogcolor",
+		"fogparams",
+		"fogscale",
+		"nightlight",
+		"puddleamount",
+		"puddlesize",
+		"rain",
+		"skybox",
+		"skyboxbrightness",
+		"skyboxrot",
+		"skyboxtint",
+		"slippery",
+		"snowamount",
+		"snowdir",
+		"snowonground",
+		"sunbrightness",
+		"suncolortint",
+		"sundir",
+		"sunfogscale",
+		"sunglare",
+		"sunlength",
+		"sunspread",
+		"waterhurt",
+		"wetness",
+		"wind",
 	}
 
 	local assembled = {}
@@ -2404,7 +2506,7 @@ function AutoGetEnvironment()
 end
 
 ---Sets every environment property of AutoGetEnvironment
----@param Environment table
+---@param Environment environment
 function AutoSetEnvironment(Environment)
 	for k, v in pairs(Environment) do
 		if type(v) == "table" then
@@ -2417,12 +2519,12 @@ function AutoSetEnvironment(Environment)
 	end
 end
 
----comment
----@param r any
----@param g any
----@param b any
----@param a any
----@param sprite any|nil Defaults to TD's 'ui/menu/white-32.png'
+---Draws Sprites around the camera to provide the illusion of a solid background
+---@param r number
+---@param g number
+---@param b number
+---@param a number
+---@param sprite sprite_handle? Defaults to TD's 'ui/menu/white-32.png'
 function AutoSolidBackground(r, g, b, a, sprite, distance)
 	r = AutoDefault(r, 0)
 	g = AutoDefault(g, 0)
@@ -2448,6 +2550,11 @@ function AutoSolidBackground(r, g, b, a, sprite, distance)
 	end
 end
 
+---Returns and environemnt that eliminates as much lighting as possible.
+---
+---Requires a solid DDS file.
+---@param pathToDDS td_path
+---@return table
 function AutoSolidEnvironment(pathToDDS)
 	return {
 		skybox = { pathToDDS },
@@ -2487,8 +2594,15 @@ end
 --#endregion
 --#region Post Processing
 
+---@class postprocessing
+---@field saturation { [1]:any, [2]:any, [3]:any ,[4]:any }
+---@field colorbalance { [1]:any, [2]:any, [3]:any ,[4]:any }
+---@field brightness { [1]:any, [2]:any, [3]:any ,[4]:any }
+---@field gamma { [1]:any, [2]:any, [3]:any ,[4]:any }
+---@field bloom { [1]:any, [2]:any, [3]:any ,[4]:any }
+
 ---Returns a table of every property of the current post-processing
----@return table
+---@return postprocessing
 function AutoGetPostProcessing()
 	local params = {
 		'saturation',
@@ -2507,8 +2621,9 @@ function AutoGetPostProcessing()
 end
 
 ---Sets every post-processing property of AutoGetPostProcessing
----@param PostProcessing table
+---@param PostProcessing postprocessing
 function AutoSetPostProcessing(PostProcessing)
+	
 	for k, v in pairs(PostProcessing) do
 		if type(v) == "table" then
 			SetPostProcessingProperty(k, unpack(v))
@@ -2528,8 +2643,8 @@ end
 --- This function is adapted from the UMF Framework
 ---
 --- https://github.com/Thomasims/TeardownUMF/blob/master/src/util/debug.lua
----@param level number|nil Optional
----@return number
+---@param level integer? Optional
+---@return integer
 function AutoGetCurrentLine(level)
 	level = (level or 0)
 	local _, line = pcall(error, '', level + 3) -- The level + 3 is to get out of error, then out of pcall, then out of this function
@@ -2541,8 +2656,8 @@ end
 --- This function is adapted from the UMF Framework
 ---
 --- https://github.com/Thomasims/TeardownUMF/blob/master/src/util/debug.lua
----@param level number|nil Optional
----@return string|nil
+---@param level integer? Optional
+---@return string?
 function AutoGetStackTrace(level)
 	level = (level or 0)
 	local _, line = pcall(error, '', level + 3) -- The level + 3 is to get out of error, then out of pcall, then out of this function
@@ -2606,8 +2721,9 @@ end
 
 ---A Alternative to DebugPrint that uses AutoInspect(), works with tables. Returns the value
 ---@param value any
----@param singleline_at any
----@param indent_str any
+---@param singleline_at number?
+---@param indent_str string?
+---@param round_numbers number|false?
 ---@return any
 function AutoInspect(value, singleline_at, indent_str, round_numbers)
 	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers)
@@ -2625,14 +2741,23 @@ end
 
 ---AutoInspect that prints to console
 ---@param value any
----@param singleline_at any
----@param indent_str any
+---@param singleline_at number?
+---@param indent_str string?
+---@param round_numbers number|false?
 ---@return any
 function AutoInspectConsole(value, singleline_at, indent_str, round_numbers)
 	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
 	return value
 end
 
+---AutoInspect that prints to DebugWatch.
+---
+---Name will default to current line number
+---@param value any
+---@param name string?
+---@param singleline_at number?
+---@param indent_str string?
+---@param round_numbers number|false?
 function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers)
 	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
 	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers))
@@ -2643,42 +2768,12 @@ function AutoClearConsole()
 	for i = 1, 24 do DebugPrint('') end
 end
 
----Draws a table of
----@param points any
----@param huescale number|nil A multipler to the hue change, Default is 1
----@param offset number|nil Offsets the hue for every point, Default is 0
----@param alpha number|nil Sets the alpha of the line, Default is 1
----@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawLines(points, huescale, offset, alpha, draw)
-	huescale = AutoDefault(huescale, 1)
-	offset = AutoDefault(offset, 0)
-	alpha = AutoDefault(alpha, 1)
-	draw = AutoDefault(draw, false)
-
-	local lines = {}
-	local dist = 0
-	for i = 1, #points - 1 do
-		local c1, c2, c3 = AutoHSVToRGB((dist / 10 * huescale) + offset, 0.5, 1)
-		table.insert(lines, { points[i], points[i + 1], c1, c2, c3, alpha })
-
-		dist = dist + AutoVecDist(points[i], points[i + 1])
-	end
-
-	for i, v in ipairs(lines) do
-		if draw then
-			DrawLine(unpack(v))
-		else
-			DebugLine(unpack(v))
-		end
-	end
-end
-
 ---Draws a Transform
 ---@param transform transform|vector
----@param size number|nil the size in meters, Default is 0.5
----@param alpha number|nil Default is 1
----@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
-function AutoDrawTransform(transform, size, alpha, hueshift, draw)
+---@param size number? the size in meters, Default is 0.5
+---@param alpha number? Default is 1
+---@param draw boolean? Whether to use DebugLine or DrawLine, Default is false (DebugLine)
+function AutoDrawTransform(transform, size, alpha, draw)
 	if not transform['pos'] then
 		-- DebugPrint('AutoDrawTransform given input not a transform')
 		transform = Transform(transform)
@@ -2710,6 +2805,15 @@ function AutoDrawTransform(transform, size, alpha, hueshift, draw)
 	return transform
 end
 
+---Simply draws a box given a center and the half size.
+---@param point vector
+---@param halfextents number|vector
+---@param r number
+---@param g number
+---@param b number
+---@param a number
+---@return vector aa lower bounds point
+---@return vector bb upper point
 function AutoDrawBox(point, halfextents, r, g, b, a)
 	local aa, bb = AutoAABBExpandPoint(point, halfextents)
 	AutoDrawAABB(aa, bb, r, g, b, a)
@@ -2719,11 +2823,11 @@ end
 
 ---Draws a Transform as a Cone
 ---@param transform transform
----@param sides number|nil the amount of sides on the cone, Default is 12
----@param angle number|nil how wide the cone is in degrees, Default is 25
----@param size number|nil the size in meters, Default is 0.5
----@param color table|nil Default is 1
----@param draw boolean|nil Whether to use DebugLine or DrawLine, Default is false (DebugLine)
+---@param sides number? the amount of sides on the cone, Default is 12
+---@param angle number? how wide the cone is in degrees, Default is 25
+---@param size number? the size in meters, Default is 0.5
+---@param color table? Default is 1
+---@param draw boolean? Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawCone(transform, sides, angle, size, color, draw)
 	if not transform['pos'] then
 		DebugPrint('AutoDrawCone given input not a transform')
@@ -2765,44 +2869,6 @@ function AutoDrawCone(transform, sides, angle, size, color, draw)
 	return transform
 end
 
----Draws some text at a world position.
----@param text string|number|nil Text Displayed, Default is 'nil'
----@param position vector The WorldSpace Position
----@param occlude boolean|nil Hides the tooltip behind walls, Default is false
-
----@param fontsize number|nil Fontsize, Default is 24
----@param alpha number|nil Alpha, Default is 0.75
----@param bold boolean|nil Use Bold Font, Default is false
-function AutoTooltip(text, position, occlude, fontsize, alpha)
-	text = AutoDefault(text or "nil")
-	occlude = AutoDefault(occlude or false)
-	fontsize = AutoDefault(fontsize or 24)
-	alpha = AutoDefault(alpha or 0.75)
-	bold = AutoDefault(bold or false)
-
-	if occlude then if not AutoPointInView(position, nil, nil, occlude) then return end end
-
-	UiPush()
-	UiAlign('center middle')
-	local x, y, dist = UiWorldToPixel(position)
-	if dist > 0 then
-		UiTranslate(x, y)
-		UiWordWrap(UiMiddle())
-		
-		UiFont(AutoFont, fontsize)
-		UiColor(0, 0, 0, 0)
-		local rw, rh = UiText(text)
-		
-		UiColorFilter(1, 1, 1, alpha)
-		UiColor(unpack(AutoSecondaryColor))
-		UiRect(rw, rh)
-		
-		UiColor(unpack(AutoPrimaryColor))
-		UiText(text)
-		UiPop()
-	end
-end
-
 --#endregion
 --#region Graphing
 
@@ -2811,7 +2877,7 @@ AutoGraphs = {}
 ---Creates a Continuous Graph that can be drawn. The given value is added into the graph as the previous ones are kept in memory.
 ---@param id string
 ---@param value number
----@param range number|nil Default is 64
+---@param range number? Default is 64
 function AutoGraphContinuous(id, value, range)
 	local Graph = AutoDefault(AutoGraphs[id], {
 		scan = 0,
@@ -2827,17 +2893,17 @@ end
 
 ---Creates a Graph with values within a range fed into a given function.
 ---@param id string
----@param rangemin number|nil Default is 0
----@param rangemax number|nil Default is 1
----@param func function|nil Is fed one parameter, a number ranging from rangemin to rangemax, Defaults to a Logisitc Function
----@param steps number|nil How many steps, or the interval of values taken from the range.
+---@param rangemin number? Default is 0
+---@param rangemax number? Default is 1
+---@param func function? Is fed one parameter, a number ranging from rangemin to rangemax, Defaults to a Logisitc Function
+---@param steps number? How many steps, or the interval of values taken from the range.
 function AutoGraphFunction(id, rangemin, rangemax, func, steps)
 	rangemin = AutoDefault(rangemin, 0)
 	rangemax = AutoDefault(rangemax, 1)
 	steps = AutoDefault(steps, 100)
 
 	func = AutoDefault(func, function(x)
-		return AutoLogistic(x, 1, -10, 0.5)
+		return AutoSigmoid(x, 1, -10, 0.5)
 	end)
 
 	local Graph = {
@@ -2856,9 +2922,9 @@ end
 ---@param id string
 ---@param sizex number width of the graph, Default is 128
 ---@param sizey number height of the graph, Default is 64
----@param rangemin number|nil If left nil, then the graph will automatically stretch the values to fill the bottom of the graph. Default is nil
----@param rangemax number|nil If left nil, then the graph will automatically stretch the values to fill the top of the graph. Default is nil
----@param linewidth number|nil The line width, Default is 2
+---@param rangemin number? If left nil, then the graph will automatically stretch the values to fill the bottom of the graph. Default is nil
+---@param rangemax number? If left nil, then the graph will automatically stretch the values to fill the top of the graph. Default is nil
+---@param linewidth number? The line width, Default is 2
 function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	local Graph = AutoGraphs[id]
 	if Graph == nil then error("Graph Doesn't exist, nil") end
@@ -2915,6 +2981,9 @@ end
 --#endregion
 --#region Registry
 
+---Concats any amount of strings by adding a single period between them
+---@vararg string
+---@return string
 function AutoKey(...)
 	local s = ''
 	for i = 1, #arg do
@@ -2927,6 +2996,9 @@ function AutoKey(...)
 	return s
 end
 
+---One out of the many methods to convert a registry key to a table
+---@param key string
+---@return table
 function AutoExpandRegistryKey(key)
 	local t = {}
 	local function delve(k, current)
@@ -2950,6 +3022,10 @@ function AutoExpandRegistryKey(key)
 	return t
 end
 
+---Gets a Int from the registry, if the key does not exist, then set the key to the default value and return it.
+---@param path string
+---@param default integer
+---@return integer
 function AutoKeyDefaultInt(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
@@ -2960,6 +3036,10 @@ function AutoKeyDefaultInt(path, default)
 	end
 end
 
+---Gets a Float from the registry, if the key does not exist, then set the key to the default value and return it.
+---@param path string
+---@param default number
+---@return number
 function AutoKeyDefaultFloat(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
@@ -2970,6 +3050,10 @@ function AutoKeyDefaultFloat(path, default)
 	end
 end
 
+---Gets a String from the registry, if the key does not exist, then set the key to the default value and return it.
+---@param path string
+---@param default string
+---@return string
 function AutoKeyDefaultString(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
@@ -2980,6 +3064,10 @@ function AutoKeyDefaultString(path, default)
 	end
 end
 
+---Gets a Bool from the registry, if the key does not exist, then set the key to the default value and return it.
+---@param path string
+---@param default boolean
+---@return boolean
 function AutoKeyDefaultBool(path, default)
 	if path == nil then error("path nil") end
 	if HasKey(path) then
@@ -2990,6 +3078,9 @@ function AutoKeyDefaultBool(path, default)
 	end
 end
 
+---A very sinful way to pipe raw code into the registry, use in combination with `AutoCMD_Parse`
+---@param path string
+---@param luastr string
 function AutoCMD_Pipe(path, luastr)
 	local keys = ListKeys(path)
 	local newkey = AutoKey(path, #keys + 1)
@@ -2997,6 +3088,11 @@ function AutoCMD_Pipe(path, luastr)
 	SetString(newkey, luastr)
 end
 
+---A very sinful way to parse raw code from the registry, use in combination with `AutoCMD_Pipe`
+---
+---_God is dead and we killed her._
+---@param path string
+---@return table<{ cmd:string, result:any }>
 function AutoCMD_Parse(path)
 	local results = {}
 	for index = 1, #ListKeys(path) do
@@ -3089,6 +3185,9 @@ local RegistryTableMeta = {
 	end
 }
 
+---Attempts to create a table that when written to, will update the registry, and when read from, will pull from the registry
+---@param path string
+---@return table
 function AutoRegistryBindedTable(path)
 	local t = {}
 	t.__path = path
@@ -3106,11 +3205,16 @@ function AutoUiCenter()
 	UiAlign('center middle')
 end
 
+---Returns the bounds, optionally subtracted by some amount
+---@param subtract number?
+---@return number
+---@return number
 function AutoUiBounds(subtract)
     subtract = subtract or 0
     return UiWidth() - subtract, UiHeight() - subtract
 end
 
+---Draws a line between two points in screen space
 function AutoUiLine(p1, p2, width)
 	width = AutoDefault(width, 2)
 	local angle = math.atan2(p2[1] - p1[1], p2[2] - p1[2]) * 180 / math.pi
@@ -3137,6 +3241,42 @@ end
 -- AutoFont = 'regular.ttf'
 -- local SpreadStack = {}
 
+-- ---Draws some text at a world position.
+-- ---@param text string|number? Text Displayed, Default is 'nil'
+-- ---@param position vector The WorldSpace Position
+-- ---@param occlude boolean? Hides the tooltip behind walls, Default is false
+-- ---@param fontsize number? Fontsize, Default is 24
+-- ---@param alpha number? Alpha, Default is 0.75
+-- function AutoTooltip(text, position, occlude, fontsize, alpha)
+-- 	text = AutoDefault(text or "nil")
+-- 	occlude = AutoDefault(occlude or false)
+-- 	fontsize = AutoDefault(fontsize or 24)
+-- 	alpha = AutoDefault(alpha or 0.75)
+-- 	bold = AutoDefault(bold or false)
+
+-- 	if occlude then if not AutoPointInView(position, nil, nil, occlude) then return end end
+
+-- 	UiPush()
+-- 	UiAlign('center middle')
+-- 	local x, y, dist = UiWorldToPixel(position)
+-- 	if dist > 0 then
+-- 		UiTranslate(x, y)
+-- 		UiWordWrap(UiMiddle())
+
+-- 		UiFont(AutoFont, fontsize)
+-- 		UiColor(0, 0, 0, 0)
+-- 		local rw, rh = UiText(text)
+
+-- 		UiColorFilter(1, 1, 1, alpha)
+-- 		UiColor(unpack(AutoSecondaryColor))
+-- 		UiRect(rw, rh)
+
+-- 		UiColor(unpack(AutoPrimaryColor))
+-- 		UiText(text)
+-- 		UiPop()
+-- 	end
+-- end
+
 -- ---Takes an alignment and returns a Vector representation.
 -- ---@param alignment string
 -- ---@return table
@@ -3152,42 +3292,42 @@ end
 -- end
 
 -- ---The next Auto Ui functions will be spread Down until AutoSpreadEnd() is called
--- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- ---@param padding number? The amount of padding that will be used, Default is AutoPad.thin
 -- function AutoSpreadDown(padding)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'down', padding = AutoDefault(padding, AutoPad.thin) })
 -- 	UiPush()
 -- end
 
 -- ---The next Auto Ui functions will be spread Up until AutoSpreadEnd() is called
--- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- ---@param padding number? The amount of padding that will be used, Default is AutoPad.thin
 -- function AutoSpreadUp(padding)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'up', padding = AutoDefault(padding, AutoPad.thin) })
 -- 	UiPush()
 -- end
 
 -- ---The next Auto Ui functions will be spread Right until AutoSpreadEnd() is called
--- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- ---@param padding number? The amount of padding that will be used, Default is AutoPad.thin
 -- function AutoSpreadRight(padding)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'right', padding = AutoDefault(padding, AutoPad.thin) })
 -- 	UiPush()
 -- end
 
 -- ---The next Auto Ui functions will be spread Left until AutoSpreadEnd() is called
--- ---@param padding number|nil The amount of padding that will be used, Default is AutoPad.thin
+-- ---@param padding number? The amount of padding that will be used, Default is AutoPad.thin
 -- function AutoSpreadLeft(padding)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'left', padding = AutoDefault(padding, AutoPad.thin) })
 -- 	UiPush()
 -- end
 
 -- ---The next Auto Ui functions will be spread Verticlely across the Height of the Bounds until AutoSpreadEnd() is called
--- ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
+-- ---@param count number? The amount of Auto Ui functions until AutoSpreadEnd()
 -- function AutoSpreadVerticle(count)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'verticle', length = UiHeight(), count = count })
 -- 	UiPush()
 -- end
 
 -- ---The next Auto Ui functions will be spread Horizontally across the Width of the Bounds until AutoSpreadEnd() is called
--- ---@param count number|nil The amount of Auto Ui functions until AutoSpreadEnd()
+-- ---@param count number? The amount of Auto Ui functions until AutoSpreadEnd()
 -- function AutoSpreadHorizontal(count)
 -- 	table.insert(SpreadStack, { type = 'spread', direction = 'horizontal', length = UiWidth(), count = count })
 -- 	UiPush()
@@ -3351,9 +3491,9 @@ end
 -- ---Create a Container with new bounds
 -- ---@param width number
 -- ---@param height number
--- ---@param padding number|nil The Amount of padding against sides of the container, Default is AutoPad.micro
--- ---@param clip boolean|nil Whether  to clip stuff outside of the container, Default is false
--- ---@param draw boolean|nil Draws the container's background, otherwise it will be invisible, Default is true
+-- ---@param padding number? The Amount of padding against sides of the container, Default is AutoPad.micro
+-- ---@param clip boolean? Whether  to clip stuff outside of the container, Default is false
+-- ---@param draw boolean? Draws the container's background, otherwise it will be invisible, Default is true
 -- ---@return table containerdata
 -- function AutoContainer(width, height, padding, clip, draw)
 -- 	width = AutoDefault(width, 300)

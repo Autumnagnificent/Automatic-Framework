@@ -1,4 +1,4 @@
--- VERSION 3.0
+-- VERSION 3.01
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -675,7 +675,7 @@ end
 ---@return vector
 function AutoBodyCenter(body)
 	local aa, bb = GetBodyBounds(body)
-	return VecScale(VecAdd(aa, bb), 0.5)
+	return VecLerp(aa, bb, 0.5)
 end
 
 ---Get the center of a shapes's bounds
@@ -683,7 +683,7 @@ end
 ---@return vector
 function AutoShapeCenter(shape)
 	local aa, bb = GetShapeBounds(shape)
-	return VecScale(VecAdd(aa, bb), 0.5)
+	return VecLerp(aa, bb, 0.5)
 end
 
 ---Returns a Axis ALigned Bounding Box with the center of pos
@@ -782,7 +782,7 @@ end
 ---@param bb vector upper-bound
 ---@param levels number?
 ---@return table
-function AutoSubdivideBounds(aa, bb, levels)
+function AutoAABBSubdivideBounds(aa, bb, levels)
 	levels = levels or 1
 	local bounds = { { aa, bb } }
 
@@ -814,10 +814,10 @@ end
 ---Draws a given Axis Aligned Bounding Box
 ---@param aa vector lower-bound
 ---@param bb vector upper-bound
----@param colorR number
----@param colorG number
----@param colorB number
----@param alpha number
+---@param colorR number?
+---@param colorG number?
+---@param colorB number?
+---@param alpha number?
 ---@param rgbcolors boolean?
 ---@param draw boolean?
 function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
@@ -1208,7 +1208,7 @@ function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _laye
 	}
 
 	if check then
-		for _, nb in ipairs(AutoSubdivideBounds(BoundsAA, BoundsBB)) do
+		for _, nb in ipairs(AutoAABBSubdivideBounds(BoundsAA, BoundsBB)) do
 			local aa, bb = unpack(nb)
 			node.children[#node.children + 1] = AutoProcessOctree(aa, bb, Layers, conditionalFuction, _layer + 1)
 		end
@@ -2144,8 +2144,32 @@ end
 ---@param maxDist number
 ---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, dist:number, dir:vector, dot:number, reflection:vector }
 function AutoQueryClosest(origin, maxDist)
+    local data = {}
+    data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
+
+    if data.hit then
+        local diff = VecSub(data.point, origin)
+        local dir = VecNormalize(diff)
+        local dot = VecDot(dir, data.normal)
+
+        data.dist = VecLength(diff)
+        data.dir = dir
+        data.dot = dot
+        data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+    else
+        data.dist = maxDist
+    end
+
+    return data
+end
+
+---A Wrapper for GetBodyClosestPoint; comes with some extra features.
+---@param body body_handle
+---@param origin vector
+---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, dist:number, dir:vector, dot:number, reflection:vector }
+function AutoQueryClosestBody(body, origin)
 	local data = {}
-	data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
+	data.hit, data.point, data.normal, data.shape = GetBodyClosestPoint(body, origin)
 
 	if data.hit then
 		local diff = VecSub(data.point, origin)
@@ -2156,8 +2180,28 @@ function AutoQueryClosest(origin, maxDist)
 		data.dir = dir
 		data.dot = dot
 		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
-	else
-		data.dist = maxDist
+	end
+
+	return data
+end
+
+---A Wrapper for GetShapeClosestPoint; comes with some extra features.
+---@param shape shape_handle
+---@param origin vector
+---@return { hit:boolean, point:vector, normal:vector, dist:number, dir:vector, dot:number, reflection:vector }
+function AutoQueryClosestShape(shape, origin)
+	local data = {}
+	data.hit, data.point, data.normal = GetShapeClosestPoint(shape, origin)
+
+	if data.hit then
+		local diff = VecSub(data.point, origin)
+		local dir = VecNormalize(diff)
+		local dot = VecDot(dir, data.normal)
+
+		data.dist = VecLength(diff)
+		data.dir = dir
+		data.dot = dot
+		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
 	end
 
 	return data
@@ -2774,6 +2818,7 @@ end
 ---@param alpha number? Default is 1
 ---@param draw boolean? Whether to use DebugLine or DrawLine, Default is false (DebugLine)
 function AutoDrawTransform(transform, size, alpha, draw)
+	if not transform then return end
 	if not transform['pos'] then
 		-- DebugPrint('AutoDrawTransform given input not a transform')
 		transform = Transform(transform)
@@ -3215,6 +3260,11 @@ function AutoUiBounds(subtract)
 end
 
 ---Draws a line between two points in screen space
+---
+---Relative to current cursor position
+---@param p1 { [1]:number, [2]:number }
+---@param p2 { [1]:number, [2]:number }
+---@param width integer? Default is 2
 function AutoUiLine(p1, p2, width)
 	width = AutoDefault(width, 2)
 	local angle = math.atan2(p2[1] - p1[1], p2[2] - p1[2]) * 180 / math.pi
@@ -3227,6 +3277,30 @@ function AutoUiLine(p1, p2, width)
 	UiAlign('center top')
 	UiRect(width, distance + 1)
 	UiPop()
+end
+
+---Draws a cricle out of lines in screen space
+---
+---Relative to current cursor position
+---@param radius number
+---@param width integer? Default is 2
+---@param steps integer?
+function AutoUiCircle(radius, width, steps)
+	width = width or 2
+	steps = steps or 16
+	
+	for i = 1, steps do
+		local t1 = (i - 1) / steps * math.pi * 2
+		local t2 = i / steps * math.pi * 2
+
+		AutoUiLine({
+			math.cos(t1) * radius,
+			math.sin(t1) * radius
+		}, {
+			math.cos(t2) * radius,
+			math.sin(t2) * radius
+		}, width)
+	end
 end
 
 ---OLD

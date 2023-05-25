@@ -1,4 +1,4 @@
--- VERSION 3.01
+-- VERSION 3.03
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -359,6 +359,14 @@ end
 ---@return number
 function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
+end
+
+---Return the Distance between Two Vectors
+---@param a vector
+---@param b vector
+---@return number
+function AutoVecDistNoZ(a, b)
+	return math.sqrt((b[1] - a[1])^2 + (b[2] - a[2])^2)
 end
 
 ---Moves a vector in a direction by a given amount
@@ -1891,7 +1899,7 @@ end
 ---Equivalent to `Transform(TransformToParentPoint(t, offset), t.rot)`
 ---@param t transform
 ---@param offset vector
----@return vector
+---@return transform
 function AutoTransformOffset(t, offset)
 	return Transform(TransformToParentPoint(t, offset), t.rot)
 end
@@ -3123,41 +3131,6 @@ function AutoKeyDefaultBool(path, default)
 	end
 end
 
----A very sinful way to pipe raw code into the registry, use in combination with `AutoCMD_Parse`
----@param path string
----@param luastr string
-function AutoCMD_Pipe(path, luastr)
-	local keys = ListKeys(path)
-	local newkey = AutoKey(path, #keys + 1)
-
-	SetString(newkey, luastr)
-end
-
----A very sinful way to parse raw code from the registry, use in combination with `AutoCMD_Pipe`
----
----_God is dead and we killed her._
----@param path string
----@return table<{ cmd:string, result:any }>
-function AutoCMD_Parse(path)
-	local results = {}
-	for index = 1, #ListKeys(path) do
-		local key = AutoKey(path, index)
-		local cmd = GetString(key)
-		local success, func = pcall(loadstring, cmd)
-
-		if success and func then -- if it fails, then the cmd is discarded and we do not try to fix it
-			results[#results + 1] = {
-				cmd = cmd,
-				result = func()
-			}
-		end
-
-		ClearKey(key)
-	end
-
-	return results
-end
-
 local RegistryTableMeta = {
 	__index = function(self, key)
 		key = key:lower()
@@ -3268,7 +3241,7 @@ end
 function AutoUiLine(p1, p2, width)
 	width = AutoDefault(width, 2)
 	local angle = math.atan2(p2[1] - p1[1], p2[2] - p1[2]) * 180 / math.pi
-	local distance = AutoVecDist(p1, p2)
+	local distance = AutoVecDistNoZ(p1, p2)
 
 	UiPush()
 	UiTranslate(p1[1] - width / 2, p1[2] - width / 2)
@@ -3293,6 +3266,9 @@ function AutoUiCircle(radius, width, steps)
 		local t1 = (i - 1) / steps * math.pi * 2
 		local t2 = i / steps * math.pi * 2
 
+		UiPush()
+
+		UiTranslate(width/2, width/2)
 		AutoUiLine({
 			math.cos(t1) * radius,
 			math.sin(t1) * radius
@@ -3300,6 +3276,65 @@ function AutoUiCircle(radius, width, steps)
 			math.cos(t2) * radius,
 			math.sin(t2) * radius
 		}, width)
+
+		UiPop()
+	end
+end
+
+---Draws a Fancy looking Arrow between two points on the screen
+---
+---Relative to current cursor position
+---@param p1 { [1]: number, [2]:number }
+---@param p2 { [1]: number, [2]:number }
+---@param line_width integer
+---@param radius integer
+function AutoUIArrow(p1, p2, line_width, radius)
+	local dir = VecNormalize(VecSub(p2, p1))
+	local angle = math.atan2(unpack(AutoSwizzle(dir, 'yx')))
+
+	local dist = AutoVecDistNoZ(p1, p2)
+	local arrow_scale = AutoSigmoid(dist, radius * 3, -0.3, 15)
+
+	UiPush()
+
+	if radius > 0 then
+		UiPush()
+		UiTranslate(unpack(p1))
+		AutoUiCircle(radius, line_width, 32)
+		UiPop()
+	end
+	
+	if dist > radius + line_width then
+		AutoUiLine(AutoVecMove(p1, dir, radius), p2, line_width)
+
+		if arrow_scale >= 0.1 then
+			AutoUiLine(p2, {
+				p2[1] + math.cos(angle + math.rad(135)) * arrow_scale,
+				p2[2] + math.sin(angle + math.rad(135)) * arrow_scale
+			}, line_width)
+			AutoUiLine(p2, {
+				p2[1] + math.cos(angle + math.rad(-135)) * arrow_scale,
+				p2[2] + math.sin(angle + math.rad(-135)) * arrow_scale
+			}, line_width)
+		end
+	end
+
+	UiPop()
+end
+
+---Draws a Fancy looking Arrow between two points in the world
+---
+---Relative to current cursor position
+---@param p1 vector
+---@param p2 vector
+---@param line_width integer
+---@param radius integer
+function AutoUIArrowInWorld(p1, p2, line_width, radius)
+	local s_p1 = { UiWorldToPixel(p1) }
+	local s_p2 = { UiWorldToPixel(p2) }
+
+	if s_p1[3] > 0 or s_p2[3] > 0 then
+		AutoUIArrow(s_p1, s_p2, line_width, s_p1[3] > 0 and radius or 0)
 	end
 end
 
@@ -3766,5 +3801,60 @@ end
 -- 	UiImage('ui/common/dot.png')
 -- 	UiPop()
 -- end
+
+--#endregion
+--#region Cursed
+
+---Loads a string as `return <lua_string>`
+---@param lua_string string
+---@return boolean success
+---@return unknown? return_value
+function AutoParse(lua_string)
+	local formatted = 'return ' .. lua_string
+	local success, func = pcall(loadstring, formatted)
+	if success and func then
+		local result_success, result = pcall(func)
+		if result_success and result then
+			return true, result
+		end
+	end
+
+	return false
+end
+
+---A very sinful way to pipe raw code into the registry, use in combination with `AutoCMD_Parse`
+---@param path string
+---@param luastr string
+function AutoCMD_Pipe(path, luastr)
+	local keys = ListKeys(path)
+	local newkey = AutoKey(path, #keys + 1)
+
+	SetString(newkey, luastr)
+end
+
+---A very sinful way to parse raw code from the registry, use in combination with `AutoCMD_Pipe`
+---
+---_God is dead and we killed her._
+---@param path string
+---@return table<{ cmd:string, result:any }>
+function AutoCMD_Parse(path)
+	local results = {}
+	for index = 1, #ListKeys(path) do
+		local key = AutoKey(path, index)
+		local cmd = GetString(key)
+		local success, func = pcall(loadstring, cmd)
+
+		if success and func then -- if it fails, then the cmd is discarded and we do not try to fix it
+			results[#results + 1] = {
+				cmd = cmd,
+				result = func()
+			}
+		end
+
+		ClearKey(key)
+	end
+
+	return results
+end
 
 --#endregion

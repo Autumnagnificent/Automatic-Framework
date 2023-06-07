@@ -1,4 +1,4 @@
--- VERSION 3.03
+-- VERSION 3.04
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -683,7 +683,7 @@ end
 ---@return vector
 function AutoBodyCenter(body)
 	local aa, bb = GetBodyBounds(body)
-	return VecLerp(aa, bb, 0.5)
+	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
 ---Get the center of a shapes's bounds
@@ -691,7 +691,7 @@ end
 ---@return vector
 function AutoShapeCenter(shape)
 	local aa, bb = GetShapeBounds(shape)
-	return VecLerp(aa, bb, 0.5)
+	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
 ---Returns a Axis ALigned Bounding Box with the center of pos
@@ -1596,6 +1596,7 @@ function AutoSM_Set(sm, target, keep_velocity)
 		sm.data.current = target
 		if not keep_velocity then
 			sm.data.velocity = 0
+			sm.data.previous = target
 		else
 			sm.data.previous = target
 		end
@@ -1604,6 +1605,7 @@ function AutoSM_Set(sm, target, keep_velocity)
 			v.current = target[k]
 			if not keep_velocity then
 				v.velocity = 0
+				v.previous = target[k]
 			else
 				v.previous = target[k]
 			end
@@ -2107,7 +2109,7 @@ end
 ---@param maxDist number
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
+---@return { hit:boolean, intersection:vector, dist:number, normal:vector, shape:shape_handle, body:body_handle, dot:number, reflection:vector }
 function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	direction = direction and VecNormalize(direction) or nil
 	
@@ -2116,6 +2118,7 @@ function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	data.intersection = VecAdd(origin, VecScale(direction, data.dist))
 	data.dot = VecDot(direction, data.normal)
 	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
+	data.body = GetShapeBody(data.shape)
 
 	return data
 end
@@ -2316,7 +2319,7 @@ end
 ---@param length number?
 ---@return vector
 function AutoPlayerInputDir(length)
-	return VecScale({
+    return VecScale({
 		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
 		0,
 		(InputDown('down') and 1 or 0) + (InputDown('up') and -1 or 0),
@@ -2716,21 +2719,22 @@ function AutoGetStackTrace(level)
 	return line
 end
 
----Creates a neatly formatted table of a value, including tables.
+---Creates a neatly formatted string given any value of any type, including tables
 ---@param t any
 ---@param singleline_at number?
 ---@param indent_str string?
 ---@param round_numbers number|false?
+---@param show_number_keys boolean?
+---@param lua_compatible boolean?
 ---@param indents number?
 ---@param visited_tables table?
 ---@return string
-function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, indents, visited_tables)
-	local singleline_at = singleline_at or 1
-	local indent_str = indent_str or '  '
-	local round_numbers = round_numbers or false
-	local format_keys = format_keys or false
-	local indents = indents or 0
-	local visited_tables = visited_tables or {}
+function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, indents, visited_tables)
+	singleline_at = singleline_at or 1
+	indent_str = indent_str or '  '
+	indents = indents or 0
+    visited_tables = visited_tables or {}
+	
 	local str = ""
 
 	if type(t) ~= "table" then
@@ -2759,9 +2763,12 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, 
 			str = str .. indent_str:rep(indents+1)
 		end
 
-		local k_str = type(k) == "number" and '' or ((format_keys and string.format("%q", tostring(k)) or tostring(k)) .. " = ")
-		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, format_keys, indents + 1, visited_tables)
-		str = str .. k_str .. v_str .. ", "
+		local not_a_number = type(k) ~= "number"
+		local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
+		local prefix = k_str and ((lua_compatible and not_a_number) and string.format("%q", tostring(k)) or k_str) .. " = " or ''
+
+		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, indents + 1, visited_tables)
+		str = str .. prefix .. v_str .. ", "
 
 		if not passedSLthreshold then
 			str = str .. "\n"
@@ -2771,14 +2778,16 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, format_keys, 
 	return str
 end
 
----A Alternative to DebugPrint that uses AutoInspect(), works with tables. Returns the value
+---A Alternative to DebugPrint that uses AutoToString(), works with tables. Returns the value
 ---@param value any
 ---@param singleline_at number?
 ---@param indent_str string?
 ---@param round_numbers number|false?
+---@param show_number_keys boolean?
+---@param lua_compatible boolean?
 ---@return any
-function AutoInspect(value, singleline_at, indent_str, round_numbers)
-	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers)
+function AutoInspect(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
+	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
 		local t = split[i]
@@ -2796,9 +2805,11 @@ end
 ---@param singleline_at number?
 ---@param indent_str string?
 ---@param round_numbers number|false?
+---@param show_number_keys boolean?
+---@param lua_compatible boolean?
 ---@return any
-function AutoInspectConsole(value, singleline_at, indent_str, round_numbers)
-	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers))
+function AutoInspectConsole(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
+	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible))
 	return value
 end
 
@@ -2810,9 +2821,11 @@ end
 ---@param singleline_at number?
 ---@param indent_str string?
 ---@param round_numbers number|false?
-function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers)
+---@param show_number_keys boolean?
+---@param lua_compatible boolean?
+function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
 	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
-	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers))
+	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible))
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"

@@ -1,4 +1,4 @@
--- VERSION 3.04
+-- VERSION 3.05
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -380,12 +380,26 @@ function AutoVecMove(vec, dir, dist)
 	return VecAdd(vec, VecScale(dir, dist))
 end
 
----Return the Vector Rounded to a number
+---Returns a Vector Rounded to a number
 ---@param vec vector
 ---@param r number?
 ---@return vector
 function AutoVecRound(vec, r)
 	return Vec(AutoRound(vec[1], r), AutoRound(vec[2], r), AutoRound(vec[3], r))
+end
+
+---Returns a Vector where all numbers are floored
+---@param vec vector
+---@return vector
+function AutoVecFloor(vec)
+	return Vec(math.floor(vec[1]), math.floor(vec[2]), math.floor(vec[3]))
+end
+
+---Returns a Vector where all numbers are ceiled
+---@param vec vector
+---@return vector
+function AutoVecCeil(vec)
+	return Vec(math.ceil(vec[1]), math.ceil(vec[2]), math.ceil(vec[3]))
 end
 
 ---Return a vector that has the magnitude of `b`, but with the direction of `a`
@@ -694,12 +708,33 @@ function AutoShapeCenter(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
+---Expands bounds to include a Point
+---
+---No return value
+---@param aa vector
+---@param bb vector
+---@param p vector
+function AutoAABBIncludePoint(aa, bb, p)
+	aa = {
+		math.min(aa[1], p[1]),
+		math.min(aa[2], p[2]),
+		math.min(aa[3], p[3]),
+	}
+	bb = {
+		math.max(bb[1], p[1]),
+		math.max(bb[2], p[2]),
+		math.max(bb[3], p[3]),
+	}
+
+	return aa, bb
+end
+
 ---Returns a Axis ALigned Bounding Box with the center of pos
 ---@param pos vector
 ---@param halfextents vector|number
 ---@return vector lower-bound
 ---@return vector upper-bound
-function AutoAABBExpandPoint(pos, halfextents)
+function AutoAABBBoxFromPoint(pos, halfextents)
 	if type(halfextents) == "number" then
 		halfextents = AutoVecOne(halfextents)
 	end
@@ -1780,9 +1815,10 @@ function AutoTableLast(t)
 end
 
 ---Copy a Table Recursivly Stolen from http://lua-users.org/wiki/CopyTable
----@param orig table
+---@generic T : table
+---@param orig T
 ---@param copies table?
----@return table
+---@return T
 function AutoTableDeepCopy(orig, copies)
 	copies = copies or {}
 	local orig_type = type(orig)
@@ -2881,7 +2917,7 @@ end
 ---@return vector aa lower bounds point
 ---@return vector bb upper point
 function AutoDrawBox(point, halfextents, r, g, b, a)
-	local aa, bb = AutoAABBExpandPoint(point, halfextents)
+	local aa, bb = AutoAABBBoxFromPoint(point, halfextents)
 	AutoDrawAABB(aa, bb, r, g, b, a)
 	
 	return aa, bb
@@ -3051,15 +3087,7 @@ end
 ---@vararg string
 ---@return string
 function AutoKey(...)
-	local s = ''
-	for i = 1, #arg do
-		if s == '' then
-			s = arg[i]
-		else
-			s = s .. '.' .. arg[i]
-		end
-	end
-	return s
+	return table.concat(arg, '.')
 end
 
 ---One out of the many methods to convert a registry key to a table

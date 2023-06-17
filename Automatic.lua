@@ -60,12 +60,12 @@ function AutoNoteFrequency(baseline)
 		As = 466.16,
 		B  = 493.88,
 	}
-
+	
 	local tuned = {}
 	for note, freq in pairs(f) do
 		tuned[note] = freq / f[baseline]
 	end
-
+	
 	return tuned
 end
 
@@ -147,7 +147,7 @@ end
 function AutoWrap(v, min, max)
 	min = AutoDefault(min, 0)
 	max = AutoDefault(max, 1)
-
+	
 	return (v - min) % ((max + 1) - min) + min
 end
 
@@ -193,7 +193,7 @@ function AutoMove(a, b, t)
 	else
 		output = math.min(a + t, b)
 	end
-
+	
 	return output
 end
 
@@ -216,7 +216,7 @@ function AutoNormalize(t, scale)
 		local abs = math.abs(t[i])
 		maxabs = abs > maxabs and abs or maxabs
 	end
-
+	
 	for i = 1, #t do
 		norm[i] = t[i] / maxabs * (scale or 1)
 	end
@@ -239,19 +239,19 @@ function AutoFlex(weights, span, padding)
 		end
 		return t
 	end)() or weights
-
+	
 	span = AutoDefault(span, 1)
 	padding = AutoDefault(padding, 0)
 	local count = #weights
-
+	
 	local flexxed = {}
 	local normalized = AutoNormalize(weights)
 	local max = 0
 	for i = 1, count do
 		max = max + normalized[i]
 	end
-
-
+	
+	
 	local padding_deduction = (padding / count) * (count - 1)
 	for i = 1, count do
 		flexxed[i] = (normalized[i] / max) * span - padding_deduction
@@ -271,11 +271,11 @@ function AutoBias(weights)
 		T[i].i = i
 		T[i].w = weights[i]
 	end
-
+	
 	table.sort(T, function(a, b)
 		return a.w < b.w
 	end)
-
+	
 	local r = math.random() * max
 	local cursor = 0
 	for i = 1, #T do
@@ -310,7 +310,7 @@ function AutoSwizzle(vec, swizzle)
 	local swizzleMap = { x = 1, y = 2, z = 3, w = 4, r = 1, g = 2, b = 3, a = 4 }
 	local built = {}
 	for i = 1, #swizzle do
-        local axis = swizzle:sub(i, i)
+		local axis = swizzle:sub(i, i)
 		local asnum = tonumber(axis)
 		built[i] = vec[asnum or swizzleMap[axis]]
 	end
@@ -322,10 +322,10 @@ end
 ---@param b vector
 ---@return boolean
 function AutoVecEquals(a, b)
-    for i, va in pairs(a) do
+	for i, va in pairs(a) do
 		if va ~= b[i] then return false end
-    end
-
+	end
+	
 	return true
 end
 
@@ -342,13 +342,13 @@ function AutoVecRnd(param1, param2)
 		offset = { 0, 0, 0 }
 		scale = param1
 	end
-
+	
 	local rndVec = VecNormalize({
 		(math.random() * 2 - 1),
 		(math.random() * 2 - 1),
 		(math.random() * 2 - 1),
 	})
-
+	
 	local v = VecAdd(offset, VecScale(rndVec, scale))
 	return v
 end
@@ -628,11 +628,11 @@ function AutoRandomQuat(angle)
 	local sinHalfAngle = math.sin(math.rad(angle) / 2)
 	local cosHalfAngle = math.cos(math.rad(angle) / 2)
 	return Quat(
-		axis[1] * sinHalfAngle,
-		axis[2] * sinHalfAngle,
-		axis[3] * sinHalfAngle,
-		cosHalfAngle
-	)
+	axis[1] * sinHalfAngle,
+	axis[2] * sinHalfAngle,
+	axis[3] * sinHalfAngle,
+	cosHalfAngle
+)
 end
 
 ---Computes the dot product of two quaternions.
@@ -647,7 +647,7 @@ end
 ---@param quat quaternion
 ---@return quaternion quat
 function AutoQuatConjugate(quat)
-    return { -quat[1], -quat[2], -quat[3], quat[4] }
+	return { -quat[1], -quat[2], -quat[3], quat[4] }
 end
 
 ---Returns the Inverse of the given quaternion.
@@ -677,11 +677,11 @@ end
 function AutoQuatFromAxisAngle(v)
 	local xyz = VecScale(v, 0.5)
 	local angle = VecLength(xyz)
-
+	
 	if angle == 0 then
 		return Quat()
 	end
-
+	
 	local co = math.cos(angle)
 	local si = math.sin(angle)
 	local qXYZ = VecScale(xyz, si / angle)
@@ -696,11 +696,11 @@ function AutoQuatToAxisAngle(q)
 	local qXYZ = Vec(q[1], q[2], q[3])
 	local co = q[4]
 	local si = VecLength(qXYZ)
-
+	
 	if si == 0 then
 		return VecScale(qXYZ, 2.0 / co)
 	end
-
+	
 	local angle = math.atan2(si, co)
 	return VecScale(qXYZ, 2.0 * angle / si)
 end
@@ -755,7 +755,7 @@ function AutoAABBBoxFromPoint(pos, halfextents)
 	if type(halfextents) == "number" then
 		halfextents = AutoVecOne(halfextents)
 	end
-
+	
 	return VecSub(pos, halfextents), VecAdd(pos, halfextents)
 end
 
@@ -766,7 +766,7 @@ end
 ---@return vector
 function AutoAABBCorrection(aa, bb)
 	local min, max = VecCopy(aa), VecCopy(bb)
-
+	
 	if bb[1] < aa[1] then
 		min[1] = bb[1]
 		max[1] = aa[1]
@@ -779,7 +779,7 @@ function AutoAABBCorrection(aa, bb)
 		min[3] = bb[3]
 		max[3] = aa[3]
 	end
-
+	
 	return min, max
 end
 
@@ -790,10 +790,10 @@ end
 ---@return vector
 function AutoAABBGetPos(aa, bb, vec)
 	vec = AutoDefault(vec, Vec(0, 0, 0))
-
+	
 	vec = AutoVecMap(vec, -1, 1, 0, 1)
 	local sizevec = VecSub(bb, aa)
-
+	
 	local size = VecLength(sizevec)
 	local scaled = AutoVecMulti(vec, sizevec)
 	return VecAdd(scaled, aa)
@@ -808,7 +808,7 @@ function AutoAABBGetCorners(aa, bb)
 	for i = 1, 3 do
 		mid[i] = (aa[i] + bb[i]) / 2
 	end
-
+	
 	local corners = {
 		{ bb[1], mid[2], mid[3] },
 		{ aa[1], mid[2], mid[3] },
@@ -819,7 +819,7 @@ function AutoAABBGetCorners(aa, bb)
 		{ aa[1], bb[2], mid[3] },
 		{ bb[1], aa[2], mid[3] }
 	}
-
+	
 	return corners
 end
 
@@ -833,7 +833,7 @@ function AutoAABBSize(aa, bb)
 	local size = VecSub(bb, aa)
 	local minval = math.min(unpack(size))
 	local maxval = math.max(unpack(size))
-
+	
 	return size, minval, maxval
 end
 
@@ -845,16 +845,16 @@ end
 function AutoAABBSubdivideBounds(aa, bb, levels)
 	levels = levels or 1
 	local bounds = { { aa, bb } }
-
+	
 	for level = 1, levels do
 		local newBounds = {}
-
+		
 		for _, bound in ipairs(bounds) do
 			local mid = {}
 			for i = 1, 3 do
 				mid[i] = (bound[1][i] + bound[2][i]) / 2
 			end
-
+			
 			table.insert(newBounds, { { bound[1][1], mid[2], mid[3] }, { mid[1], bound[2][2], bound[2][3] } })
 			table.insert(newBounds, { { mid[1], mid[2], mid[3] }, { bound[2][1], bound[2][2], bound[2][3] } })
 			table.insert(newBounds, { { mid[1], bound[1][2], mid[3] }, { bound[2][1], mid[2], bound[2][3] } })
@@ -864,10 +864,10 @@ function AutoAABBSubdivideBounds(aa, bb, levels)
 			table.insert(newBounds, { { mid[1], bound[1][2], bound[1][3] }, { bound[2][1], mid[2], mid[3] } })
 			table.insert(newBounds, { { bound[1][1], bound[1][2], bound[1][3] }, { mid[1], mid[2], mid[3] } })
 		end
-
+		
 		bounds = newBounds
 	end
-
+	
 	return bounds
 end
 
@@ -887,7 +887,7 @@ function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 	alpha = AutoDefault(alpha, 1)
 	rgbcolors = AutoDefault(rgbcolors, false)
 	draw = AutoDefault(draw, false)
-
+	
 	local min, max = {
 		[1] = Vec(aa[1], aa[2], aa[3]),
 		[2] = Vec(bb[1], aa[2], aa[3]),
@@ -899,7 +899,7 @@ function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 		[3] = Vec(bb[1], bb[2], bb[3]),
 		[4] = Vec(aa[1], bb[2], bb[3]),
 	}
-
+	
 	-- This code made me want to give up
 	local lines = {
 		{ min[2], min[3], colorR, colorG, colorB, alpha },
@@ -908,20 +908,20 @@ function AutoDrawAABB(aa, bb, colorR, colorG, colorB, alpha, rgbcolors, draw)
 		{ max[4], max[1], colorR, colorG, colorB, alpha },
 		{ min[2], max[2], colorR, colorG, colorB, alpha },
 		{ min[4], max[4], colorR, colorG, colorB, alpha },
-
+		
 		{ min[1], min[2], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
 		{ max[2], max[3], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
 		{ max[3], max[4], rgbcolors and 1 or colorR, rgbcolors and 0 or colorG, rgbcolors and 0 or colorB, alpha },
 		{ min[1], max[1], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
-			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
 		{ min[3], max[3], rgbcolors and 0 or colorR, rgbcolors and 0 or colorG,
-			rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
+		rgbcolors and 1 or rgbcolors and 0 or colorB, alpha },
 		{ min[4], min[1], rgbcolors and 0 or colorR, rgbcolors and 1 or colorG, rgbcolors and 0 or colorB, alpha },
 	}
-
+	
 	local DrawLine = DrawLine
 	local DebugLine = DebugLine
-
+	
 	for i, v in ipairs(lines) do
 		if draw then
 			DrawLine(unpack(v))
@@ -941,9 +941,9 @@ end
 ---@param bb vector
 ---@return OBB
 function AutoAABBToOBB(aa, bb)
-    local center = VecLerp(bb, aa, 0.5)
-    local size = VecSub(bb, aa)
-    return { pos = center, rot = QuatEuler(), size = size }
+	local center = VecLerp(bb, aa, 0.5)
+	local size = VecSub(bb, aa)
+	return { pos = center, rot = QuatEuler(), size = size }
 end
 
 ---Defines a Oriented Bounding Box
@@ -952,9 +952,9 @@ end
 ---@param size vector|number?
 ---@return table
 function AutoOBB(center, rot, size)
-    return {
-        pos = center or Vec(),
-        rot = rot or QuatEuler(),
+	return {
+		pos = center or Vec(),
+		rot = rot or QuatEuler(),
 		size = type(size) == 'table' and size or AutoVecOne(size or 1)
 	}
 end
@@ -964,7 +964,7 @@ end
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
 function AutoGetOBBCorners(obb)
 	local corners = {}
-
+	
 	-- Calculate the eight corner points of the OBB based on the center, dimensions, and orientation
 	local hs = VecScale(obb.size, 0.5)
 	corners.xyz = TransformToParentPoint(obb, VecScale(hs, -1))
@@ -975,7 +975,7 @@ function AutoGetOBBCorners(obb)
 	corners.XyZ = TransformToParentPoint(obb, Vec(hs[1], -hs[2], hs[3]))
 	corners.xYZ = TransformToParentPoint(obb, Vec(-hs[1], hs[2], hs[3]))
 	corners.XYZ = TransformToParentPoint(obb, hs)
-
+	
 	return corners
 end
 
@@ -985,40 +985,40 @@ end
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
 function AutoGetOBBFaces(obb)
 	local corners = AutoGetOBBCorners(obb)
-
+	
 	local faces = {}
 	faces.z = AutoPlane(
-		VecLerp(corners.xyZ, corners.XYZ, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
-		{ obb.size[1], obb.size[2] }
-	)
-	faces.zn = AutoPlane(
-		VecLerp(corners.xyz, corners.XYz, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
-		{ obb.size[1], obb.size[2] }
-	)
-	faces.x = AutoPlane(
-		VecLerp(corners.Xyz, corners.XYZ, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
-		{ obb.size[2], obb.size[3] }
-	)
-	faces.xn = AutoPlane(
-		VecLerp(corners.xyz, corners.xYZ, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
-		{ obb.size[2], obb.size[3] }
-	)
-	faces.y = AutoPlane(
-		VecLerp(corners.xYz, corners.XYZ, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
-		{ obb.size[1], obb.size[3] }
-	)
-	faces.yn = AutoPlane(
-		VecLerp(corners.xyz, corners.XyZ, 0.5),
-		QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
-		{ obb.size[1], obb.size[3] }
-	)
+	VecLerp(corners.xyZ, corners.XYZ, 0.5),
+	QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
+	{ obb.size[1], obb.size[2] }
+)
+faces.zn = AutoPlane(
+VecLerp(corners.xyz, corners.XYz, 0.5),
+QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
+{ obb.size[1], obb.size[2] }
+)
+faces.x = AutoPlane(
+VecLerp(corners.Xyz, corners.XYZ, 0.5),
+QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
+{ obb.size[2], obb.size[3] }
+)
+faces.xn = AutoPlane(
+VecLerp(corners.xyz, corners.xYZ, 0.5),
+QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
+{ obb.size[2], obb.size[3] }
+)
+faces.y = AutoPlane(
+VecLerp(corners.xYz, corners.XYZ, 0.5),
+QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
+{ obb.size[1], obb.size[3] }
+)
+faces.yn = AutoPlane(
+VecLerp(corners.xyz, corners.XyZ, 0.5),
+QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
+{ obb.size[1], obb.size[3] }
+)
 
-	return faces, corners
+return faces, corners
 end
 
 ---Returns a table representing the lines connecting the sides of a Oriented Bounding Box
@@ -1026,18 +1026,18 @@ end
 ---@return table<{ [1]:vector, [2]:vector }>
 function AutoOBBLines(obb)
 	local c = AutoGetOBBCorners(obb)
-
+	
 	return {
 		{ c.xyz, c.Xyz },
 		{ c.xYz, c.XYz },
 		{ c.xyZ, c.XyZ },
 		{ c.xYZ, c.XYZ },
-
+		
 		{ c.xyz, c.xYz },
 		{ c.Xyz, c.XYz },
 		{ c.xyZ, c.xYZ },
 		{ c.XyZ, c.XYZ },
-
+		
 		{ c.xyz, c.xyZ },
 		{ c.Xyz, c.XyZ },
 		{ c.xYz, c.xYZ },
@@ -1051,7 +1051,7 @@ function AutoGetShapeOBB(shape)
 	local transform = GetShapeWorldTransform(shape)
 	local x, y, z, scale = GetShapeSize(shape)
 	local size = VecScale(Vec(x, y, z), scale)
-
+	
 	local center = TransformToParentPoint(transform, VecScale(size, 0.5))
 	return AutoOBB(center, transform.rot, size)
 end
@@ -1064,7 +1064,7 @@ end
 ---@param alpha number? Default is 1
 function AutoDrawOBB(obb, red, green, blue, alpha)
 	local lines = AutoOBBLines(obb)
-
+	
 	for k, l in pairs(lines) do
 		DebugLine(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
 	end
@@ -1087,18 +1087,18 @@ end
 ---@return { [1]:vector, [2]:vector, [3]:vector, [4]:vector }
 function AutoGetPlaneCorners(plane)
 	local size = VecScale(plane.size, 0.5)
-
+	
 	local corner1 = Vec(-size[1], -size[2])
 	local corner2 = Vec(size[1], -size[2])
 	local corner3 = Vec(size[1], size[2])
 	local corner4 = Vec(-size[1], size[2])
-
+	
 	-- Rotate corners using the quaternion rotation from the plane object
 	corner1 = TransformToParentPoint(plane, corner1)
 	corner2 = TransformToParentPoint(plane, corner2)
 	corner3 = TransformToParentPoint(plane, corner3)
 	corner4 = TransformToParentPoint(plane, corner4)
-
+	
 	return { corner1, corner2, corner3, corner4 }
 end
 
@@ -1111,15 +1111,15 @@ function AutoRaycastPlane(plane, startPos, direction, oneway)
 	local pos = plane.pos or Vec(0, 0, 0)
 	local rot = plane.rot or Quat()
 	local size = plane.size or Vec(1, 1, 1)
-
+	
 	local halfsize = VecScale(size, 0.5)
 	local corner1 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], -halfsize[2], 0)))
 	local corner2 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], -halfsize[2], 0)))
 	local corner3 = VecAdd(pos, QuatRotateVec(rot, Vec(halfsize[1], halfsize[2], 0)))
 	local corner4 = VecAdd(pos, QuatRotateVec(rot, Vec(-halfsize[1], halfsize[2], 0)))
-
+	
 	local normal = QuatRotateVec(rot, { 0, 0, -1 })
-
+	
 	local rayDirDotNormal = VecDot(direction, normal)
 	if (oneway and rayDirDotNormal or math.abs(rayDirDotNormal)) < 0 then
 		-- Ray is parallel to plane, or wrong way; no intersection
@@ -1128,9 +1128,9 @@ function AutoRaycastPlane(plane, startPos, direction, oneway)
 		local rayToPlane = VecSub(startPos, pos)
 		local t = -VecDot(rayToPlane, normal) / rayDirDotNormal
 		local intersection = VecAdd(startPos, VecScale(direction, t))
-
+		
 		local dist = AutoVecDist(startPos, intersection)
-
+		
 		-- Check if the intersection is inside the plane's bounds
 		local edge1 = VecSub(corner2, corner1)
 		local edge2 = VecSub(corner3, corner2)
@@ -1140,19 +1140,19 @@ function AutoRaycastPlane(plane, startPos, direction, oneway)
 		local vec2 = VecSub(intersection, corner2)
 		local vec3 = VecSub(intersection, corner3)
 		local vec4 = VecSub(intersection, corner4)
-
+		
 		local isInside = true
 		local function checkInsideEdge(vec, edge)
 			if VecDot(edge, vec) < 0 then
 				isInside = false
 			end
 		end
-
+		
 		checkInsideEdge(vec1, edge1)
 		checkInsideEdge(vec2, edge2)
 		checkInsideEdge(vec3, edge3)
 		checkInsideEdge(vec4, edge4)
-
+		
 		return {
 			hit = isInside and t > 0,
 			intersection = intersection,
@@ -1175,25 +1175,25 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 	local pos = plane.pos or Vec(0, 0, 0)
 	local rot = plane.rot or Quat()
 	local size = plane.size or Vec(1, 1, 1)
-
+	
 	-- Calculate the forward, right, and up vectors from the rotation
 	local forward = QuatRotateVec(rot, Vec(0, 0, 1))
 	local right = QuatRotateVec(rot, Vec(1, 0, 0))
 	local up = QuatRotateVec(rot, Vec(0, 1, 0))
-
+	
 	-- Calculate the corners of the plane
 	local corner1 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, -size[2] / 2))
 	local corner2 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, -size[2] / 2))
 	local corner3 = VecAdd(VecAdd(pos, VecScale(right, size[1] / 2)), VecScale(up, size[2] / 2))
 	local corner4 = VecAdd(VecAdd(pos, VecScale(right, -size[1] / 2)), VecScale(up, size[2] / 2))
-
+	
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 	pattern = pattern or 0
-
+	
 	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
 		return
 	end
-
+	
 	-- Draw the grid
 	if pattern == 0 then
 		patternstrength = (patternstrength or 0) + 1
@@ -1202,7 +1202,7 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 			local subH2 = VecLerp(corner4, corner3, i / patternstrength)
 			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
 			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
-
+			
 			DebugLine(subH1, subH2, r, g, b, a)
 			DebugLine(subV1, subV2, r, g, b, a)
 		end
@@ -1212,28 +1212,28 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 		DebugLine(corner3, corner4, r, g, b, a)
 		DebugLine(corner4, corner1, r, g, b, a)
 	end
-
+	
 	if pattern == 1 or pattern == 3 then
 		patternstrength = (patternstrength or 1)
 		local step = 1 / patternstrength
 		for t = step, 2, step * 2 do
 			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
 			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
-
+			
 			DebugLine(p1, p2, r, g, b, a)
 		end
 	end
-
+	
 	if pattern == 2 or pattern == 3 then
 		patternstrength = (patternstrength or 0)
 		local step = 1 / patternstrength
 		for t = step, 2, step * 2 do
 			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
 			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
-
+			
 			DebugLine(p1, p2, r, g, b, a)
 		end
-
+		
 		DebugLine(corner1, corner2, r, g, b, a)
 		DebugLine(corner2, corner3, r, g, b, a)
 		DebugLine(corner3, corner4, r, g, b, a)
@@ -1254,9 +1254,9 @@ end
 function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _layer)
 	_layer = _layer or 1
 	if _layer >= (Layers or 5) + 1 then return end
-
+	
 	conditionalFuction = AutoDefault(conditionalFuction, AutoQueryBoundsForBody)
-
+	
 	local check, querydata = conditionalFuction(BoundsAA, BoundsBB)
 	local node = {
 		aa = BoundsAA,
@@ -1266,14 +1266,14 @@ function AutoProcessOctree(BoundsAA, BoundsBB, Layers, conditionalFuction, _laye
 		layer = _layer,
 		children = {},
 	}
-
+	
 	if check then
 		for _, nb in ipairs(AutoAABBSubdivideBounds(BoundsAA, BoundsBB)) do
 			local aa, bb = unpack(nb)
 			node.children[#node.children + 1] = AutoProcessOctree(aa, bb, Layers, conditionalFuction, _layer + 1)
 		end
 	end
-
+	
 	return node
 end
 
@@ -1296,13 +1296,13 @@ end
 ---@param drawfunction function?
 function AutoDrawOctree(node, layer, drawfunction)
 	if node == nil then return end
-
+	
 	if layer then
 		if node.layer > layer then
 			return
 		end
 	end
-
+	
 	if not drawfunction then
 		if node.check and (not layer or (node.layer == layer)) then
 			local c1, c2, c3 = AutoHSVToRGB(node.layer / 10, 1, 1)
@@ -1311,7 +1311,7 @@ function AutoDrawOctree(node, layer, drawfunction)
 	elseif not layer or (node.layer == layer) then
 		drawfunction(node, layer)
 	end
-
+	
 	for _, child in ipairs(node.children) do
 		AutoDrawOctree(child, layer, drawfunction)
 	end
@@ -1324,14 +1324,14 @@ end
 function AutoSimInstance()
 	local t = {
 		Points = {
-
+			
 		},
 		Settings = {
 			Steps = 1,
 			PointsAffectBodies = true,
 		}
 	}
-
+	
 	---Creates a Point to be Simulated with SimInstance:CreatePoint(), you can add parameters after it is created and change existing ones, such as point.reflectivity, and point.mass
 	---@param Position vector? Default is Vec(0, 0, 0)
 	---@param Velocity vector? Default is Vec(0, 0, 0)
@@ -1342,39 +1342,39 @@ function AutoSimInstance()
 		new_point.pos = AutoDefault(Position, { 0, 0, 0 })
 		new_point.vel = AutoDefault(Velocity, { 0, 0, 0 })
 		new_point.acc = Vec(0, 0, 0)
-
+		
 		new_point.radius = 0
 		new_point.mass = 1
 		new_point.drag = 0.0
 		new_point.reflectivity = 0
 		new_point.gravity = Vec(0, -10, 0)
-
+		
 		new_point.collision = true
 		new_point.simulate = true
 		new_point.presimulate = nil
 		new_point.draw = true
 		new_point.remove = nil
-
+		
 		new_point.color = { 1, 1, 1, 1 }
-
+		
 		local new_index = #self.Points + 1
 		self.Points[new_index] = new_point
-
+		
 		return new_point, new_index
 	end
-
+	
 	---Updates all of the point in the Simulation
 	---@param dt number The timestep that is used. Default is GetTimeStep()
 	function t:Simulate(dt, showsteps)
 		dt = AutoDefault(dt, GetTimeStep()) / self.Settings.Steps
 		showsteps = AutoDefault(showsteps, false)
-
+		
 		for _ = 1, not showsteps and self.Settings.Steps or 1 do
 			-- Update Points
 			for i, p in ipairs(self.Points) do
 				if p.simulate then
 					AutoExecute(p.presimulate, p, i, dt)
-
+					
 					local new_pos = VecAdd(VecAdd(p.pos, VecScale(p.vel, dt)), VecScale(p.acc, dt ^ 2 * 0.5))
 					local new_acc = (function()
 						local grav_acc = VecCopy(p.gravity)
@@ -1383,10 +1383,10 @@ function AutoSimInstance()
 						return VecSub(grav_acc, drag_acc)
 					end)()
 					local new_vel = VecAdd(p.vel, VecScale(VecAdd(p.acc, new_acc), dt * 0.5))
-
+					
 					local collided = false
 					local collisiondata = {}
-
+					
 					if p.collision then
 						local diff = VecSub(new_pos, p.pos)
 						local dir = VecNormalize(diff)
@@ -1394,19 +1394,19 @@ function AutoSimInstance()
 						if hit then
 							local colpoint = VecAdd(new_pos, VecScale(dir, dist))
 							local precol_vel = VecCopy(new_vel)
-
+							
 							local dot = VecDot(new_vel, normal)
 							local incoming = -VecDot(VecNormalize(precol_vel), normal)
-
+							
 							new_pos = VecAdd(VecScale(diff, math.min(dist, VecLength(diff))), p.pos)
-
+							
 							new_vel = VecScale(VecSub(new_vel, VecScale(normal, dot * 2)), p.reflectivity)
 							new_vel = VecAdd(new_vel, VecScale(GetBodyVelocity(GetShapeBody(shape)), 2))
-
+							
 							if self.Settings.PointsAffectBodies then
 								ApplyBodyImpulse(GetShapeBody(shape), colpoint, VecScale(precol_vel, incoming * p.mass))
 							end
-
+							
 							collided = true
 							collisiondata = {
 								location = colpoint,
@@ -1417,32 +1417,32 @@ function AutoSimInstance()
 							}
 						end
 					end
-
+					
 					p.pos = new_pos
 					p.vel = new_vel
 					p.acc = new_acc
-
+					
 					if collided then AutoExecute(p.collision, p, i, collisiondata) end
 					AutoExecute(p.simulate, p, i, dt)
 				end
 			end
 		end
 	end
-
+	
 	---Removes a point from the Simulation by it's index, Calls point.remove if it is a function or table of functions
 	---@param index table The Index of the Point that should be removed
 	function t:Remove(index)
 		AutoExecute(self.Points[index].remove, self.Points[index])
-
+		
 		-- Cleanup
 		for i, v in pairs(self.Points[index]) do
 			v = nil
 			self.Points[index][i] = nil
 		end
-
+		
 		table.remove(self.Points, index)
 	end
-
+	
 	---Iterate through every Point
 	---@param func function The Function that is called, called with the input parameter of (Point, Index)
 	function t:Do(func)
@@ -1450,7 +1450,7 @@ function AutoSimInstance()
 			AutoExecute(func, p, i)
 		end
 	end
-
+	
 	---Draw every point in which point.draw is not false (by default, point.draw is true), calling p.draw at the end if it is a function
 	---@param Image string|false? A image that is drawn in the position of the points, Default is 'ui/common/dot.png', if set to false, then draws a Transform at the position instead
 	---@param SizeMultiplier number? a multipler for the size of the drawn image, Default is 3.5
@@ -1459,16 +1459,16 @@ function AutoSimInstance()
 		Image = AutoDefault(Image, 'ui/common/dot.png')
 		SizeMultiplier = AutoDefault(SizeMultiplier, 3.5)
 		Occlude = AutoDefault(Occlude, true)
-
+		
 		local inview = true
-
+		
 		for i, p in ipairs(self.Points) do
 			if p.draw then
 				local inview, angle, dist = AutoPointInView(p.pos, nil, nil, Occlude)
 				if inview then
 					local x, y = UiWorldToPixel(p.pos)
 					local size = 1 / dist * SizeMultiplier
-
+					
 					if not Image then
 						AutoDrawTransform(Transform(p.pos, p.rot and p.rot or QuatEuler(0, 0, 0)), size / 10)
 					else
@@ -1476,18 +1476,18 @@ function AutoSimInstance()
 						if p.color then UiColor(p.color[1], p.color[2], p.color[3], p.color[4]) end
 						UiAlign('center middle')
 						UiTranslate(x, y)
-
+						
 						UiScale(size)
 						UiImage(Image)
 						UiPop()
 					end
 				end
-
+				
 				AutoExecute(p.draw, p, i, inview)
 			end
 		end
 	end
-
+	
 	return t
 end
 
@@ -1516,7 +1516,7 @@ function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 			raw_k and response or (response * dampening / (2 * math.pi * frequency)),
 		}
 	}
-
+	
 	if sosdata.type ~= 'single' then
 		for k, v in pairs(initial) do
 			sosdata.data[k] = {
@@ -1533,7 +1533,7 @@ function AutoSM_Define(initial, frequency, dampening, response, raw_k)
 		}
 	end
 	
-
+	
 	return sosdata
 end
 
@@ -1545,7 +1545,7 @@ end
 ---@param raw_k boolean?
 ---@return Secondary_Motion_Data
 function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
-    local sosdata = {
+	local sosdata = {
 		type = 'quaternion',
 		data = {
 			current = QuatCopy(initial),
@@ -1558,7 +1558,7 @@ function AutoSM_DefineQuat(initial, frequency, dampening, response, raw_k)
 			raw_k and response or (dampening * response / (2 * math.pi * frequency)),
 		}
 	}
-
+	
 	return sosdata
 end
 
@@ -1568,28 +1568,28 @@ end
 ---@param target number|table<number>
 ---@param timestep number?
 function AutoSM_Update(sm, target, timestep)
-    timestep = timestep or GetTimeStep()
-
-    if sm.type ~= 'quaternion' then
-        local function update(v, t)
-            local xd = (t - v.previous) / timestep
-            v.previous = t
-
-            local k2_stable = math.max(sm.k_values[2], timestep ^ 2 / 2 + timestep * sm.k_values[1] / 2,
-            timestep * sm.k_values[1])
-            v.current = v.current + timestep * v.velocity
-            v.velocity = v.velocity +
-            timestep * (t + sm.k_values[3] * xd - v.current - sm.k_values[1] * v.velocity) / k2_stable
-        end
-
-        if sm.type == 'single' then
-            update(sm.data, target)
-        else
-            for k, v in pairs(sm.data) do
-                update(v, target[k])
-            end
-        end
-    else
+	timestep = timestep or GetTimeStep()
+	
+	if sm.type ~= 'quaternion' then
+		local function update(v, t)
+			local xd = (t - v.previous) / timestep
+			v.previous = t
+			
+			local k2_stable = math.max(sm.k_values[2], timestep ^ 2 / 2 + timestep * sm.k_values[1] / 2,
+			timestep * sm.k_values[1])
+			v.current = v.current + timestep * v.velocity
+			v.velocity = v.velocity +
+			timestep * (t + sm.k_values[3] * xd - v.current - sm.k_values[1] * v.velocity) / k2_stable
+		end
+		
+		if sm.type == 'single' then
+			update(sm.data, target)
+		else
+			for k, v in pairs(sm.data) do
+				update(v, target[k])
+			end
+		end
+	else
 		-- Compute the quaternion that will rotate the last quaternion to the desired quaternion
 		-- Convert it to an axis-angle rotation vector
 		local q = QuatRotateQuat(AutoQuatConjugate(sm.data.previous), AutoQuatNearest(target, sm.data.previous))
@@ -1597,19 +1597,19 @@ function AutoSM_Update(sm, target, timestep)
 		dx = VecScale(dx, 1 / timestep)
 		
 		sm.data.previous = QuatCopy(target)
-
+		
 		-- Convert our angular velocity to a quaternion
 		local qVel = AutoQuatFromAxisAngle(VecScale(sm.data.velocity, timestep))
 		sm.data.current = QuatRotateQuat(sm.data.current, qVel) -- Rotate
-
+		
 		-- desired - sos.data.current, in quaternion form
 		local q2 = QuatRotateQuat(AutoQuatConjugate(sm.data.current), AutoQuatNearest(target, sm.data.current))
 		local s = AutoQuatToAxisAngle(q2)
 		local k2_stable = math.max(sm.k_values[2], timestep * timestep / 2 + timestep * sm.k_values[1] / 2, timestep * sm.k_values[1])
-
+		
 		--- "wtf" - Autumn
 		sm.data.velocity = VecAdd(sm.data.velocity, VecScale(VecScale(VecAdd(s, VecSub(VecScale(dx, sm.k_values[3]), VecScale(sm.data.velocity, sm.k_values[1]))), timestep), 1 / k2_stable))
-    end
+	end
 end
 
 ---Returns the current value of a Second Order System
@@ -1623,7 +1623,7 @@ function AutoSM_Get(sm)
 		for k, v in pairs(sm.data) do
 			values[k] = v.current
 		end
-
+		
 		return values
 	end
 end
@@ -1718,7 +1718,7 @@ function AutoTableCount(t)
 	for i in pairs(t) do
 		c = c + 1
 	end
-
+	
 	return c
 end
 
@@ -1873,7 +1873,7 @@ end
 ---@vararg any
 function AutoExecute(f, ...)
 	if not f then return end
-
+	
 	if type(f) == "function" then
 		f(unpack(arg))
 	elseif type(f) == "table" then
@@ -1922,9 +1922,9 @@ function AutoTransformLerp(a, b, t, t2)
 		t2 = t
 	end
 	return Transform(
-		VecLerp(a.pos, b.pos, t),
-		QuatSlerp(a.rot, b.rot, t2)
-	)
+	VecLerp(a.pos, b.pos, t),
+	QuatSlerp(a.rot, b.rot, t2)
+)
 end
 
 ---Equivalent to `QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))`
@@ -2005,15 +2005,15 @@ end
 ---@return number, number, number Returns the red, green, blue of the given hue, saturation, value
 function AutoHSVToRGB(hue, sat, val)
 	local r, g, b
-
+	
 	local i = math.floor(hue * 6);
 	local f = hue * 6 - i;
 	local p = val * (1 - sat);
 	local q = val * (1 - f * sat);
 	local t = val * (1 - (1 - f) * sat);
-
+	
 	i = i % 6
-
+	
 	if i == 0 then r, g, b = val, t, p
 	elseif i == 1 then r, g, b = q, val, p
 	elseif i == 2 then r, g, b = p, val, t
@@ -2021,7 +2021,7 @@ function AutoHSVToRGB(hue, sat, val)
 	elseif i == 4 then r, g, b = t, p, val
 	elseif i == 5 then r, g, b = val, p, q
 	end
-
+	
 	return r, g, b
 end
 
@@ -2035,10 +2035,10 @@ function AutoRGBToHSV(r, g, b)
 	local max, min = math.max(r, g, b), math.min(r, g, b)
 	local h, s, v
 	v = max
-
+	
 	local d = max - min
 	if max == 0 then s = 0 else s = d / max end
-
+	
 	if max == min then
 		h = 0 -- achromatic
 	else
@@ -2050,7 +2050,7 @@ function AutoRGBToHSV(r, g, b)
 		end
 		h = h / 6
 	end
-
+	
 	return h, s, v
 end
 
@@ -2061,16 +2061,40 @@ function AutoHEXtoRGB(hex)
 	local function f(x, p)
 		x = x:gsub("#", "")
 		local r, g, b = tonumber("0x" .. x:sub(1, 2)) / 255, tonumber("0x" .. x:sub(3, 4)) / 255,
-			tonumber("0x" .. x:sub(5, 6)) / 255
+		tonumber("0x" .. x:sub(5, 6)) / 255
 		if p then return { r, g, b } else return r, g, b end
 	end
-
+	
 	if type(hex) == 'string' then return f(hex) else
 		local t = {}
 		for key, val in pairs(hex) do
 			t[key] = f(val, true)
 		end
 		return t
+	end
+end
+
+---Converts an RGB color code or a table of RGB color codes to hexadecimal color space
+---@param r number|table<number> Red component (0-1) or table of RGB color codes
+---@param g number Green component (0-1) (optional)
+---@param b number Blue component (0-1) (optional)
+---@return string|table<string> Hexadecimal color code or table of hex codes
+function AutoRGBtoHEX(r, g, b)
+	local function f(x)
+		local hx = string.format("%02X", math.floor(x * 255))
+		return hx
+	end
+	
+	if type(r) == 'table' then
+		local t = {}
+		for key, val in pairs(r) do
+			local hex = "#" .. f(val[1]) .. f(val[2]) .. f(val[3])
+			t[key] = hex
+		end
+		return t
+	else
+		local hex = "#" .. f(r) .. f(g) .. f(b)
+		return hex
 	end
 end
 
@@ -2106,14 +2130,14 @@ end
 ---@return boolean
 function AutoPrimaryMenuButton(title)
 	local value = PauseMenuButton(title, true)
-
+	
 	for _, item in pairs(ListKeys('game.pausemenu.items')) do
 		if GetString(AutoKey('game.pausemenu.items', item)) == title then
 			SetInt('game.pausemenu.primary', item)
 			break
 		end
 	end
-
+	
 	return value
 end
 
@@ -2126,22 +2150,22 @@ function AutoDeleteHandles(t, CheckIfValid)
 	for k, v in pairs(t) do
 		local valid = IsHandleValid(v)
 		list[#list+1] = { handle = v, type = GetEntityType(v), valid = valid }
-
+		
 		if not CheckIfValid or (valid and v ~= GetWorldBody()) then
 			Delete(v)
 		end
 	end
-
+	
 	return list
 end
 
 function AutoTags(handle)
-    local T = {}
-    for _, t in pairs(ListTags(handle)) do
-        T[t] = GetTagValue(handle, t)
-    end
-
-    return T
+	local T = {}
+	for _, t in pairs(ListTags(handle)) do
+		T[t] = GetTagValue(handle, t)
+	end
+	
+	return T
 end
 
 
@@ -2182,7 +2206,7 @@ function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	data.dot = VecDot(direction, data.normal)
 	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
 	data.body = GetShapeBody(data.shape)
-
+	
 	return data
 end
 
@@ -2209,7 +2233,7 @@ end
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
 	local trans = usePlayerCamera and GetPlayerCameraTransform() or GetCameraTransform()
 	local fwd = AutoTransformFwd(trans)
-
+	
 	return AutoRaycast(trans.pos, fwd, maxDist, radius, rejectTransparent), trans, fwd
 end
 
@@ -2218,24 +2242,24 @@ end
 ---@param maxDist number
 ---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, body:body_handle, dist:number, dir:vector, dot:number, reflection:vector }
 function AutoQueryClosest(origin, maxDist)
-    local data = {}
-    data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
-
-    if data.hit then
-        local diff = VecSub(data.point, origin)
-        local dir = VecNormalize(diff)
-        local dot = VecDot(dir, data.normal)
-
-        data.dist = VecLength(diff)
-        data.dir = dir
-        data.dot = dot
-        data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+	local data = {}
+	data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
+	
+	if data.hit then
+		local diff = VecSub(data.point, origin)
+		local dir = VecNormalize(diff)
+		local dot = VecDot(dir, data.normal)
+		
+		data.dist = VecLength(diff)
+		data.dir = dir
+		data.dot = dot
+		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
 		data.body = GetShapeBody(data.shape)
-    else
-        data.dist = maxDist
-    end
-
-    return data
+	else
+		data.dist = maxDist
+	end
+	
+	return data
 end
 
 ---A Wrapper for GetBodyClosestPoint; comes with some extra features.
@@ -2245,19 +2269,19 @@ end
 function AutoQueryClosestBody(body, origin)
 	local data = {}
 	data.hit, data.point, data.normal, data.shape = GetBodyClosestPoint(body, origin)
-
+	
 	if data.hit then
 		local diff = VecSub(data.point, origin)
 		local dir = VecNormalize(diff)
 		local dot = VecDot(dir, data.normal)
-
+		
 		data.dist = VecLength(diff)
 		data.dir = dir
 		data.dot = dot
-        data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
 		data.body = GetShapeBody(data.shape)
 	end
-
+	
 	return data
 end
 
@@ -2268,18 +2292,18 @@ end
 function AutoQueryClosestShape(shape, origin)
 	local data = {}
 	data.hit, data.point, data.normal = GetShapeClosestPoint(shape, origin)
-
+	
 	if data.hit then
 		local diff = VecSub(data.point, origin)
 		local dir = VecNormalize(diff)
 		local dot = VecDot(dir, data.normal)
-
+		
 		data.dist = VecLength(diff)
 		data.dir = dir
 		data.dot = dot
 		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
 	end
-
+	
 	return data
 end
 
@@ -2300,8 +2324,8 @@ end
 ---@return vector scaled
 ---@return vector orginal
 function AutoScaleBodyVelocity(body, scale)
-    local orginal = GetBodyVelocity(body)
-    local scaled = VecScale(orginal, scale)
+	local orginal = GetBodyVelocity(body)
+	local scaled = VecScale(orginal, scale)
 	SetBodyVelocity(body, scaled)
 	return scaled, orginal
 end
@@ -2324,10 +2348,10 @@ end
 ---@return number
 function AutoPointToAngle(point, fromtrans)
 	fromtrans = AutoDefault(fromtrans, GetCameraTransform())
-
+	
 	local fromtopointdir = VecNormalize(VecSub(point, fromtrans.pos))
 	local fromdir = AutoTransformFwd(fromtrans)
-
+	
 	local dot = VecDot(fromtopointdir, fromdir)
 	return math.deg(math.acos(dot))
 end
@@ -2345,20 +2369,20 @@ function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
 	raycastcheck = AutoDefault(raycastcheck, true)
 	raycasterror = AutoDefault(raycasterror, 0)
-
+	
 	local useangle = not (angle < 0)
-
+	
 	local fromtopointdir = VecNormalize(VecSub(point, oftrans.pos))
 	local fromdir = AutoTransformFwd(oftrans)
-
+	
 	local dist = AutoVecDist(oftrans.pos, point)
-
+	
 	local dot = VecDot(fromtopointdir, fromdir)
 	local dotangle = math.deg(math.acos(dot))
 	local seen = dotangle < angle / 2
-
+	
 	seen = (not useangle) and (true) or (seen)
-
+	
 	if seen then
 		if raycastcheck then
 			local hit, hitdist = QueryRaycast(oftrans.pos, fromtopointdir, dist, 0, true)
@@ -2374,7 +2398,7 @@ function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 			end
 		end
 	end
-
+	
 	return seen, dotangle, dist
 end
 
@@ -2384,7 +2408,7 @@ end
 ---@param length number?
 ---@return vector
 function AutoPlayerInputDir(length)
-    return VecScale({
+	return VecScale({
 		-InputValue('left') + InputValue('right'),
 		0,
 		-InputValue('down') + InputValue('up'),
@@ -2397,7 +2421,7 @@ end
 ---@return vector "Last Point"
 function AutoRetrievePath(precision)
 	precision = AutoDefault(precision, 0.2)
-
+	
 	local path = {}
 	local length = GetPathLength()
 	local l = 0
@@ -2405,7 +2429,7 @@ function AutoRetrievePath(precision)
 		path[#path + 1] = GetPathPoint(l)
 		l = l + precision
 	end
-
+	
 	return path, path[#path]
 end
 
@@ -2437,7 +2461,7 @@ function AutoRejectShapesWithoutTag(tag)
 	for _, v in pairs(FindShapes(tag, true)) do
 		keep[v] = v
 	end
-
+	
 	for _, v in pairs(all) do
 		if keep[v] == nil then QueryRejectShape(v) end
 	end
@@ -2486,7 +2510,7 @@ function AutoPredictPosition(body, time, raycast, funcbefore)
 	}
 	local log = { VecCopy(point.pos) }
 	local normal = Vec(0, 1, 0)
-
+	
 	for steps = 0, time, GetTimeStep() do
 		if type(funcbefore) == "function" then
 			funcbefore(point)
@@ -2495,11 +2519,11 @@ function AutoPredictPosition(body, time, raycast, funcbefore)
 				func(point)
 			end
 		end
-
+		
 		point.vel = VecAdd(point.vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
 		point.pos = VecAdd(point.pos, VecScale(point.vel, GetTimeStep()))
 		log[#log + 1] = AutoTableDeepCopy(point.pos)
-
+		
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
@@ -2507,7 +2531,7 @@ function AutoPredictPosition(body, time, raycast, funcbefore)
 			if hit then normal = norm break end
 		end
 	end
-
+	
 	return log, point.vel, normal
 end
 
@@ -2524,21 +2548,21 @@ function AutoPredictPlayerPosition(time, raycast)
 	local vel = GetPlayerVelocity()
 	local log = { VecCopy(pos) }
 	local normal = Vec(0, 1, 0)
-
+	
 	for steps = 0, time, GetTimeStep() do
 		vel = VecAdd(vel, VecScale(Vec(0, -10, 0), GetTimeStep()))
 		log[#log + 1] = VecAdd(log[#log], VecScale(vel, GetTimeStep()))
-
+		
 		if raycast then
 			local last = log[#log - 1]
 			local cur = log[#log]
 			local hit, dist, norm = QueryRaycast(last, QuatLookAt(last, cur), VecLength(VecSub(cur, last)))
 			normal = norm
-
+			
 			if hit then break end
 		end
 	end
-
+	
 	return log, vel, normal
 end
 
@@ -2616,12 +2640,12 @@ function AutoGetEnvironment()
 		"wetness",
 		"wind",
 	}
-
+	
 	local assembled = {}
 	for _, k in ipairs(params) do
 		assembled[k] = { GetEnvironmentProperty(k) }
 	end
-
+	
 	return assembled
 end
 
@@ -2651,7 +2675,7 @@ function AutoFlatBackground(r, g, b, a, sprite, distance)
 	b = AutoDefault(b, 0)
 	a = AutoDefault(a, 1)
 	sprite = AutoDefault(sprite, AutoFlatSprite)
-
+	
 	local cam = GetCameraTransform()
 	local distance = distance or 256
 	local overextention = 2
@@ -2665,9 +2689,9 @@ function AutoFlatBackground(r, g, b, a, sprite, distance)
 	}
 	for i, v in ipairs(transforms) do
 		DrawSprite(sprite, v, distance * 2 + overextention, distance * 2 + overextention,
-			r, g, b, a, true, false
-		)
-	end
+		r, g, b, a, true, false
+	)
+end
 end
 
 ---Returns and environemnt that eliminates as much lighting as possible, making colors look flat.
@@ -2731,12 +2755,12 @@ function AutoGetPostProcessing()
 		'gamma',
 		'bloom',
 	}
-
+	
 	local assembled = {}
 	for _, k in ipairs(params) do
 		assembled[k] = { GetPostProcessingProperty(k) }
 	end
-
+	
 	return assembled
 end
 
@@ -2798,10 +2822,10 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_k
 	singleline_at = singleline_at or 1
 	indent_str = indent_str or '  '
 	indents = indents or 0
-    visited_tables = visited_tables or {}
+	visited_tables = visited_tables or {}
 	
 	local str = ""
-
+	
 	if type(t) ~= "table" then
 		if type(t) == "string" then
 			return string.format("%q", t)
@@ -2822,19 +2846,19 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_k
 	local passedSLthreshold = singleline_at <= 0
 	str = passedSLthreshold and "{ " or "{\n"
 	if passedSLthreshold then indents = indents + 1 end
-
+	
 	for k, v in pairs(t) do
 		if not passedSLthreshold then
 			str = str .. indent_str:rep(indents+1)
 		end
-
+		
 		local not_a_number = type(k) ~= "number"
 		local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
 		local prefix = k_str and ((lua_compatible and not_a_number) and string.format("%q", tostring(k)) or k_str) .. " = " or ''
-
+		
 		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, indents + 1, visited_tables)
 		str = str .. prefix .. v_str .. ", "
-
+		
 		if not passedSLthreshold then
 			str = str .. "\n"
 		end
@@ -2909,22 +2933,22 @@ function AutoDrawTransform(transform, size, alpha, draw)
 		-- DebugPrint('AutoDrawTransform given input not a transform')
 		transform = Transform(transform)
 	end
-
+	
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
 	alpha = AutoDefault(alpha, 1)
 	draw = AutoDefault(draw, false)
-
+	
 	local right = TransformToParentPoint(transform, Vec(size, 0, 0))
 	local up = TransformToParentPoint(transform, Vec(0, size, 0))
 	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
-
+	
 	local lines = {
 		{ transform['pos'], right, 1, 0, 0, alpha },
 		{ transform['pos'], up, 0, 1, 0, alpha },
 		{ transform['pos'], forward, 0, 0, 1, alpha },
 	}
-
+	
 	for i, v in ipairs(lines) do
 		if draw then
 			DrawLine(unpack(v))
@@ -2932,7 +2956,7 @@ function AutoDrawTransform(transform, size, alpha, draw)
 			DebugLine(unpack(v))
 		end
 	end
-
+	
 	return transform
 end
 
@@ -2963,32 +2987,32 @@ function AutoDrawCone(transform, sides, angle, size, color, draw)
 	if not transform['pos'] then
 		DebugPrint('AutoDrawCone given input not a transform')
 	end
-
+	
 	transform.rot = AutoDefault(transform.rot, QuatEuler(0, 0, 0))
 	size = AutoDefault(size, 0.5)
 	color = AutoDefault(color, { 1, 1, 1, 1 })
 	draw = AutoDefault(draw, false)
 	sides = AutoDefault(sides, 12)
 	angle = AutoDefault(angle, 25)
-
+	
 	local forward = TransformToParentPoint(transform, Vec(0, 0, size))
-
+	
 	local lines = {}
 	local endpoints = {}
 	for i = 1, sides do
 		local rotated = TransformCopy(transform)
 		local rr = i / sides * 360
 		rotated.rot = QuatRotateQuat(rotated.rot, QuatEuler(angle, 0, rr))
-
+		
 		local endpoint = TransformToParentPoint(rotated, Vec(0, 0, -size))
 		lines[#lines + 1] = { transform['pos'], endpoint }
 		endpoints[#endpoints + 1] = endpoint
 	end
-
+	
 	for i = 1, #endpoints do
 		lines[#lines + 1] = { endpoints[i], endpoints[AutoWrap(i + 1, 1, #endpoints)] }
 	end
-
+	
 	for i, v in ipairs(lines) do
 		if draw then
 			DrawLine(v[1], v[2], unpack(color))
@@ -2996,7 +3020,7 @@ function AutoDrawCone(transform, sides, angle, size, color, draw)
 			DebugLine(v[1], v[2], unpack(color))
 		end
 	end
-
+	
 	return transform
 end
 
@@ -3015,10 +3039,10 @@ function AutoGraphContinuous(id, value, range)
 		range = AutoDefault(range, 64),
 		values = {}
 	})
-
+	
 	Graph.scan = AutoWrap(Graph.scan + 1, 1, range)
 	Graph.values[Graph.scan] = value
-
+	
 	AutoGraphs[id] = Graph
 end
 
@@ -3032,20 +3056,20 @@ function AutoGraphFunction(id, rangemin, rangemax, func, steps)
 	rangemin = AutoDefault(rangemin, 0)
 	rangemax = AutoDefault(rangemax, 1)
 	steps = AutoDefault(steps, 100)
-
+	
 	func = AutoDefault(func, function(x)
 		return AutoSigmoid(x, 1, -10, 0.5)
 	end)
-
+	
 	local Graph = {
 		values = {}
 	}
-
+	
 	for i = 1, steps do
 		local v = func(AutoMap(i / steps, 0, 1, rangemin, rangemax))
 		Graph.values[i] = v
 	end
-
+	
 	AutoGraphs[id] = Graph
 end
 
@@ -3059,54 +3083,54 @@ end
 function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	local Graph = AutoGraphs[id]
 	if Graph == nil then error("Graph Doesn't exist, nil") end
-
+	
 	sizex = AutoDefault(sizex, 128)
 	sizey = AutoDefault(sizey, 64)
-
+	
 	UiPush()
 	UiWindow(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, true)
-
+	
 	local minval = 0
 	local maxval = 0
 	for _, v in ipairs(Graph.values) do
 		if v < minval then minval = v end
 		if v > maxval then maxval = v end
 	end
-
+	
 	minval = AutoDefault(rangemin, minval)
 	maxval = AutoDefault(rangemax, maxval)
-
+	
 	for i = 1, #Graph.values - 1 do
 		if Graph.values[i] == AutoClamp(Graph.values[i], minval, maxval) then
 			local a = Vec(
-				AutoMap(i, 1, #Graph.values, 0, sizex),
-				AutoMap(Graph.values[i], minval, maxval, sizey, 0),
-				0
-			)
-			local b = Vec(
-				AutoMap(i + 1, 1, #Graph.values, 0, sizex),
-				AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
-				0
-			)
-
-			local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
-			local distance = AutoVecDist(a, b)
-			local width = AutoDefault(linewidth, 2)
-
-			UiPush()
-			UiTranslate(a[1] - width / 2, a[2] - width / 2)
-			UiRotate(angle)
-
-			UiColor(unpack(AutoPrimaryColor))
-			UiAlign('left top')
-			UiRect(width, distance + 1)
-			UiPop()
-		end
-	end
+			AutoMap(i, 1, #Graph.values, 0, sizex),
+			AutoMap(Graph.values[i], minval, maxval, sizey, 0),
+			0
+		)
+		local b = Vec(
+		AutoMap(i + 1, 1, #Graph.values, 0, sizex),
+		AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
+		0
+	)
+	
+	local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
+	local distance = AutoVecDist(a, b)
+	local width = AutoDefault(linewidth, 2)
+	
+	UiPush()
+	UiTranslate(a[1] - width / 2, a[2] - width / 2)
+	UiRotate(angle)
+	
+	UiColor(unpack(AutoPrimaryColor))
+	UiAlign('left top')
+	UiRect(width, distance + 1)
 	UiPop()
+end
+end
+UiPop()
 
-	local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-	AutoHandleSpread(AutoGetSpread(), data, 'draw')
+local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
+AutoHandleSpread(AutoGetSpread(), data, 'draw')
 end
 
 --#endregion
@@ -3208,29 +3232,29 @@ local RegistryTableMeta = {
 		if not HasKey(path) then
 			return nil
 		end
-
+		
 		local type = GetString(AutoKey(path, '__type'))
-
+		
 		if type == 'table' then
 			return AutoRegistryBindedTable(path)
 		else
 			local str = GetString(path)
-
+			
 			if type == 'number' then
 				return tonumber(str)
 			end
-
+			
 			return str
 		end
 	end,
 	__newindex = function(self, key, value)
 		key = key:lower()
 		local path = AutoKey(rawget(self, '__path'), key)
-
+		
 		local function dive(p, v)
 			if type(v) ~= "table" then
 				SetString(p, v)
-
+				
 				if type(v) ~= "nil" then
 					SetString(AutoKey(p, '__type'), type(v))
 				end
@@ -3241,19 +3265,19 @@ local RegistryTableMeta = {
 				end
 			end
 		end
-
+		
 		dive(path, value)
 	end,
 	__call = function(self)
 		local path = rawget(self, '__path')
-
+		
 		local function dive(p)
 			local keys = ListKeys(p)
 			local full = {}
-
+			
 			for i = 1, #keys do
 				local child = AutoKey(p, keys[i])
-
+				
 				if keys[i] ~= '__type' then
 					local t = GetString(AutoKey(child, '__type'))
 					if t == 'table' then
@@ -3265,10 +3289,10 @@ local RegistryTableMeta = {
 					end
 				end
 			end
-
+			
 			return full
 		end
-
+		
 		return dive(path)
 	end
 }
@@ -3280,7 +3304,7 @@ function AutoRegistryBindedTable(path)
 	local t = {}
 	t.__path = path
 	setmetatable(t, RegistryTableMeta)
-
+	
 	return t
 end
 
@@ -3298,8 +3322,8 @@ end
 ---@return number
 ---@return number
 function AutoUiBounds(subtract)
-    subtract = subtract or 0
-    return UiWidth() - subtract, UiHeight() - subtract
+	subtract = subtract or 0
+	return UiWidth() - subtract, UiHeight() - subtract
 end
 
 ---Draws a line between two points in screen space
@@ -3312,11 +3336,11 @@ function AutoUiLine(p1, p2, width)
 	width = AutoDefault(width, 2)
 	local angle = math.atan2(p2[1] - p1[1], p2[2] - p1[2]) * 180 / math.pi
 	local distance = AutoVecDistNoZ(p1, p2)
-
+	
 	UiPush()
 	UiTranslate(p1[1] - width / 2, p1[2] - width / 2)
 	UiRotate(angle)
-
+	
 	UiAlign('center top')
 	UiRect(width, distance + 1)
 	UiPop()
@@ -3335,9 +3359,9 @@ function AutoUiCircle(radius, width, steps)
 	for i = 1, steps do
 		local t1 = (i - 1) / steps * math.pi * 2
 		local t2 = i / steps * math.pi * 2
-
+		
 		UiPush()
-
+		
 		UiTranslate(width/2, width/2)
 		AutoUiLine({
 			math.cos(t1) * radius,
@@ -3346,7 +3370,7 @@ function AutoUiCircle(radius, width, steps)
 			math.cos(t2) * radius,
 			math.sin(t2) * radius
 		}, width)
-
+		
 		UiPop()
 	end
 end
@@ -3361,12 +3385,12 @@ end
 function AutoUIArrow(p1, p2, line_width, radius)
 	local dir = VecNormalize(VecSub(p2, p1))
 	local angle = math.atan2(unpack(AutoSwizzle(dir, 'yx')))
-
+	
 	local dist = AutoVecDistNoZ(p1, p2)
 	local arrow_scale = AutoSigmoid(dist, radius * 3, -0.3, 15)
-
+	
 	UiPush()
-
+	
 	if radius > 0 then
 		UiPush()
 		UiTranslate(unpack(p1))
@@ -3376,7 +3400,7 @@ function AutoUIArrow(p1, p2, line_width, radius)
 	
 	if dist > radius + line_width then
 		AutoUiLine(AutoVecMove(p1, dir, radius), p2, line_width)
-
+		
 		if arrow_scale >= 0.1 then
 			AutoUiLine(p2, {
 				p2[1] + math.cos(angle + math.rad(135)) * arrow_scale,
@@ -3388,7 +3412,7 @@ function AutoUIArrow(p1, p2, line_width, radius)
 			}, line_width)
 		end
 	end
-
+	
 	UiPop()
 end
 
@@ -3402,7 +3426,7 @@ end
 function AutoUIArrowInWorld(p1, p2, line_width, radius)
 	local s_p1 = { UiWorldToPixel(p1) }
 	local s_p2 = { UiWorldToPixel(p2) }
-
+	
 	if s_p1[3] > 0 or s_p2[3] > 0 then
 		AutoUIArrow(s_p1, s_p2, line_width, s_p1[3] > 0 and radius or 0)
 	end
@@ -3888,7 +3912,7 @@ function AutoParse(lua_string)
 			return true, result
 		end
 	end
-
+	
 	return false
 end
 
@@ -3898,7 +3922,7 @@ end
 function AutoCMD_Pipe(path, luastr)
 	local keys = ListKeys(path)
 	local newkey = AutoKey(path, #keys + 1)
-
+	
 	SetString(newkey, luastr)
 end
 
@@ -3913,17 +3937,17 @@ function AutoCMD_Parse(path)
 		local key = AutoKey(path, index)
 		local cmd = GetString(key)
 		local success, func = pcall(loadstring, cmd)
-
+		
 		if success and func then -- if it fails, then the cmd is discarded and we do not try to fix it
 			results[#results + 1] = {
 				cmd = cmd,
 				result = func()
 			}
 		end
-
+		
 		ClearKey(key)
 	end
-
+	
 	return results
 end
 

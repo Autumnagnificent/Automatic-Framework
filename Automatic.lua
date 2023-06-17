@@ -1,4 +1,4 @@
--- VERSION 3.06
+-- VERSION 3.08
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -361,7 +361,23 @@ function AutoVecDist(a, b)
 	return VecLength(VecSub(b, a))
 end
 
----Return the Distance between Two Vectors
+---Return the Distance between Two Vectors, without considering the X component
+---@param a vector
+---@param b vector
+---@return number
+function AutoVecDistNoX(a, b)
+	return math.sqrt((b[2] - a[2])^2 + (b[3] - a[3])^2)
+end
+
+---Return the Distance between Two Vectors, without considering the Y component
+---@param a vector
+---@param b vector
+---@return number
+function AutoVecDistNoY(a, b)
+	return math.sqrt((b[1] - a[1])^2 + (b[3] - a[3])^2)
+end
+
+---Return the Distance between Two Vectors, without considering the Z component
 ---@param a vector
 ---@param b vector
 ---@return number
@@ -708,24 +724,25 @@ function AutoShapeCenter(shape)
 	return VecScale(VecAdd(aa, bb), 0.5)
 end
 
----Expands bounds to include a Point
----
----No return value
+---Expands a given boudns to include a point
 ---@param aa vector
 ---@param bb vector
----@param p vector
-function AutoAABBIncludePoint(aa, bb, p)
-	aa = {
-		math.min(aa[1], p[1]),
-		math.min(aa[2], p[2]),
-		math.min(aa[3], p[3]),
-	}
-	bb = {
-		math.max(bb[1], p[1]),
-		math.max(bb[2], p[2]),
-		math.max(bb[3], p[3]),
-	}
-
+---@param ... vector Points, can be one or multiple
+---@return vector
+---@return vector
+function AutoAABBInclude(aa, bb, ...)
+	for _, point in ipairs(arg) do
+		aa, bb = {
+			math.min(aa[1], point[1]),
+			math.min(aa[2], point[2]),
+			math.min(aa[3], point[3]),
+		}, {
+			math.max(bb[1], point[1]),
+			math.max(bb[2], point[2]),
+			math.max(bb[3], point[3]),
+		}
+	end
+	
 	return aa, bb
 end
 
@@ -2175,7 +2192,7 @@ end
 ---@param manualDistance number?
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dot:number, reflection:vector }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
 	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
@@ -2186,7 +2203,7 @@ end
 ---@param maxDist number
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, dot:number, reflection:vector }
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dot:number, reflection:vector }
 ---@return transform cameraTransform
 ---@return vector cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
@@ -2199,7 +2216,7 @@ end
 ---A Wrapper for QueryClosestPoint; comes with some extra features.
 ---@param origin vector
 ---@param maxDist number
----@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, dist:number, dir:vector, dot:number, reflection:vector }
+---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, body:body_handle, dist:number, dir:vector, dot:number, reflection:vector }
 function AutoQueryClosest(origin, maxDist)
     local data = {}
     data.hit, data.point, data.normal, data.shape = QueryClosestPoint(origin, maxDist)
@@ -2213,6 +2230,7 @@ function AutoQueryClosest(origin, maxDist)
         data.dir = dir
         data.dot = dot
         data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+		data.body = GetShapeBody(data.shape)
     else
         data.dist = maxDist
     end
@@ -2223,7 +2241,7 @@ end
 ---A Wrapper for GetBodyClosestPoint; comes with some extra features.
 ---@param body body_handle
 ---@param origin vector
----@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, dist:number, dir:vector, dot:number, reflection:vector }
+---@return { hit:boolean, point:vector, normal:vector, shape:shape_handle, body:body_handle, dist:number, dir:vector, dot:number, reflection:vector }
 function AutoQueryClosestBody(body, origin)
 	local data = {}
 	data.hit, data.point, data.normal, data.shape = GetBodyClosestPoint(body, origin)
@@ -2236,7 +2254,8 @@ function AutoQueryClosestBody(body, origin)
 		data.dist = VecLength(diff)
 		data.dir = dir
 		data.dot = dot
-		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+        data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+		data.body = GetShapeBody(data.shape)
 	end
 
 	return data
@@ -2366,9 +2385,9 @@ end
 ---@return vector
 function AutoPlayerInputDir(length)
     return VecScale({
-		(InputDown('left') and -1 or 0) + (InputDown('right') and 1 or 0),
+		-InputValue('left') + InputValue('right'),
 		0,
-		(InputDown('down') and 1 or 0) + (InputDown('up') and -1 or 0),
+		-InputValue('down') + InputValue('up'),
 	}, length or 1)
 end
 

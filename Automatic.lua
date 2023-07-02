@@ -1,4 +1,4 @@
--- VERSION 3.08
+-- VERSION 3.09
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1062,11 +1062,13 @@ end
 ---@param green number? Default is 0
 ---@param blue number? Default is 0
 ---@param alpha number? Default is 1
-function AutoDrawOBB(obb, red, green, blue, alpha)
+---@param linefunction function? Default is DebugLine
+function AutoDrawOBB(obb, red, green, blue, alpha, linefunction)
 	local lines = AutoOBBLines(obb)
 	
+	linefunction = linefunction or DebugLine
 	for k, l in pairs(lines) do
-		DebugLine(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
+		linefunction(l[1], l[2], red or 0, green or 0, blue or 0, alpha or 1)
 	end
 end
 
@@ -1171,13 +1173,20 @@ end
 ---@param g number?
 ---@param b number?
 ---@param a number?
-function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
+---@param linefunction function?
+function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, linefunction)
 	local pos = plane.pos or Vec(0, 0, 0)
 	local rot = plane.rot or Quat()
 	local size = plane.size or Vec(1, 1, 1)
 	
 	-- Calculate the forward, right, and up vectors from the rotation
 	local forward = QuatRotateVec(rot, Vec(0, 0, 1))
+	
+	-- Cancel for oneway
+	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
+		return
+	end
+	
 	local right = QuatRotateVec(rot, Vec(1, 0, 0))
 	local up = QuatRotateVec(rot, Vec(0, 1, 0))
 	
@@ -1189,10 +1198,8 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 	
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 	pattern = pattern or 0
-	
-	if oneway and VecDot(VecSub(pos, GetCameraTransform().pos), forward) < 0 then
-		return
-	end
+
+	linefunction = linefunction or DebugLine
 	
 	-- Draw the grid
 	if pattern == 0 then
@@ -1203,14 +1210,14 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
 			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
 			
-			DebugLine(subH1, subH2, r, g, b, a)
-			DebugLine(subV1, subV2, r, g, b, a)
+			linefunction(subH1, subH2, r, g, b, a)
+			linefunction(subV1, subV2, r, g, b, a)
 		end
 	elseif pattern > 0 then
-		DebugLine(corner1, corner2, r, g, b, a)
-		DebugLine(corner2, corner3, r, g, b, a)
-		DebugLine(corner3, corner4, r, g, b, a)
-		DebugLine(corner4, corner1, r, g, b, a)
+		linefunction(corner1, corner2, r, g, b, a)
+		linefunction(corner2, corner3, r, g, b, a)
+		linefunction(corner3, corner4, r, g, b, a)
+		linefunction(corner4, corner1, r, g, b, a)
 	end
 	
 	if pattern == 1 or pattern == 3 then
@@ -1220,7 +1227,7 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
 			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
 			
-			DebugLine(p1, p2, r, g, b, a)
+			linefunction(p1, p2, r, g, b, a)
 		end
 	end
 	
@@ -1231,13 +1238,13 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a)
 			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
 			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
 			
-			DebugLine(p1, p2, r, g, b, a)
+			linefunction(p1, p2, r, g, b, a)
 		end
 		
-		DebugLine(corner1, corner2, r, g, b, a)
-		DebugLine(corner2, corner3, r, g, b, a)
-		DebugLine(corner3, corner4, r, g, b, a)
-		DebugLine(corner4, corner1, r, g, b, a)
+		linefunction(corner1, corner2, r, g, b, a)
+		linefunction(corner2, corner3, r, g, b, a)
+		linefunction(corner3, corner4, r, g, b, a)
+		linefunction(corner4, corner1, r, g, b, a)
 	end
 end
 

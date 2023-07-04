@@ -1198,7 +1198,7 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 	
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 	pattern = pattern or 0
-
+	
 	linefunction = linefunction or DebugLine
 	
 	-- Draw the grid
@@ -1653,20 +1653,18 @@ end
 function AutoSM_Set(sm, target, keep_velocity)
 	if sm.type ~= 'table' then
 		sm.data.current = target
+		sm.data.previous = target
 		if not keep_velocity then
+			
 			sm.data.velocity = 0
-			sm.data.previous = target
-		else
-			sm.data.previous = target
 		end
 	else
 		for k, v in pairs(sm.data) do
 			v.current = target[k]
+			v.previous = target[k]
+			
 			if not keep_velocity then
 				v.velocity = 0
-				v.previous = target[k]
-			else
-				v.previous = target[k]
 			end
 		end
 	end
@@ -1676,8 +1674,10 @@ end
 ---@param sm Secondary_Motion_Data
 ---@param velocity number|table<number>
 function AutoSM_SetVelocity(sm, velocity)
-	if sm.type ~= 'table' then
+	if sm.type == 'single' then
 		sm.data.velocity = velocity
+	elseif sm.type == 'quaternion' then
+		sm.data.velocity = AutoEulerTable(velocity)
 	else
 		for k, v in pairs(sm.data) do
 			v.velocity = velocity[k]
@@ -2195,6 +2195,21 @@ function AutoSpawnScript(path, ...)
 	local f = [[<script file="%s" param0="%s" param1="%s" param2="%s" param3="%s"/>]]
 	local param = { arg[1] or '', arg[2] or '', arg[3] or '', arg[4] or '' }
 	return Spawn((f):format(path, unpack(param)), Transform())[1]
+end
+
+---Attempts to get the handle of the current script by abusing pause menu item keys
+---
+---May not work if a pause menu button is already being created from the script
+---
+---Original coded from Thomasims
+function AutoGetScriptHandle()
+	local id = tostring(math.random())
+	PauseMenuButton(id)
+	for _, handle in ipairs(ListKeys("game.pausemenu.items")) do
+		if GetString("game.pausemenu.items." .. handle) == id then
+			return tonumber(handle)
+		end
+	end
 end
 
 ---A Wrapper for QueryRaycast; comes with some extra features.

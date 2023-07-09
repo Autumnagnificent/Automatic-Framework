@@ -8,3 +8,5 @@ It has every function I have ever used that I deemed worthy enough to be include
 I strongly recommend you to use this in combinination with **VScode**, and the **Lua Server** Extention.
 You can setup the Lua-server-document (Which allows for hand documented functions, and Autocompletion) here :
 https://github.com/SpunkyTheHedgeHog/Teardown-Totally-Documented/blob/main/lua-server-docs.lua
+
+_duck.vox_ is not required.

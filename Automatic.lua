@@ -1923,15 +1923,23 @@ end
 ---@param b transform
 ---@param t number
 ---@param t2 number?
----@return table
+---@return transform
 function AutoTransformLerp(a, b, t, t2)
 	if t2 == nil then
 		t2 = t
 	end
 	return Transform(
-	VecLerp(a.pos, b.pos, t),
-	QuatSlerp(a.rot, b.rot, t2)
-)
+		VecLerp(a.pos, b.pos, t),
+		QuatSlerp(a.rot, b.rot, t2)
+	)
+end
+
+---Scales a transform, is the equivelent of (s)lerping the position and rotation from Vec(), Quat()
+---@param t transform
+---@param s number
+---@return transform
+function AutoTransformScale(t, s)
+	return AutoTransformLerp(Transform(Vec(), Quat()), t, s)
 end
 
 ---Equivalent to `QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))`
@@ -3411,7 +3419,7 @@ function AutoUIArrow(p1, p2, line_width, radius)
 	local angle = math.atan2(unpack(AutoSwizzle(dir, 'yx')))
 	
 	local dist = AutoVecDistNoZ(p1, p2)
-	local arrow_scale = AutoSigmoid(dist, radius * 3, -0.3, 15)
+	local arrow_scale = AutoSigmoid(dist, line_width * 3, -0.3, 15)
 	
 	UiPush()
 	

@@ -1,4 +1,4 @@
--- VERSION 3.09
+-- VERSION 3.10
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2218,13 +2218,14 @@ end
 ---@param maxDist number
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, intersection:vector, dist:number, normal:vector, shape:shape_handle, body:body_handle, dot:number, reflection:vector }
+---@return { hit:boolean, intersection:vector, dist:number, normal:vector, shape:shape_handle, body:body_handle, dir:vector, dot:number, reflection:vector }
 function AutoRaycast(origin, direction, maxDist, radius, rejectTransparent)
 	direction = direction and VecNormalize(direction) or nil
 	
 	local data = {}
 	data.hit, data.dist, data.normal, data.shape = QueryRaycast(origin, direction, maxDist or 256, radius, rejectTransparent)
 	data.intersection = VecAdd(origin, VecScale(direction, data.dist))
+	data.dir = direction
 	data.dot = VecDot(direction, data.normal)
 	data.reflection = VecSub(direction, VecScale(data.normal, data.dot * 2))
 	data.body = GetShapeBody(data.shape)
@@ -2238,7 +2239,7 @@ end
 ---@param manualDistance number?
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dot:number, reflection:vector }
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dir:vector, dot:number, reflection:vector }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
 	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
@@ -2249,7 +2250,7 @@ end
 ---@param maxDist number
 ---@param radius number?
 ---@param rejectTransparent boolean?
----@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dot:number, reflection:vector }
+---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dir:vector, dot:number, reflection:vector }
 ---@return transform cameraTransform
 ---@return vector cameraForward
 function AutoRaycastCamera(usePlayerCamera, maxDist, radius, rejectTransparent)
@@ -2310,7 +2311,7 @@ end
 ---A Wrapper for GetShapeClosestPoint; comes with some extra features.
 ---@param shape shape_handle
 ---@param origin vector
----@return { hit:boolean, point:vector, normal:vector, dist:number, dir:vector, dot:number, reflection:vector }
+---@return { hit:boolean, point:vector, normal:vector, dist:number, dir:vector, dot:number, reflection:vector, body:body_handle }
 function AutoQueryClosestShape(shape, origin)
 	local data = {}
 	data.hit, data.point, data.normal = GetShapeClosestPoint(shape, origin)
@@ -2324,6 +2325,7 @@ function AutoQueryClosestShape(shape, origin)
 		data.dir = dir
 		data.dot = dot
 		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+		data.body = GetShapeBody(shape)
 	end
 	
 	return data

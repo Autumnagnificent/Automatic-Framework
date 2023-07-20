@@ -1,4 +1,4 @@
--- VERSION 3.10
+-- VERSION 3.11
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1923,23 +1923,15 @@ end
 ---@param b transform
 ---@param t number
 ---@param t2 number?
----@return transform
+---@return table
 function AutoTransformLerp(a, b, t, t2)
 	if t2 == nil then
 		t2 = t
 	end
 	return Transform(
-		VecLerp(a.pos, b.pos, t),
-		QuatSlerp(a.rot, b.rot, t2)
-	)
-end
-
----Scales a transform, is the equivelent of (s)lerping the position and rotation from Vec(), Quat()
----@param t transform
----@param s number
----@return transform
-function AutoTransformScale(t, s)
-	return AutoTransformLerp(Transform(Vec(), Quat()), t, s)
+	VecLerp(a.pos, b.pos, t),
+	QuatSlerp(a.rot, b.rot, t2)
+)
 end
 
 ---Equivalent to `QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))`
@@ -2190,7 +2182,7 @@ end
 function AutoListHandleTypes(t)
 	local nt = {}
 	for key, value in pairs(t) do
-		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or false }
+		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or false, tags = AutoTags(value) }
 	end
 	return nt
 end
@@ -2205,16 +2197,27 @@ function AutoSpawnScript(path, ...)
 	return Spawn((f):format(path, unpack(param)), Transform())[1]
 end
 
+---Spawn in a voxscript node in the game world. No parameters
+---@param path td_path
+---@return script_handle
+function AutoSpawnVoxScript(path)
+	local f = [[<voxscript file="%s"/>]]
+	return Spawn((f):format(path), Transform())[1]
+end
+
 ---Attempts to get the handle of the current script by abusing pause menu item keys
 ---
 ---May not work if a pause menu button is already being created from the script
 ---
 ---Original coded from Thomasims
+---@return script_handle
 function AutoGetScriptHandle()
 	local id = tostring(math.random())
 	PauseMenuButton(id)
 	for _, handle in ipairs(ListKeys("game.pausemenu.items")) do
-		if GetString("game.pausemenu.items." .. handle) == id then
+		local p = "game.pausemenu.items." .. handle
+		if GetString(p) == id then
+			ClearKey(p)
 			return tonumber(handle)
 		end
 	end
@@ -2730,7 +2733,7 @@ end
 ---
 ---Requires a flat DDS file.
 ---@param pathToDDS td_path
----@return table
+---@return environment
 function AutoFlatEnvironment(pathToDDS)
 	return {
 		ambience = { "outdoor/field.ogg", 0 },
@@ -3120,7 +3123,7 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	sizey = AutoDefault(sizey, 64)
 	
 	UiPush()
-	UiWindow(sizex + AutoPad.micro * 2, sizey + AutoPad.micro * 2, true)
+	UiWindow(sizex + 8, sizey + 8, true)
 	
 	local minval = 0
 	local maxval = 0
@@ -3135,34 +3138,32 @@ function AutoGraphDraw(id, sizex, sizey, rangemin, rangemax, linewidth)
 	for i = 1, #Graph.values - 1 do
 		if Graph.values[i] == AutoClamp(Graph.values[i], minval, maxval) then
 			local a = Vec(
-			AutoMap(i, 1, #Graph.values, 0, sizex),
-			AutoMap(Graph.values[i], minval, maxval, sizey, 0),
-			0
-		)
-		local b = Vec(
-		AutoMap(i + 1, 1, #Graph.values, 0, sizex),
-		AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
-		0
-	)
-	
-	local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
-	local distance = AutoVecDist(a, b)
-	local width = AutoDefault(linewidth, 2)
-	
-	UiPush()
-	UiTranslate(a[1] - width / 2, a[2] - width / 2)
-	UiRotate(angle)
-	
-	UiColor(unpack(AutoPrimaryColor))
-	UiAlign('left top')
-	UiRect(width, distance + 1)
-	UiPop()
-end
-end
-UiPop()
+				AutoMap(i, 1, #Graph.values, 0, sizex),
+				AutoMap(Graph.values[i], minval, maxval, sizey, 0),
+				0
+			)
+			local b = Vec(
+				AutoMap(i + 1, 1, #Graph.values, 0, sizex),
+				AutoMap(Graph.values[i + 1], minval, maxval, sizey, 0),
+				0
+			)
+		
+			local angle = math.atan2(b[1] - a[1], b[2] - a[2]) * 180 / math.pi
+			local distance = AutoVecDist(a, b)
+			local width = AutoDefault(linewidth, 2)
+			
+			UiPush()
+			UiTranslate(a[1] - width / 2, a[2] - width / 2)
+			UiRotate(angle)
+			
+			UiColor(1, 1, 1, 1)
+			UiAlign('left top')
+			UiRect(width, distance + 1)
+			UiPop()
+		end
+	end
 
-local data = { rect = { w = sizex + AutoPad.micro * 2, h = sizey + AutoPad.micro * 2 } }
-AutoHandleSpread(AutoGetSpread(), data, 'draw')
+	UiPop()
 end
 
 --#endregion

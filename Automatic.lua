@@ -1,4 +1,4 @@
--- VERSION 3.11
+-- VERSION 3.12
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1916,6 +1916,15 @@ function AutoTableLerp(a, b, t)
 		c[k] = AutoLerp(a[k], b[k], t)
 	end
 	return c
+end
+
+---Scales a transform, is the equivelent of (s)lerping the position and rotation from Vec(), Quat()
+---@param t transform
+---@param s number
+---@param s2 number?
+---@return transform
+function AutoTransformScale(t, s, s2)
+	return AutoTransformLerp(Transform(Vec(), Quat()), t, s, s2)
 end
 
 ---Returns a Linear Interpolated Transform, Interpolated by t.

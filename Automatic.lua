@@ -1,4 +1,4 @@
--- VERSION 3.14
+-- VERSION 3.15
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2227,13 +2227,20 @@ function AutoDeleteHandles(t, CheckIfValid)
 	return list
 end
 
-function AutoTags(handle)
+function AutoGetTags(handle)
 	local T = {}
+
 	for _, t in pairs(ListTags(handle)) do
 		T[t] = GetTagValue(handle, t)
 	end
 	
 	return T
+end
+
+function AutoSetTags(handle, tags)
+	for t, v in pairs(tags) do
+		SetTag(handle, t, v)
+	end
 end
 
 
@@ -2243,7 +2250,7 @@ end
 function AutoListHandleTypes(t)
 	local nt = {}
 	for key, value in pairs(t) do
-		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or false, tags = AutoTags(value) }
+		nt[key] = { handle = value, type = IsHandleValid(value) and GetEntityType(value) or false, tags = AutoGetTags(value) }
 	end
 	return nt
 end
@@ -2709,15 +2716,17 @@ function AutoSplitShapeIntoBodies(shape, removeResidual, static)
 	return new_bodies
 end
 
----Creates a new body with a 1x1x1 voxel in position, taking the material from a shape.
+---Creates a new shape offset a 1x1x1 voxel in place of an existing voxel.
 ---@param shape shape_handle
 ---@param voxel_position vector
 ---@param keep_original boolean?
----@param require_material material[]?
+---@param no_body boolean?
+---@param require_materials material[]?
 ---@return body_handle|false
-function AutoPopVoxel(shape, voxel_position, keep_original, require_material)
+---@return shape_handle|false
+function AutoPopVoxel(shape, voxel_position, keep_original, no_body, require_materials)
 	local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
-	if material[1] == '' or (require_material and not AutoTableContains(require_material, material[1])) then return false end
+	if material[1] == '' or (require_materials and not AutoTableContains(require_materials, material[1])) then return false, false end
 
 	local shape_size = { GetShapeSize(shape) }
 	local shape_transform = GetShapeWorldTransform(shape)
@@ -2729,56 +2738,73 @@ function AutoPopVoxel(shape, voxel_position, keep_original, require_material)
 		DrawShapeLine(shape, voxel_position[1], voxel_position[2], voxel_position[3], voxel_position[1], voxel_position[2], voxel_position[3])
 	end
 
-	local body_transform = Transform(TransformToParentPoint(shape_transform, VecScale(voxel_position, shape_size[4])), shape_transform.rot)
-	local body = Spawn('<body/>', body_transform)[1]
+	local body
+	local new_shape
 
-	local new_shape = CreateShape(body, Transform(AutoVecOne(0)), shape)
-	SetBrush('cube', 1, material[6])
-	DrawShapeLine(new_shape, 0, 0, 0, 0, 0, 0)
+	if no_body then
+		new_shape = CreateShape(GetWorldBody(), Transform(TransformToParentPoint(shape_transform, VecScale(voxel_position, shape_size[4])), shape_transform.rot), shape)
+		SetBrush('cube', 1, material[6])
+		DrawShapeLine(new_shape, 0, 0, 0, 0, 0, 0)
+	else
+		local body_transform = Transform(TransformToParentPoint(shape_transform, VecScale(voxel_position, shape_size[4])), shape_transform.rot)
+		body = Spawn('<body/>', body_transform)[1]
+	
+		new_shape = CreateShape(body, Transform(), shape)
+		SetBrush('cube', 1, material[6])
+		DrawShapeLine(new_shape, 0, 0, 0, 0, 0, 0)
+	
+		SetBodyDynamic(body, true)
+		SetBodyActive(body, true)
+	
+		SetBodyVelocity(body, shape_body_velocity.linear)
+		SetBodyAngularVelocity(body, shape_body_velocity.rotational)
+	end
 
-	SetBodyDynamic(body, true)
-	SetBodyActive(body, true)
-
-	SetBodyVelocity(body, shape_body_velocity.linear)
-	SetBodyAngularVelocity(body, shape_body_velocity.rotational)
-
-	return body
+	return body, new_shape
 end
 
 ---A function inspired by the Liquify Mod.
 ---@param shape shape_handle
+---@param keep_original boolean?
 ---@param inherit_tags boolean?
+---@param no_bodies boolean?
 ---@return body_handle[]
-function AutoLiquifyShape(shape, inherit_tags)
+---@return shape_handle[]
+function AutoLiquifyShape(shape, keep_original, inherit_tags, no_bodies)
 	local shape_size = { GetShapeSize(shape) }
 
 	local bodies = {}
+	local shapes = {}
                 
 	for z=0, shape_size[3] - 1 do
 		for y=0, shape_size[2] - 1 do
 			for x=0, shape_size[1] - 1 do
-				local new = AutoPopVoxel(shape, { x, y, z }, true)
+				local new_body, new_shape = AutoPopVoxel(shape, { x, y, z }, true, no_bodies)
 
-				if new then
-					bodies[#bodies+1] = new
-				end
+				if new_body then bodies[#bodies+1] = new_body end
+				if new_shape then shapes[#shapes+1] = new_shape end
 			end
 		end
 	end
 
 	if inherit_tags then
-		local parent = AutoTags(shape)
-		for i = 1, #bodies do
-			local s = GetBodyShapes(bodies[i])[1]
-			for t, v in pairs(parent) do
-				SetTag(s, t, v)
+		local parent_body_tags = AutoGetTags(GetShapeBody(shape))
+		local parent_shape_tags = AutoGetTags(shape)
+
+		for _, b in pairs(bodies) do
+			AutoSetTags(b, parent_body_tags)
+			
+			for _, s in pairs(GetBodyShapes(b)) do
+				AutoSetTags(s, parent_shape_tags)
 			end
 		end
 	end
 
-	Delete(shape)
+	if not keep_original then
+		Delete(shape)
+	end
 
-	return bodies
+	return bodies, shapes
 end
 
 function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels)

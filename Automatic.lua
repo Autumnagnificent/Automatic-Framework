@@ -1,4 +1,4 @@
--- VERSION 3.13
+-- VERSION 3.14
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -988,37 +988,37 @@ function AutoGetOBBFaces(obb)
 	
 	local faces = {}
 	faces.z = AutoPlane(
-	VecLerp(corners.xyZ, corners.XYZ, 0.5),
-	QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
-	{ obb.size[1], obb.size[2] }
-)
-faces.zn = AutoPlane(
-VecLerp(corners.xyz, corners.XYz, 0.5),
-QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
-{ obb.size[1], obb.size[2] }
-)
-faces.x = AutoPlane(
-VecLerp(corners.Xyz, corners.XYZ, 0.5),
-QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
-{ obb.size[2], obb.size[3] }
-)
-faces.xn = AutoPlane(
-VecLerp(corners.xyz, corners.xYZ, 0.5),
-QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
-{ obb.size[2], obb.size[3] }
-)
-faces.y = AutoPlane(
-VecLerp(corners.xYz, corners.XYZ, 0.5),
-QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
-{ obb.size[1], obb.size[3] }
-)
-faces.yn = AutoPlane(
-VecLerp(corners.xyz, corners.XyZ, 0.5),
-QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
-{ obb.size[1], obb.size[3] }
-)
+		VecLerp(corners.xyZ, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(180, 0, 0)),
+		{ obb.size[1], obb.size[2] }
+	)
+	faces.zn = AutoPlane(
+		VecLerp(corners.xyz, corners.XYz, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, 0, 0)),
+		{ obb.size[1], obb.size[2] }
+	)
+	faces.x = AutoPlane(
+		VecLerp(corners.Xyz, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, -90, -90)),
+		{ obb.size[2], obb.size[3] }
+	)
+	faces.xn = AutoPlane(
+		VecLerp(corners.xyz, corners.xYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(0, 90, 90)),
+		{ obb.size[2], obb.size[3] }
+	)
+	faces.y = AutoPlane(
+		VecLerp(corners.xYz, corners.XYZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(90, 0, 0)),
+		{ obb.size[1], obb.size[3] }
+	)
+	faces.yn = AutoPlane(
+		VecLerp(corners.xyz, corners.XyZ, 0.5),
+		QuatRotateQuat(obb.rot, QuatEuler(-90, 180, 0)),
+		{ obb.size[1], obb.size[3] }
+	)
 
-return faces, corners
+	return faces, corners
 end
 
 ---Returns a table representing the lines connecting the sides of a Oriented Bounding Box
@@ -1163,6 +1163,58 @@ function AutoRaycastPlane(plane, startPos, direction, oneway)
 			dot = rayDirDotNormal,
 		}
 	end
+end
+
+---@param startPos vector
+---@param direction vector
+---@return { hit:boolean, intersections:{ [1]:vector, [2]:vector }, normals:{ [1]:vector, [2]:vector }, dists:{ [1]:number, [2]:number } }
+function AutoRaycastSphere(sphere_origin, sphere_radius, startPos, direction)
+    local center = sphere_origin or Vec(0, 0, 0)
+    local radius = sphere_radius or 1
+
+    local rayToSphere = VecSub(center, startPos)
+    local tca = VecDot(rayToSphere, direction)
+    local d2 = VecDot(rayToSphere, rayToSphere) - tca * tca
+
+    if d2 > radius * radius then
+        -- No intersection with sphere
+        return { hit = false }
+    end
+
+    local thc = math.sqrt(radius * radius - d2)
+    local t0 = tca - thc
+    local t1 = tca + thc
+
+    local intersections = {}
+    local normals = {}
+    local dists = {}
+
+    if t0 >= 0 then
+        local intersection = VecAdd(startPos, VecScale(direction, t0))
+        local normal = VecNormalize(VecSub(intersection, center))
+        local dist = AutoVecDist(startPos, intersection)
+
+        table.insert(intersections, intersection)
+        table.insert(normals, normal)
+        table.insert(dists, dist)
+    end
+
+    if t1 >= 0 then
+        local intersection = VecAdd(startPos, VecScale(direction, t1))
+        local normal = VecNormalize(VecSub(intersection, center))
+        local dist = AutoVecDist(startPos, intersection)
+
+        table.insert(intersections, intersection)
+        table.insert(normals, normal)
+        table.insert(dists, dist)
+    end
+
+    return {
+        hit = #intersections > 0,
+        intersections = intersections,
+        normals = normals,
+        dists = dists,
+    }
 end
 
 ---@param plane plane

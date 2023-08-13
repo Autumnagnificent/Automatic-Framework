@@ -1,4 +1,4 @@
--- VERSION 3.15
+-- VERSION 3.16
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2807,16 +2807,16 @@ function AutoLiquifyShape(shape, keep_original, inherit_tags, no_bodies)
 	return bodies, shapes
 end
 
-function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels)
-    local pops = {}
+function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_voxels_inherit_tags, pop_voxels_no_bodies)
+    local popped_bodies = {}
+    local popped_shapes = {}
 
     local function action(voxel_position)
         if pop_voxels then
-            local body = AutoPopVoxel(shape, voxel_position, false)
+            local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies)
 
-            if body then
-                pops[#pops + 1] = body
-            end
+            if new_body then popped_bodies[#popped_bodies+1] = new_body end
+			if new_shape then popped_shapes[#popped_shapes+1] = new_shape end
         else
             local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
             if material[1] == '' then return false end
@@ -2846,7 +2846,20 @@ function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_vox
         end
     end
 
-    return pops
+	if pop_voxels and pop_voxels_inherit_tags then
+		local parent_body_tags = AutoGetTags(GetShapeBody(shape))
+		local parent_shape_tags = AutoGetTags(shape)
+
+		for _, b in pairs(popped_bodies) do
+			AutoSetTags(b, parent_body_tags)
+			
+			for _, s in pairs(GetBodyShapes(b)) do
+				AutoSetTags(s, parent_shape_tags)
+			end
+		end
+	end
+
+    return popped_bodies, popped_shapes
 end
 
 --#endregion

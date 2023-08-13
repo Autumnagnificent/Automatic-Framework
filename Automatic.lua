@@ -1,4 +1,4 @@
--- VERSION 3.12
+-- VERSION 3.13
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2608,6 +2608,167 @@ function AutoPredictPlayerPosition(time, raycast)
 	end
 	
 	return log, vel, normal
+end
+
+--#endregion
+--#region Shape Utility
+
+function AutoWorldToShapeVoxelIndex(shape, world_point)
+	local shape_size = { GetShapeSize(shape) }
+	local shape_transform = GetShapeWorldTransform(shape)
+	local shape_pos = TransformToLocalPoint(shape_transform, world_point)
+	return AutoVecFloor(VecScale(shape_pos, 1 / shape_size[4]))
+end
+
+function AutoMoveShapeToNewBody(shape, static)
+	local shape_transform = GetShapeWorldTransform(shape)
+	local shape_body = GetShapeBody(shape)
+
+	local body_transform = Transform(AutoShapeCenter(shape), shape_transform.rot)
+	local body = Spawn('<body/>', body_transform)[1]
+	SetShapeBody(shape, body, TransformToLocalTransform(body_transform, GetShapeWorldTransform(shape)))
+
+	if static then
+		SetBodyDynamic(body, false)
+	else
+		local shape_body_velocity = { linear = GetBodyVelocity(shape_body), rotational = GetBodyAngularVelocity(shape_body) }
+
+		SetBodyDynamic(body, true)
+		SetBodyActive(body, true)
+		
+		SetBodyVelocity(body, shape_body_velocity.linear)
+		SetBodyAngularVelocity(body, shape_body_velocity.rotational)
+	end
+		
+	return body
+end
+
+---SplitShape with some extra stuff to put each shape under a dynamic body - copying the velocity of the original shape.
+---@param shape shape_handle
+---@param removeResidual boolean?
+---@return body_handle[]
+function AutoSplitShapeIntoBodies(shape, removeResidual, static)
+	local new_bodies = {}
+
+	for _, new_shape in pairs(SplitShape(shape, removeResidual)) do
+		new_bodies[#new_bodies+1] = AutoMoveShapeToNewBody(new_shape, static)
+	end
+
+	return new_bodies
+end
+
+---Creates a new body with a 1x1x1 voxel in position, taking the material from a shape.
+---@param shape shape_handle
+---@param voxel_position vector
+---@param keep_original boolean?
+---@param require_material material[]?
+---@return body_handle|false
+function AutoPopVoxel(shape, voxel_position, keep_original, require_material)
+	local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
+	if material[1] == '' or (require_material and not AutoTableContains(require_material, material[1])) then return false end
+
+	local shape_size = { GetShapeSize(shape) }
+	local shape_transform = GetShapeWorldTransform(shape)
+	local shape_body = GetShapeBody(shape)
+	local shape_body_velocity = { linear = GetBodyVelocity(shape_body), rotational = GetBodyAngularVelocity(shape_body) }
+
+	if not keep_original then
+		SetBrush('cube', 1, 0)
+		DrawShapeLine(shape, voxel_position[1], voxel_position[2], voxel_position[3], voxel_position[1], voxel_position[2], voxel_position[3])
+	end
+
+	local body_transform = Transform(TransformToParentPoint(shape_transform, VecScale(voxel_position, shape_size[4])), shape_transform.rot)
+	local body = Spawn('<body/>', body_transform)[1]
+
+	local new_shape = CreateShape(body, Transform(AutoVecOne(0)), shape)
+	SetBrush('cube', 1, material[6])
+	DrawShapeLine(new_shape, 0, 0, 0, 0, 0, 0)
+
+	SetBodyDynamic(body, true)
+	SetBodyActive(body, true)
+
+	SetBodyVelocity(body, shape_body_velocity.linear)
+	SetBodyAngularVelocity(body, shape_body_velocity.rotational)
+
+	return body
+end
+
+---A function inspired by the Liquify Mod.
+---@param shape shape_handle
+---@param inherit_tags boolean?
+---@return body_handle[]
+function AutoLiquifyShape(shape, inherit_tags)
+	local shape_size = { GetShapeSize(shape) }
+
+	local bodies = {}
+                
+	for z=0, shape_size[3] - 1 do
+		for y=0, shape_size[2] - 1 do
+			for x=0, shape_size[1] - 1 do
+				local new = AutoPopVoxel(shape, { x, y, z }, true)
+
+				if new then
+					bodies[#bodies+1] = new
+				end
+			end
+		end
+	end
+
+	if inherit_tags then
+		local parent = AutoTags(shape)
+		for i = 1, #bodies do
+			local s = GetBodyShapes(bodies[i])[1]
+			for t, v in pairs(parent) do
+				SetTag(s, t, v)
+			end
+		end
+	end
+
+	Delete(shape)
+
+	return bodies
+end
+
+function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels)
+    local pops = {}
+
+    local function action(voxel_position)
+        if pop_voxels then
+            local body = AutoPopVoxel(shape, voxel_position, false)
+
+            if body then
+                pops[#pops + 1] = body
+            end
+        else
+            local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
+            if material[1] == '' then return false end
+
+            SetBrush('cube', 1, 0)
+            DrawShapeLine(shape, voxel_position[1], voxel_position[2], voxel_position[3], voxel_position[1], voxel_position[2], voxel_position[3])
+        end
+    end
+
+    local x, y, z = unpack(AutoWorldToShapeVoxelIndex(shape, world_point))
+    local inner_radius_squared = inner_radius ^ 2
+    local outer_radius_squared = outer_radius ^ 2
+
+    for i = math.floor(x - outer_radius), math.ceil(x + outer_radius) do
+        for j = math.floor(y - outer_radius), math.ceil(y + outer_radius) do
+            for k = math.floor(z - outer_radius), math.ceil(z + outer_radius) do
+                local dx = i - x
+                local dy = j - y
+                local dz = k - z
+
+                local distanceSquared = dx * dx + dy * dy + dz * dz
+
+                if distanceSquared <= outer_radius_squared and distanceSquared >= inner_radius_squared then
+                    action({ i, j, k })
+                end
+            end
+        end
+    end
+
+    return pops
 end
 
 --#endregion

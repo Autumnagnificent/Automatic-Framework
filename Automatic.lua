@@ -1,4 +1,4 @@
--- VERSION 3.16
+-- VERSION 3.17
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2721,12 +2721,12 @@ end
 ---@param voxel_position vector
 ---@param keep_original boolean?
 ---@param no_body boolean?
----@param require_materials material[]?
+---@param reject_materials material[]?
 ---@return body_handle|false
 ---@return shape_handle|false
-function AutoPopVoxel(shape, voxel_position, keep_original, no_body, require_materials)
+function AutoPopVoxel(shape, voxel_position, keep_original, no_body, reject_materials)
 	local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
-	if material[1] == '' or (require_materials and not AutoTableContains(require_materials, material[1])) then return false, false end
+	if material[1] == '' or (reject_materials and AutoTableContains(reject_materials, material[1])) then return false, false end
 
 	local shape_size = { GetShapeSize(shape) }
 	local shape_transform = GetShapeWorldTransform(shape)
@@ -2807,13 +2807,13 @@ function AutoLiquifyShape(shape, keep_original, inherit_tags, no_bodies)
 	return bodies, shapes
 end
 
-function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_voxels_inherit_tags, pop_voxels_no_bodies)
+function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_reject_materials, pop_voxels_inherit_tags, pop_voxels_no_bodies)
     local popped_bodies = {}
     local popped_shapes = {}
 
     local function action(voxel_position)
         if pop_voxels then
-            local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies)
+            local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies, pop_reject_materials)
 
             if new_body then popped_bodies[#popped_bodies+1] = new_body end
 			if new_shape then popped_shapes[#popped_shapes+1] = new_shape end

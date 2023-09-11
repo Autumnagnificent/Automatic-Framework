@@ -1,4 +1,4 @@
--- VERSION 3.18
+-- VERSION 3.2
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -510,7 +510,8 @@ end
 ---@param length number return the vector of size length, Default is 1
 ---@return vector
 function AutoVecOne(length)
-	return VecScale(Vec(1, 1, 1), length or 1)
+	local l = length or 1
+	return Vec(l, l, l)
 end
 
 ---Returns the midpoint between two vectors
@@ -2351,7 +2352,8 @@ end
 ---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dir:vector, dot:number, reflection:vector }
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
-	return AutoRaycast(pointA, diff, manualDistance or VecLength(diff), radius, rejectTransparent)
+	local distance_between_points = VecLength(diff)
+	return AutoRaycast(pointA, diff, manualDistance or distance_between_points, radius, rejectTransparent), distance_between_points
 end
 
 ---AutoRaycast using the camera or player camera as the origin and direction
@@ -2735,6 +2737,7 @@ end
 ---SplitShape with some extra stuff to put each shape under a dynamic body - copying the velocity of the original shape.
 ---@param shape shape_handle
 ---@param removeResidual boolean?
+---@param static boolean?
 ---@return body_handle[]
 function AutoSplitShapeIntoBodies(shape, removeResidual, static)
 	local new_bodies = {}
@@ -2837,6 +2840,16 @@ function AutoLiquifyShape(shape, keep_original, inherit_tags, no_bodies)
 	return bodies, shapes
 end
 
+---@param shape shape_handle
+---@param world_point vector
+---@param inner_radius number
+---@param outer_radius number
+---@param pop_voxels boolean
+---@param pop_reject_materials any
+---@param pop_voxels_inherit_tags boolean
+---@param pop_voxels_no_bodies boolean
+---@return body_handle[]
+---@return shape_handle[]
 function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_reject_materials, pop_voxels_inherit_tags, pop_voxels_no_bodies)
     local popped_bodies = {}
     local popped_shapes = {}
@@ -3141,10 +3154,11 @@ end
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
+---@param ignore_keys any[]?
 ---@param indents number?
 ---@param visited_tables table?
 ---@return string
-function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, indents, visited_tables)
+function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys, indents, visited_tables)
 	singleline_at = singleline_at or 1
 	indent_str = indent_str or '  '
 	indents = indents or 0
@@ -3174,19 +3188,21 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_k
 	if passedSLthreshold then indents = indents + 1 end
 	
 	for k, v in pairs(t) do
-		if not passedSLthreshold then
-			str = str .. indent_str:rep(indents+1)
-		end
-		
-		local not_a_number = type(k) ~= "number"
-		local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
-		local prefix = k_str and ((lua_compatible and not_a_number) and string.format("%q", tostring(k)) or k_str) .. " = " or ''
-		
-		local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, indents + 1, visited_tables)
-		str = str .. prefix .. v_str .. ", "
-		
-		if not passedSLthreshold then
-			str = str .. "\n"
+		if not ignore_keys or not AutoTableContains(ignore_keys, k) then
+			if not passedSLthreshold then
+				str = str .. indent_str:rep(indents+1)
+			end
+			
+			local not_a_number = type(k) ~= "number"
+			local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
+			local prefix = k_str and ((lua_compatible and not_a_number) and string.format("%q", tostring(k)) or k_str) .. " = " or ''
+			
+			local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys, indents + 1, visited_tables)
+			str = str .. prefix .. v_str .. ", "
+			
+			if not passedSLthreshold then
+				str = str .. "\n"
+			end
 		end
 	end
 	str = (passedSLthreshold and str:sub(1, -3) or str) .. (passedSLthreshold and " }" or (indent_str:rep(indents) .. "}"))
@@ -3200,9 +3216,10 @@ end
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
+---@param ignore_keys any[]?
 ---@return any
-function AutoInspect(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
-	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible)
+function AutoInspect(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
+	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
 	local split = AutoSplit(text, '\n')
 	for i=1, #split do
 		local t = split[i]
@@ -3222,9 +3239,10 @@ end
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
+---@param ignore_keys any[]?
 ---@return any
-function AutoInspectConsole(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
-	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible))
+function AutoInspectConsole(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
+	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys))
 	return value
 end
 
@@ -3238,9 +3256,10 @@ end
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
-function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible)
+---@param ignore_keys any[]?
+function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
 	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
-	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible))
+	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys))
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"
@@ -4273,6 +4292,10 @@ function AutoCMD_Parse(path)
 	end
 	
 	return results
+end
+
+function AutoCrash()
+	Spawn('<vehicle/>', Transform())
 end
 
 --#endregion

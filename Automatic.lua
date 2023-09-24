@@ -1,4 +1,4 @@
--- VERSION 3.2
+-- VERSION 3.3
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1196,58 +1196,6 @@ function AutoRaycastPlane(plane, startPos, direction, oneway)
 	end
 end
 
----@param startPos vector
----@param direction vector
----@return { hit:boolean, intersections:{ [1]:vector, [2]:vector }, normals:{ [1]:vector, [2]:vector }, dists:{ [1]:number, [2]:number } }
-function AutoRaycastSphere(sphere_origin, sphere_radius, startPos, direction)
-    local center = sphere_origin or Vec(0, 0, 0)
-    local radius = sphere_radius or 1
-
-    local rayToSphere = VecSub(center, startPos)
-    local tca = VecDot(rayToSphere, direction)
-    local d2 = VecDot(rayToSphere, rayToSphere) - tca * tca
-
-    if d2 > radius * radius then
-        -- No intersection with sphere
-        return { hit = false }
-    end
-
-    local thc = math.sqrt(radius * radius - d2)
-    local t0 = tca - thc
-    local t1 = tca + thc
-
-    local intersections = {}
-    local normals = {}
-    local dists = {}
-
-    if t0 >= 0 then
-        local intersection = VecAdd(startPos, VecScale(direction, t0))
-        local normal = VecNormalize(VecSub(intersection, center))
-        local dist = AutoVecDist(startPos, intersection)
-
-        table.insert(intersections, intersection)
-        table.insert(normals, normal)
-        table.insert(dists, dist)
-    end
-
-    if t1 >= 0 then
-        local intersection = VecAdd(startPos, VecScale(direction, t1))
-        local normal = VecNormalize(VecSub(intersection, center))
-        local dist = AutoVecDist(startPos, intersection)
-
-        table.insert(intersections, intersection)
-        table.insert(normals, normal)
-        table.insert(dists, dist)
-    end
-
-    return {
-        hit = #intersections > 0,
-        intersections = intersections,
-        normals = normals,
-        dists = dists,
-    }
-end
-
 ---@param plane plane
 ---@param pattern 0|1|2|3
 ---@param patternstrength number
@@ -1329,6 +1277,110 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 		linefunction(corner3, corner4, r, g, b, a)
 		linefunction(corner4, corner1, r, g, b, a)
 	end
+end
+
+--#endregion
+--#region Sphere Functions
+
+function AutoFibonacciSphere(numPoints, sphere_origin, sphere_radius)
+    local points = {}
+    local phi = math.pi * (3.0 - math.sqrt(5.0)) -- Golden angle in radians
+
+    for i = 0, numPoints - 1 do
+        local y = 1 - (i / (numPoints - 1)) * 2 -- Range from -1 to 1
+        local radiusY = math.sqrt(1 - y * y)
+        local theta = phi * i -- Golden angle increment
+
+        local x = math.cos(theta) * radiusY
+        local z = math.sin(theta) * radiusY
+
+        points[i] = {
+            x * sphere_radius + sphere_origin[1],
+            y * sphere_radius + sphere_origin[2],
+            z * sphere_radius + sphere_origin[3],
+		}
+    end
+
+    return points
+end
+
+---@param sphere_origin vector Origin of the sphere
+---@param sphere_radius number Radius of the sphere
+---@param quality number? Default is 1
+---@param draw_function function? Function used for drawing. Default is `DebugLine`
+---@vararg any draw_parameters Parameters fed into `draw_function`
+function AutoDrawSphereTangent(sphere_origin, sphere_radius, quality, draw_function, ... )
+	local camera = GetCameraTransform()
+	local camera_up = AutoTransformUp(camera)
+	local diff_to_camera = VecSub(camera.pos, sphere_origin)
+	local dist = VecLength(diff_to_camera)
+	local dir = VecNormalize(diff_to_camera)
+    local cross = VecCross(camera_up, dir)
+	draw_function = draw_function or DebugLine
+	
+	local step_size = ((math.max(dist, 1) ^ 0.5) / (64 * (quality or 1)) / (math.max(sphere_radius ^ 0.5, 0.01)))* 360
+	local last_point
+    for a = 0, 360, step_size do
+        local next_point = VecAdd(sphere_origin, QuatRotateVec(QuatAxisAngle(dir, a), VecScale(cross, sphere_radius)))
+		if last_point then draw_function(last_point, next_point, ... ) end
+        last_point = next_point
+    end
+
+	draw_function(last_point, VecAdd(sphere_origin, VecScale(cross, sphere_radius)), ... )
+end
+
+---@param sphere_origin vector
+---@param sphere_radius number
+---@param startPos vector
+---@param direction vector
+---@return { hit:boolean, intersections:{ [1]:vector, [2]:vector }, normals:{ [1]:vector, [2]:vector }, dists:{ [1]:number, [2]:number } }
+function AutoRaycastSphere(sphere_origin, sphere_radius, startPos, direction)
+    local center = sphere_origin or Vec(0, 0, 0)
+    local radius = sphere_radius or 1
+
+    local rayToSphere = VecSub(center, startPos)
+    local tca = VecDot(rayToSphere, direction)
+    local d2 = VecDot(rayToSphere, rayToSphere) - tca * tca
+
+    if d2 > radius * radius then
+        -- No intersection with sphere
+        return { hit = false }
+    end
+
+    local thc = math.sqrt(radius * radius - d2)
+    local t0 = tca - thc
+    local t1 = tca + thc
+
+    local intersections = {}
+    local normals = {}
+    local dists = {}
+
+    if t0 >= 0 then
+        local intersection = VecAdd(startPos, VecScale(direction, t0))
+        local normal = VecNormalize(VecSub(intersection, center))
+        local dist = AutoVecDist(startPos, intersection)
+
+        table.insert(intersections, intersection)
+        table.insert(normals, normal)
+        table.insert(dists, dist)
+    end
+
+    if t1 >= 0 then
+        local intersection = VecAdd(startPos, VecScale(direction, t1))
+        local normal = VecNormalize(VecSub(intersection, center))
+        local dist = AutoVecDist(startPos, intersection)
+
+        table.insert(intersections, intersection)
+        table.insert(normals, normal)
+        table.insert(dists, dist)
+    end
+
+    return {
+        hit = #intersections > 0,
+        intersections = intersections,
+        normals = normals,
+        dists = dists,
+    }
 end
 
 --#endregion
@@ -2497,8 +2549,8 @@ end
 ---@param angle number? The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean? Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
----@return number? angle The Angle the point is away from the center of the looking direction
----@return number? distance The Distance from the point to fromtrans
+---@return number angle The Angle the point is away from the center of the looking direction
+---@return number distance The Distance from the point to fromtrans
 function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 	oftrans = AutoDefault(oftrans, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
@@ -2590,15 +2642,16 @@ end
 
 ---Finds and rejects all shapes that do not have a given tag
 ---@param tag string
-function AutoRejectShapesWithoutTag(tag)
-	local all = FindShapes(nil, true)
-	local keep = {}
-	for _, v in pairs(FindShapes(tag, true)) do
-		keep[v] = v
-	end
-	
-	for _, v in pairs(all) do
-		if keep[v] == nil then QueryRejectShape(v) end
+function AutoRejectShapesWithoutTag(tag, global)
+	local all = FindShapes(nil, global)
+	local keepers = FindShapes(tag, global)
+
+	local last_handle = keepers[#keepers]
+	for i=1, #all do
+		local h = all[i]
+		if h > last_handle or not AutoTableContains(keepers, h) then
+			QueryRejectShape(h)
+		end
 	end
 end
 
@@ -3268,10 +3321,12 @@ function AutoClearConsole()
 end
 
 ---Draws a Transform
----@param transform transform|vector
+---@generic T : transform|vector
+---@param transform T
 ---@param size number? the size in meters, Default is 0.5
 ---@param alpha number? Default is 1
 ---@param draw boolean? Whether to use DebugLine or DrawLine, Default is false (DebugLine)
+---@return T
 function AutoDrawTransform(transform, size, alpha, draw)
 	if not transform then return end
 	if not transform['pos'] then
@@ -4295,7 +4350,7 @@ function AutoCMD_Parse(path)
 end
 
 function AutoCrash()
-	Spawn('<vehicle/>', Transform())
+	Spawn '<vehicle/>'
 end
 
 --#endregion

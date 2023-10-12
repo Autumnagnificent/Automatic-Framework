@@ -1,4 +1,4 @@
--- VERSION 3.3
+-- VERSION 3.5
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -503,6 +503,19 @@ function AutoVecClamp(v, min, max)
 		AutoClamp(v[1], min, max),
 		AutoClamp(v[2], min, max),
 		AutoClamp(v[3], min, max)
+	}
+end
+
+---Limits a vector to be between min and max vector
+---@param v vector The Vector to clamp
+---@param min vector The minimum
+---@param max vector The maximum
+---@return vector
+function AutoVecClampVec(v, min, max)
+	return {
+		AutoClamp(v[1], min[1], max[1]),
+		AutoClamp(v[2], min[2], max[2]),
+		AutoClamp(v[3], min[3], max[3])
 	}
 end
 
@@ -2474,7 +2487,7 @@ end
 ---A Wrapper for GetShapeClosestPoint; comes with some extra features.
 ---@param shape shape_handle
 ---@param origin vector
----@return { hit:boolean, point:vector, normal:vector, dist:number, dir:vector, dot:number, reflection:vector, body:body_handle }
+---@return { hit:boolean, point:vector, normal:vector, dist:number, dir:vector, dot:number, reflection:vector, shape:shape_handle, body:body_handle }
 function AutoQueryClosestShape(shape, origin)
 	local data = {}
 	data.hit, data.point, data.normal = GetShapeClosestPoint(shape, origin)
@@ -2488,6 +2501,7 @@ function AutoQueryClosestShape(shape, origin)
 		data.dir = dir
 		data.dot = dot
 		data.reflection = VecSub(dir, VecScale(data.normal, 2 * dot))
+		data.shape = shape
 		data.body = GetShapeBody(shape)
 	end
 	
@@ -2545,24 +2559,22 @@ end
 
 ---Checks if a point is in the view using a transform acting as the "Camera"
 ---@param point vector
----@param oftrans transform? The Transform acting as the camera, Default is the Player's Camera
+---@param from_transform transform? The Transform acting as the camera, Default is the Player's Camera
 ---@param angle number? The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean? Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
----@return number angle The Angle the point is away from the center of the looking direction
----@return number distance The Distance from the point to fromtrans
-function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
-	oftrans = AutoDefault(oftrans, GetCameraTransform())
+---@return number? angle The Angle the point is away from the center of the looking direction
+---@return number? distance The Distance from the point to fromtrans
+function AutoPointInView(point, from_transform, angle, raycastcheck, raycasterror)
+	from_transform = AutoDefault(from_transform, GetCameraTransform())
 	angle = AutoDefault(angle, GetInt('options.gfx.fov'))
 	raycastcheck = AutoDefault(raycastcheck, true)
 	raycasterror = AutoDefault(raycasterror, 0)
 	
 	local useangle = not (angle < 0)
 	
-	local fromtopointdir = VecNormalize(VecSub(point, oftrans.pos))
-	local fromdir = AutoTransformFwd(oftrans)
-	
-	local dist = AutoVecDist(oftrans.pos, point)
+	local fromtopointdir = VecNormalize(VecSub(point, from_transform.pos))
+	local fromdir = AutoTransformFwd(from_transform)
 	
 	local dot = VecDot(fromtopointdir, fromdir)
 	local dotangle = math.deg(math.acos(dot))
@@ -2570,12 +2582,14 @@ function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 	
 	seen = (not useangle) and (true) or (seen)
 	
+	local distance = AutoVecDist(point, from_transform.pos)
+
 	if seen then
 		if raycastcheck then
-			local hit, hitdist = QueryRaycast(oftrans.pos, fromtopointdir, dist, 0, true)
+			local hit, hitdist = QueryRaycast(from_transform.pos, fromtopointdir, distance, 0, true)
 			if hit then
 				if raycasterror > 0 then
-					local hitpoint = VecAdd(oftrans.pos, VecScale(fromtopointdir, hitdist))
+					local hitpoint = VecAdd(from_transform.pos, VecScale(fromtopointdir, hitdist))
 					if AutoVecDist(hitpoint, point) > raycasterror then
 						seen = false
 					end
@@ -2586,7 +2600,7 @@ function AutoPointInView(point, oftrans, angle, raycastcheck, raycasterror)
 		end
 	end
 	
-	return seen, dotangle, dist
+	return seen, dotangle, distance
 end
 
 ---Gets the direction the player is inputting and creates a vector.
@@ -2621,7 +2635,7 @@ function AutoRetrievePath(precision)
 end
 
 ---Reject a table of bodies for the next Query
----@param bodies table<body_handle>
+---@param bodies body_handle[]
 function AutoQueryRejectBodies(bodies)
 	for _, h in pairs(bodies) do
 		if h then
@@ -2631,7 +2645,7 @@ function AutoQueryRejectBodies(bodies)
 end
 
 ---Reject a table of shapes for the next Query
----@param shapes table<shape_handle>
+---@param shapes shape_handle[]
 function AutoQueryRejectShapes(shapes)
 	for _, h in pairs(shapes) do
 		if h then
@@ -2768,14 +2782,15 @@ function AutoMoveShapeToNewBody(shape, static)
 	local shape_transform = GetShapeWorldTransform(shape)
 	local shape_body = GetShapeBody(shape)
 
-	local body_transform = Transform(AutoShapeCenter(shape), shape_transform.rot)
+	local shape_center = AutoShapeCenter(shape)
+	local body_transform = Transform(shape_center, shape_transform.rot)
 	local body = Spawn('<body/>', body_transform)[1]
 	SetShapeBody(shape, body, TransformToLocalTransform(body_transform, GetShapeWorldTransform(shape)))
 
 	if static then
 		SetBodyDynamic(body, false)
 	else
-		local shape_body_velocity = { linear = GetBodyVelocity(shape_body), rotational = GetBodyAngularVelocity(shape_body) }
+		local shape_body_velocity = { linear = GetBodyVelocityAtPos(shape_body, shape_center), rotational = GetBodyAngularVelocity(shape_body) }
 
 		SetBodyDynamic(body, true)
 		SetBodyActive(body, true)
@@ -3246,9 +3261,16 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_k
 				str = str .. indent_str:rep(indents+1)
 			end
 			
-			local not_a_number = type(k) ~= "number"
-			local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
-			local prefix = k_str and ((lua_compatible and not_a_number) and string.format("%q", tostring(k)) or k_str) .. " = " or ''
+			-- local k_str = not_a_number and tostring(k) or (show_number_keys and string.format('[%s]', tostring(k)) or false)
+			-- local k_str = not_a_number and (lua_compatible and ("['%s']"):format(tostring(k))) or (show_number_keys and ("[%s]"):format(tostring(k)) and false)
+			local k_str = false
+			if type(k) ~= "number" then
+				k_str = lua_compatible and ("['%s']"):format(tostring(k)) or tostring(k)
+            elseif show_number_keys then
+				k_str = ("[%s]"):format(tostring(k))
+			end
+			
+			local prefix = k_str and k_str .. " = " or ''
 			
 			local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys, indents + 1, visited_tables)
 			str = str .. prefix .. v_str .. ", "

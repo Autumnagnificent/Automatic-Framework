@@ -1,4 +1,4 @@
--- VERSION 3.5
+-- VERSION 3.6
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1091,8 +1091,8 @@ end
 
 ---@param shape shape_handle
 ---@return OBB
-function AutoGetShapeOBB(shape)
-	local transform = GetShapeWorldTransform(shape)
+function AutoGetShapeOBB(shape, local_space)
+	local transform = local_space and Transform() or GetShapeWorldTransform(shape)
 	local x, y, z, scale = GetShapeSize(shape)
 	local size = VecScale(Vec(x, y, z), scale)
 	
@@ -1877,6 +1877,14 @@ function AutoTableCount(t)
 	return c
 end
 
+function AutoSelector(t, f, number_indexed_return)
+	local returns = {}
+	for k, v in pairs(t) do
+		returns[number_indexed_return and #returns+1 or k] = f(v)
+	end
+	return returns
+end
+
 ---Repeats a value `v`, `r` amount of times
 ---@param v any
 ---@param r integer
@@ -2506,6 +2514,25 @@ function AutoQueryClosestShape(shape, origin)
 	end
 	
 	return data
+end
+
+---Unsteps a query from QueryClosestPoint
+---
+---Thank you Dima and Thomasims.
+---@param shape shape_handle
+---@param query_origin vector
+---@param voxel_stepped_point vector
+---@return vector
+function AutoResolveUnsteppedPoint(shape, query_origin, voxel_stepped_point)
+    local shape_world_transform = GetShapeWorldTransform(shape)
+    local relative_query_origin = TransformToLocalPoint(shape_world_transform, query_origin)
+    local relative_query_point = TransformToLocalPoint(shape_world_transform, voxel_stepped_point)
+
+    local _, _, _, scale = GetShapeSize(shape)
+    local offset = AutoVecOne(scale / 2)
+
+    local applied_offset = AutoVecClampVec(relative_query_origin, VecSub(relative_query_point, offset), VecAdd(relative_query_point, offset))
+    return TransformToParentPoint(shape_world_transform, applied_offset) -- Extrapolated
 end
 
 ---Goes through each shape on a body and adds up their voxel count

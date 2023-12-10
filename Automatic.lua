@@ -1,4 +1,4 @@
--- VERSION 3.6
+-- VERSION 3.8
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -1769,7 +1769,7 @@ end
 
 ---Returns the current value of a Second Order System
 ---@param sm Secondary_Motion_Data
----@return number|table<number>|quaternion
+---@return unknown
 function AutoSM_Get(sm)
 	if sm.type ~= 'table' then
 		return sm.data.current
@@ -1785,7 +1785,7 @@ end
 
 ---Returns the current velocity of a Second Order System
 ---@param sm Secondary_Motion_Data
----@return number|table<number>
+---@return unknown
 function AutoSM_GetVelocity(sm)
 	if sm.type ~= 'table' then
 		return sm.data.velocity
@@ -1798,22 +1798,18 @@ end
 ---@param sm Secondary_Motion_Data
 ---@param target number|table<number>|quaternion
 ---@param keep_velocity boolean?
-function AutoSM_Set(sm, target, keep_velocity)
+function AutoSM_Set(sm, target, keep_velocity, keep_previous)
 	if sm.type ~= 'table' then
 		sm.data.current = target
-		sm.data.previous = target
-		if not keep_velocity then
-			
-			sm.data.velocity = 0
-		end
+		
+		if not keep_velocity then sm.data.velocity = 0 end
+		if not keep_previous then sm.data.previous = target end
 	else
 		for k, v in pairs(sm.data) do
 			v.current = target[k]
-			v.previous = target[k]
 			
-			if not keep_velocity then
-				v.velocity = 0
-			end
+			if not keep_velocity then v.velocity = 0 end
+			if not keep_previous then v.previous = target[k] end
 		end
 	end
 end
@@ -2632,7 +2628,7 @@ end
 
 ---Gets the direction the player is inputting and creates a vector.
 ---
----`{ horizontal, 0, -vertical }`
+---`{ horizontal, 0, vertical }`
 ---@param length number?
 ---@return vector
 function AutoPlayerInputDir(length)
@@ -3004,37 +3000,37 @@ end
 --#region Environment
 
 ---@class environment
----@field ambience { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field ambient { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field ambientexponent { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field brightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field constant { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field exposure { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field fogcolor { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field fogparams { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field fogscale { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field nightlight { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field puddleamount { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field puddlesize { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field rain { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field skybox { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field skyboxbrightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field skyboxrot { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field skyboxtint { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field slippery { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field snowamount { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field snowdir { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field snowonground { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sunbrightness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field suncolortint { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sundir { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sunfogscale { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sunglare { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sunlength { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field sunspread { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field waterhurt { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field wetness { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
----@field wind { [1]:any, [2]:any, [3]:any ,[4]:any, [5]:any }
+---@field ambience { [1]:td_path, [2]:number }
+---@field ambient number
+---@field ambientexponent number
+---@field brightness number
+---@field constant { [1]:number, [2]:number, [3]:number }
+---@field exposure { [1]:number, [2]:number }
+---@field fogcolor { [1]:number, [2]:number, [3]:number }
+---@field fogparams { [1]:number, [2]:number, [3]:number, [4]:number }
+---@field fogscale number
+---@field nightlight boolean
+---@field puddleamount number
+---@field puddlesize number
+---@field rain number
+---@field skybox td_path
+---@field skyboxbrightness number
+---@field skyboxrot number
+---@field skyboxtint { [1]:number, [2]:number, [3]:number }
+---@field slippery number
+---@field snowamount { [1]:number, [2]:number }
+---@field snowdir { [1]:number, [2]:number, [3]:number, [4]:number }
+---@field snowonground boolean
+---@field sunbrightness number
+---@field suncolortint { [1]:number, [2]:number, [3]:number }
+---@field sundir { [1]:number, [2]:number, [3]:number }|'auto'|0
+---@field sunfogscale number
+---@field sunglare number
+---@field sunlength number
+---@field sunspread number
+---@field waterhurt number
+---@field wetness number
+---@field wind { [1]:number, [2]:number, [3]:number }
 
 ---@type environment_property
 
@@ -3077,7 +3073,8 @@ function AutoGetEnvironment()
 	
 	local assembled = {}
 	for _, k in ipairs(params) do
-		assembled[k] = { GetEnvironmentProperty(k) }
+		local get = { GetEnvironmentProperty(k) }
+		assembled[k] = #get > 1 and get or get[1]
 	end
 	
 	return assembled
@@ -3087,10 +3084,8 @@ end
 ---@param Environment environment
 function AutoSetEnvironment(Environment)
 	for k, v in pairs(Environment) do
-		if type(v) == "table" then
+		if type(v) == 'table' then
 			SetEnvironmentProperty(k, unpack(v))
-		elseif type(v) == "function" then
-			SetEnvironmentProperty(k, v())
 		else
 			SetEnvironmentProperty(k, v)
 		end
@@ -3173,11 +3168,11 @@ end
 --#region Post Processing
 
 ---@class postprocessing
----@field saturation { [1]:any, [2]:any, [3]:any ,[4]:any }
----@field colorbalance { [1]:any, [2]:any, [3]:any ,[4]:any }
----@field brightness { [1]:any, [2]:any, [3]:any ,[4]:any }
----@field gamma { [1]:any, [2]:any, [3]:any ,[4]:any }
----@field bloom { [1]:any, [2]:any, [3]:any ,[4]:any }
+---@field saturation number
+---@field colorbalance { [1]:number, [2]:number, [3]:number }
+---@field brightness number
+---@field gamma number
+---@field bloom number
 
 ---Returns a table of every property of the current post-processing
 ---@return postprocessing
@@ -3192,7 +3187,8 @@ function AutoGetPostProcessing()
 	
 	local assembled = {}
 	for _, k in ipairs(params) do
-		assembled[k] = { GetPostProcessingProperty(k) }
+		local get = { GetPostProcessingProperty(k) }
+		assembled[k] = #get > 1 and get or get[1]
 	end
 	
 	return assembled
@@ -3201,12 +3197,9 @@ end
 ---Sets every post-processing property of AutoGetPostProcessing
 ---@param PostProcessing postprocessing
 function AutoSetPostProcessing(PostProcessing)
-	
 	for k, v in pairs(PostProcessing) do
-		if type(v) == "table" then
+		if type(v) == 'table' then
 			SetPostProcessingProperty(k, unpack(v))
-		elseif type(v) == "function" then
-			SetPostProcessingProperty(k, v())
 		else
 			SetPostProcessingProperty(k, v)
 		end

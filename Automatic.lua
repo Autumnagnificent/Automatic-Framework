@@ -1,4 +1,4 @@
--- VERSION 3.8
+-- VERSION 4.0
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -169,6 +169,34 @@ function AutoClampLength(v, max)
 	end
 end
 
+function AutoLengthSmallest(...)
+    local args = {...}
+    local minAbsValue = math.abs(args[1])
+
+    for i = 2, #args do
+        local absValue = math.abs(args[i])
+        if absValue < minAbsValue then
+            minAbsValue = absValue
+        end
+    end
+
+    return minAbsValue
+end
+
+function AutoLengthLargest(...)
+    local args = {...}
+    local maxAbsValue = math.abs(args[1])
+
+    for i = 2, #args do
+        local absValue = math.abs(args[i])
+        if absValue > maxAbsValue then
+            maxAbsValue = absValue
+        end
+    end
+
+    return maxAbsValue
+end
+
 ---Wraps a value inbetween a range, Thank you iaobardar for the Optimization
 ---@param v number The number to wrap
 ---@param min number? The minimum range
@@ -238,14 +266,17 @@ end
 ---Normalizes all values in a table to have a magnitude of 1 - Scales every number to still represent the same "direction"
 ---@param t table<number>
 ---@param scale number?
+---@param zero_compatability boolean? If the length is zero, do not normalize values
 ---@return table
-function AutoNormalize(t, scale)
+function AutoNormalize(t, scale, zero_compatability)
 	local norm = {}
 	local maxabs = 0
 	for i = 1, #t do
 		local abs = math.abs(t[i])
 		maxabs = abs > maxabs and abs or maxabs
 	end
+
+	if zero_compatability and maxabs == 0 then maxabs = 1 end
 	
 	for i = 1, #t do
 		norm[i] = t[i] / maxabs * (scale or 1)
@@ -647,6 +678,20 @@ function AutoVecSubsituteZ(v, subz)
 	return new
 end
 
+--- Projects a vector onto a plane defined by its normal.
+---@param vector vector The vector to be projected.
+---@param planeNormal vector The normal vector of the plane.
+---@param rescale boolean? Rescale the projected vector to be the same length as the provided vector
+---@return vector projectedVector The projected vector.
+function AutoVecProjectOntoPlane(vector, planeNormal, rescale)
+    local dotProduct = VecDot(vector, planeNormal)
+    local projection = VecScale(planeNormal, dotProduct)
+    local projectedVector = VecSub(vector, projection)
+	if rescale then return AutoVecRescale(projectedVector, VecLength(vector)) else return projectedVector end
+end
+
+
+
 ---Converts the output of VecDot with normalized vectors to an angle
 ---@param dot number
 ---@return number
@@ -914,6 +959,75 @@ function AutoAABBSubdivideBounds(aa, bb, levels)
 	
 	return bounds
 end
+
+---@param point vector
+---@param lower_bound vector
+---@param upper_bound vector
+---@return boolean
+function AutoAABBInside(lower_bound, upper_bound, point)
+    for i = 1, 3 do
+        if point[i] < lower_bound[i] or point[i] > upper_bound[i] then
+            return false
+        end
+    end
+	
+    return true
+end
+
+
+---@param lower_bound vector
+---@param upper_bound vector
+---@param start_pos vector
+---@param direction vector
+---@param trigger_inside boolean
+---@return { hit:boolean, intersection:vector, normal:vector, dist:number }
+function AutoRaycastAABB(lower_bound, upper_bound, start_pos, direction, trigger_inside)
+    local t1 = (lower_bound[1] - start_pos[1]) / direction[1]
+    local t2 = (upper_bound[1] - start_pos[1]) / direction[1]
+
+    local tmin = math.min(t1, t2)
+    local tmax = math.max(t1, t2)
+
+    for i = 2, 3 do
+        t1 = (lower_bound[i] - start_pos[i]) / direction[i]
+        t2 = (upper_bound[i] - start_pos[i]) / direction[i]
+
+        tmin = math.max(tmin, math.min(t1, t2))
+        tmax = math.min(tmax, math.max(t1, t2))
+    end
+
+    local inside = tmin < 0 and tmax >= 0
+
+    if inside or (tmax >= tmin and tmax >= 0) then
+        local intersection
+        local normal
+
+        if inside and not trigger_inside then
+			return { hit = false }
+        else
+            intersection = VecAdd(start_pos, VecScale(direction, tmin))
+            normal = { 0, 0, 0 }
+
+            for i = 1, 3 do
+                if intersection[i] == lower_bound[i] then
+                    normal[i] = -1
+                elseif intersection[i] == upper_bound[i] then
+                    normal[i] = 1
+                end
+            end
+        end
+
+        return {
+            hit = true,
+            intersection = intersection,
+            normal = normal,
+            dist = tmin
+        }
+    end
+
+    return { hit = false }
+end
+
 
 ---Draws a given Axis Aligned Bounding Box
 ---@param aa vector lower-bound
@@ -3237,21 +3351,20 @@ end
 
 ---Creates a neatly formatted string given any value of any type, including tables
 ---@param t any
----@param singleline_at number?
----@param indent_str string?
 ---@param round_numbers number|false?
+---@param singleline_at number?
 ---@param show_number_keys boolean?
----@param lua_compatible boolean?
 ---@param ignore_keys any[]?
+---@param lua_compatible boolean?
 ---@param indents number?
 ---@param visited_tables table?
 ---@return string
-function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys, indents, visited_tables)
+function AutoToString(t, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible, indents, visited_tables)
 	singleline_at = singleline_at or 1
-	indent_str = indent_str or '  '
 	indents = indents or 0
 	visited_tables = visited_tables or {}
 	
+	local indent_str = '  '
 	local str = ""
 	
 	if type(t) ~= "table" then
@@ -3292,7 +3405,7 @@ function AutoToString(t, singleline_at, indent_str, round_numbers, show_number_k
 			
 			local prefix = k_str and k_str .. " = " or ''
 			
-			local v_str = AutoToString(v, singleline_at - 1, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys, indents + 1, visited_tables)
+			local v_str = AutoToString(v, round_numbers, singleline_at - 1, show_number_keys, ignore_keys, lua_compatible, indents + 1, visited_tables)
 			str = str .. prefix .. v_str .. ", "
 			
 			if not passedSLthreshold then
@@ -3306,16 +3419,17 @@ end
 
 ---A Alternative to DebugPrint that uses AutoToString(), works with tables. Returns the value
 ---@param value any
----@param singleline_at number?
----@param indent_str string?
+---@param format_output string?
 ---@param round_numbers number|false?
+---@param singleline_at number?
 ---@param show_number_keys boolean?
----@param lua_compatible boolean?
 ---@param ignore_keys any[]?
+---@param lua_compatible boolean?
 ---@return any
-function AutoInspect(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
-	local text = AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
-	local split = AutoSplit(text, '\n')
+function AutoInspect(value, format_output, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
+	local text = AutoToString(value, round_numbers, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
+	local formatted_text = format_output and (string.match(format_output, "%%s") ~= nil and string.format(format_output, text) or format_output .. text) or text
+	local split = AutoSplit(formatted_text, '\n')
 	for i=1, #split do
 		local t = split[i]
 		if i > 20 and i == #split then
@@ -3330,14 +3444,16 @@ end
 ---AutoInspect that prints to console
 ---@param value any
 ---@param singleline_at number?
----@param indent_str string?
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
 ---@param ignore_keys any[]?
 ---@return any
-function AutoInspectConsole(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
-	print(AutoToString(value, singleline_at or 3, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys))
+function AutoInspectConsole(value, format_output, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
+	local text = AutoToString(value, round_numbers, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
+	local formatted_text = format_output and (string.match(format_output, "%%s") ~= nil and string.format(format_output, text) or format_output .. text) or text
+
+	print(formatted_text)
 	return value
 end
 
@@ -3347,14 +3463,13 @@ end
 ---@param value any
 ---@param name string?
 ---@param singleline_at number?
----@param indent_str string?
 ---@param round_numbers number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
 ---@param ignore_keys any[]?
-function AutoInspectWatch(value, name, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys)
+function AutoInspectWatch(value, name, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
 	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
-	DebugWatch(name, AutoToString(value, singleline_at, indent_str, round_numbers, show_number_keys, lua_compatible, ignore_keys))
+	DebugWatch(name, AutoToString(value, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible))
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"

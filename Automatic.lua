@@ -1,4 +1,4 @@
--- VERSION 4.0
+-- VERSION 4.01
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -2503,6 +2503,8 @@ function AutoGetScriptHandle()
 			return tonumber(handle)
 		end
 	end
+
+	return 0 -- Compatability for scripts run in a ui environment like Command('game.startui')
 end
 
 ---A Wrapper for QueryRaycast; comes with some extra features.
@@ -3170,9 +3172,9 @@ function AutoGetEnvironment()
 		"skyboxrot",
 		"skyboxtint",
 		"slippery",
-		"snowamount",
-		"snowdir",
-		"snowonground",
+		-- "snowamount", -- SCREWS WITH THINGS IN LATEST RELEASE
+		-- "snowdir", -- SCREWS WITH THINGS IN LATEST RELEASE
+		-- "snowonground", -- SCREWS WITH THINGS IN LATEST RELEASE
 		"sunbrightness",
 		"suncolortint",
 		"sundir",

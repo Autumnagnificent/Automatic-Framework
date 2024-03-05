@@ -2751,7 +2751,7 @@ function AutoPlayerInputDir(length)
 	return VecScale({
 		-InputValue('left') + InputValue('right'),
 		0,
-		-InputValue('down') + InputValue('up'),
+		-InputValue('up') + InputValue('down'),
 	}, length or 1)
 end
 

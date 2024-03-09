@@ -1,4 +1,4 @@
--- VERSION 4.01
+-- VERSION 4.02
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -113,6 +113,24 @@ end
 function AutoSigmoid(v, max, steep, offset)
 	v = AutoDefault(v, math.random(0, 10000) / 10000)
 	return (max or 1) / (1 + math.exp((v - (offset or 0.5)) * (steep or -10)))
+end
+
+---Returns a smoothed value from 0 to 1,
+---
+---If `x` is less than `edge_1`, output `0`.
+---
+---If `x` is more than `edge_2`, output `1`.
+---
+---If `x` is between, interpoalte on a curve
+---
+---This is the "smootherstep" varation
+---@param x number
+---@param edge_1 number
+---@param edge_2 number
+---@return number
+function AutoSmoothStep(x, edge_1, edge_2)
+	x = AutoClamp((x - edge_1) / (edge_2 - edge_1))
+	return x ^ 3 * (x * (6.0 * x - 15.0) + 10.0)
 end
 
 ---Rounds a number.

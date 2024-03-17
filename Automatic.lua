@@ -1,4 +1,4 @@
--- VERSION 4.02
+-- VERSION 4.03
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -121,7 +121,7 @@ end
 ---
 ---If `x` is more than `edge_2`, output `1`.
 ---
----If `x` is between, interpoalte on a curve
+---If `x` is between, interpolate between the two edges
 ---
 ---This is the "smootherstep" varation
 ---@param x number
@@ -131,6 +131,31 @@ end
 function AutoSmoothStep(x, edge_1, edge_2)
 	x = AutoClamp((x - edge_1) / (edge_2 - edge_1))
 	return x ^ 3 * (x * (6.0 * x - 15.0) + 10.0)
+end
+
+---Basically smooth step between `edge_1` and `edge_2`, then smooth step between `edge_2` and `edge_3`
+---
+---If `x` is less than `edge_1`, output `0`.
+---
+---If `x` is `edge_2`, output `1`
+---
+---If `x` is more than `edge_3`, output `0`.
+---
+---If `x` is between, interpolate between the two closest edges
+---
+---@param x number
+---@param edge_1 number
+---@param edge_2 number
+---@param edge_3 number
+---@return number
+function AutoSmoothStep3(x, edge_1, edge_2, edge_3)
+    local t
+    if x < edge_2 then
+        t = AutoSmoothStep(x, edge_1, edge_2)
+    else
+        t = 1.0 - AutoSmoothStep(x, edge_2, edge_3)
+    end
+    return t
 end
 
 ---Rounds a number.

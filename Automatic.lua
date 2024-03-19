@@ -1,4 +1,4 @@
--- VERSION 4.03
+-- VERSION 4.04
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -434,7 +434,15 @@ function AutoVecEquals(a, b)
 end
 
 ---Return a Random Vector with an optional offset and scale
----@param param1 number|vector
+---
+---Not equally distributed! Uses `AutoVecRndSpherical` instead!
+---
+---```
+---AutoVecRnd()
+---AutoVecRnd(2)
+---AutoVecRnd(Vec(0, 1), 0.5)
+---```
+---@param param1 number|vector?
 ---@param param2 number?
 ---@return vector
 function AutoVecRnd(param1, param2)
@@ -444,7 +452,7 @@ function AutoVecRnd(param1, param2)
 		scale = param2 or 1
 	else
 		offset = { 0, 0, 0 }
-		scale = param1
+		scale = param1 or 1
 	end
 	
 	local rndVec = VecNormalize({
@@ -453,8 +461,41 @@ function AutoVecRnd(param1, param2)
 		(math.random() * 2 - 1),
 	})
 	
-	local v = VecAdd(offset, VecScale(rndVec, scale))
-	return v
+	return VecAdd(offset, VecScale(rndVec, scale))
+end
+
+---Return ask Random Vector on a Sphere with an optional offset and scale
+---
+---Ensures more even distribution
+---
+---```
+---AutoVecRndSpherical()
+---AutoVecRndSpherical(2)
+---AutoVecRndSpherical(Vec(0, 1), 0.5)
+---```
+---@param param1 number|vector?
+---@param param2 number?
+---@return vector
+function AutoVecRndSpherical(param1, param2)
+	local offset, scale
+	if type(param1) == "table" then
+		offset = param1
+		scale = param2 or 1
+	else
+		offset = { 0, 0, 0 }
+		scale = param1 or 1
+	end
+	
+	local theta = math.random() * 2 * math.pi
+    local phi = math.acos(math.random() * 2 - 1)
+
+    local v = {
+		math.sin(phi) * math.cos(theta),
+		math.sin(phi) * math.sin(theta),
+		math.cos(phi)
+	}
+
+	return VecAdd(offset, VecScale(v, scale))
 end
 
 ---Return the Distance between Two Vectors

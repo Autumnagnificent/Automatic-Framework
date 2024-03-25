@@ -1,4 +1,4 @@
--- VERSION 4.04
+-- VERSION 4.1
 -- I ask that you please do not rename Automatic.lua - Thankyou
 
 --#region Documentation
@@ -498,6 +498,25 @@ function AutoVecRndSpherical(param1, param2)
 	return VecAdd(offset, VecScale(v, scale))
 end
 
+---Return a random vector within a Hemisphere, pointing towrads the negative Z axis
+---
+---Ensures even distribution within the specified angle range
+---
+---@return vector
+function AutoVecRndHemi(from_dot, to_dot)
+    local phi = math.acos(AutoMap(math.random(), 0, 1, from_dot or 0, to_dot or 1))
+    local theta = math.random() * 2 * math.pi
+
+    local v = {
+        math.sin(phi) * math.cos(theta),
+        math.sin(phi) * math.sin(theta),
+        math.cos(phi)
+    }
+
+    return v
+end
+
+
 ---Return the Distance between Two Vectors
 ---@param a vector
 ---@param b vector
@@ -658,9 +677,9 @@ end
 ---@return vector
 function AutoVecMulti(a, b)
 	return {
-		a[1] * b[1],
-		a[2] * b[2],
-		a[3] * b[3],
+		(a[1] or 0) * (b[1] or 0),
+		(a[2] or 0) * (b[2] or 0),
+		(a[3] or 0) * (b[3] or 0),
 	}
 end
 
@@ -670,9 +689,9 @@ end
 ---@return vector
 function AutoVecDiv(a, b)
 	return {
-		a[1] / b[1],
-		a[2] / b[2],
-		a[3] / b[3],
+		(a[1] or 0) / (b[1] or 0),
+		(a[2] or 0) / (b[2] or 0),
+		(a[3] or 0) / (b[3] or 0),
 	}
 end
 
@@ -682,9 +701,9 @@ end
 ---@return vector
 function AutoVecPow(a, b)
 	return {
-		a[1] ^ b,
-		a[2] ^ b,
-		a[3] ^ b,
+		(a[1] or 0) ^ (b or 0),
+		(a[2] or 0) ^ (b or 0),
+		(a[3] or 0) ^ (b or 0),
 	}
 end
 
@@ -840,6 +859,25 @@ end
 ---Thankyou to Mathias for this function
 function AutoQuatNearest(a, b)
 	return AutoQuatDot(a, b) < 0 and { -a[1], -a[2], -a[3], -a[4] } or { a[1], a[2], a[3], a[4] }
+end
+
+--- Returns the angle of which a quaternion is rotated about a given axis
+---
+--- Credit goes to Mathias, thank you!
+function AutoQuatAngleAboutAxis(q, axis)
+    local qXYZ = Vec(q[1], q[2], q[3])
+    local co = q[4]
+    local si = VecDot(axis, qXYZ) / VecDot(axis, axis)
+
+    if si == 0 then return 0 end
+
+    -- eliminate double-cover
+    if co < 0 then
+        co = -co
+        si = -si
+    end
+
+    return math.deg(2.0 * math.atan2(si, co))
 end
 
 ---Same as `QuatAxisAngle()` but takes a single vector instead of a unit vector + an angle, for convenience
@@ -1493,12 +1531,12 @@ end
 --#endregion
 --#region Sphere Functions
 
-function AutoFibonacciSphere(numPoints, sphere_origin, sphere_radius)
+function AutoFibonacciSphere(numPoints, sphere_origin, sphere_radius, y_multi)
     local points = {}
     local phi = math.pi * (3.0 - math.sqrt(5.0)) -- Golden angle in radians
 
     for i = 0, numPoints - 1 do
-        local y = 1 - (i / (numPoints - 1)) * 2 -- Range from -1 to 1
+        local y = 1 - (i / (numPoints - 1)) * 2 * (y_multi or 1) -- Range from -1 to 1
         local radiusY = math.sqrt(1 - y * y)
         local theta = phi * i -- Golden angle increment
 
@@ -2731,6 +2769,21 @@ function AutoResolveUnsteppedPoint(shape, query_origin, voxel_stepped_point)
     return TransformToParentPoint(shape_world_transform, applied_offset) -- Extrapolated
 end
 
+---@param shapes_a shape_handle[]
+---@param shapes_b shape_handle[]
+---@return boolean
+function AutoIsShapesTouchingShapes(shapes_a, shapes_b)
+	for i=1, #shapes_a do
+		local sa = shapes_a[i]
+		for j=1, #shapes_b do
+			local sb = shapes_b[j]
+			if sa ~= sb and IsShapeTouching(sa, sb) then return true end
+		end
+	end
+
+	return false
+end
+
 ---Goes through each shape on a body and adds up their voxel count
 ---@param body body_handle
 ---@return integer
@@ -3952,6 +4005,26 @@ end
 --#endregion
 --#region User Interface
 
+---Raycasts to an imaginary plane, useful for getting a point in which UIWorldToPixel will not work
+---@param origin vector
+---@param direction vector
+---@param plane_distance number
+---@param camera_fov number
+---@return number, number
+function AutoUIRaycastPlane(origin, direction, plane_distance, camera_fov)
+    local vertical_fov_rad = math.rad(camera_fov)
+    local tan_vertical_fov_rad = math.tan(vertical_fov_rad / 2)
+
+    local intersection = {
+        direction[1] / tan_vertical_fov_rad / direction[3] - origin[1] / (plane_distance - origin[3]),
+        direction[2] / tan_vertical_fov_rad / direction[3] - origin[2] / (plane_distance - origin[3]),
+    }
+
+	local bounds_x = AutoUiBounds()
+
+    return -intersection[1] * (bounds_x / 2), intersection[2] * (bounds_x / 2)
+end
+
 ---UiTranslate and UiAlign to the Center
 function AutoUiCenter()
 	UiTranslate(UiCenter(), UiMiddle())
@@ -3965,6 +4038,14 @@ end
 function AutoUiBounds(subtract)
 	subtract = subtract or 0
 	return UiWidth() - subtract, UiHeight() - subtract
+end
+
+---@param a table
+---@param b table?
+---@return number
+function AutoUiDistance(a, b)
+	b = b or { 0, 0 }
+    return VecLength(VecSub(Vec(a[1], a[2]), Vec(b[1], b[2])))
 end
 
 ---Draws a line between two points in screen space

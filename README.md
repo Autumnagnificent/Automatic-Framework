@@ -10,3 +10,5 @@ You can setup the Lua-server-document (Which allows for hand documented function
 https://github.com/SpunkyTheHedgeHog/Teardown-Totally-Documented/blob/main/lua-server-docs.lua
 
 _duck.vox is not required._
+
+![Automatic](https://github.com/Autumnagnificent/Automatic-Framework/blob/master/Automatic%20Framework.png?raw=true)

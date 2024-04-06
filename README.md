@@ -9,4 +9,6 @@ I strongly recommend you to use this in combinination with **VScode**, and the *
 You can setup the Lua-server-document (Which allows for hand documented functions, and Autocompletion) here :
 https://github.com/SpunkyTheHedgeHog/Teardown-Totally-Documented/blob/main/lua-server-docs.lua
 
-_duck.vox is not required._
+_duck.vox nor the logo is required._
+
+![Automatic](https://github.com/Autumnagnificent/Automatic-Framework/blob/master/Automatic%20Framework.png?raw=true)

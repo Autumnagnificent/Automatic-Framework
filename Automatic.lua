@@ -1449,12 +1449,12 @@ end
 ---@param pattern 0|1|2|3
 ---@param patternstrength number
 ---@param oneway boolean?
+---@param draw_function function?
 ---@param r number?
 ---@param g number?
 ---@param b number?
 ---@param a number?
----@param linefunction function?
-function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, linefunction)
+function AutoDrawPlane(plane, pattern, patternstrength, oneway, draw_function, r, g, b, a)
 	local pos = plane.pos or Vec(0, 0, 0)
 	local rot = plane.rot or Quat()
 	local size = plane.size or Vec(1, 1, 1)
@@ -1479,7 +1479,7 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 	r, g, b, a = r or 1, g or 1, b or 1, a or 1
 	pattern = pattern or 0
 	
-	linefunction = linefunction or DebugLine
+	draw_function = draw_function or DebugLine
 	
 	-- Draw the grid
 	if pattern == 0 then
@@ -1490,14 +1490,14 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 			local subV1 = VecLerp(corner1, corner4, i / patternstrength)
 			local subV2 = VecLerp(corner2, corner3, i / patternstrength)
 			
-			linefunction(subH1, subH2, r, g, b, a)
-			linefunction(subV1, subV2, r, g, b, a)
+			draw_function(subH1, subH2, r, g, b, a)
+			draw_function(subV1, subV2, r, g, b, a)
 		end
 	elseif pattern > 0 then
-		linefunction(corner1, corner2, r, g, b, a)
-		linefunction(corner2, corner3, r, g, b, a)
-		linefunction(corner3, corner4, r, g, b, a)
-		linefunction(corner4, corner1, r, g, b, a)
+		draw_function(corner1, corner2, r, g, b, a)
+		draw_function(corner2, corner3, r, g, b, a)
+		draw_function(corner3, corner4, r, g, b, a)
+		draw_function(corner4, corner1, r, g, b, a)
 	end
 	
 	if pattern == 1 or pattern == 3 then
@@ -1507,7 +1507,7 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 			local p1 = t <= 1 and VecLerp(corner1, corner2, t) or VecLerp(corner2, corner3, t - 1)
 			local p2 = t <= 1 and VecLerp(corner1, corner4, t) or VecLerp(corner4, corner3, t - 1)
 			
-			linefunction(p1, p2, r, g, b, a)
+			draw_function(p1, p2, r, g, b, a)
 		end
 	end
 	
@@ -1518,13 +1518,13 @@ function AutoDrawPlane(plane, pattern, patternstrength, oneway, r, g, b, a, line
 			local p1 = t <= 1 and VecLerp(corner2, corner3, t) or VecLerp(corner3, corner4, t - 1)
 			local p2 = t <= 1 and VecLerp(corner2, corner1, t) or VecLerp(corner1, corner4, t - 1)
 			
-			linefunction(p1, p2, r, g, b, a)
+			draw_function(p1, p2, r, g, b, a)
 		end
 		
-		linefunction(corner1, corner2, r, g, b, a)
-		linefunction(corner2, corner3, r, g, b, a)
-		linefunction(corner3, corner4, r, g, b, a)
-		linefunction(corner4, corner1, r, g, b, a)
+		draw_function(corner1, corner2, r, g, b, a)
+		draw_function(corner2, corner3, r, g, b, a)
+		draw_function(corner3, corner4, r, g, b, a)
+		draw_function(corner4, corner1, r, g, b, a)
 	end
 end
 
@@ -2406,7 +2406,7 @@ end
 ---@param hue number? The hue from 0 to 1
 ---@param sat number? The saturation from 0 to 1
 ---@param val number? The value from 0 to 1
----@return number, number, number Returns the red, green, blue of the given hue, saturation, value
+---@return number, number, number rgb Returns the red, green, blue of the given hue, saturation, value
 function AutoHSVToRGB(hue, sat, val)
 	local r, g, b
 	
@@ -3490,7 +3490,7 @@ end
 
 ---Creates a neatly formatted string given any value of any type, including tables
 ---@param t any
----@param round_numbers number|false?
+---@param floating_point number|false?
 ---@param singleline_at number?
 ---@param show_number_keys boolean?
 ---@param ignore_keys any[]?
@@ -3498,7 +3498,7 @@ end
 ---@param indents number?
 ---@param visited_tables table?
 ---@return string
-function AutoToString(t, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible, indents, visited_tables)
+function AutoToString(t, floating_point, singleline_at, show_number_keys, ignore_keys, lua_compatible, indents, visited_tables)
 	singleline_at = singleline_at or 1
 	indents = indents or 0
 	visited_tables = visited_tables or {}
@@ -3510,8 +3510,8 @@ function AutoToString(t, round_numbers, singleline_at, show_number_keys, ignore_
 		if type(t) == "string" then
 			return string.format("%q", t)
 		elseif type(t) == 'number' then
-			if round_numbers then
-				return tostring(AutoRound(t, round_numbers))
+			if floating_point then
+				return string.format('%.' .. tostring(floating_point) .. 'f', t)
 			else
 				return tostring(t)
 			end
@@ -3544,7 +3544,7 @@ function AutoToString(t, round_numbers, singleline_at, show_number_keys, ignore_
 			
 			local prefix = k_str and k_str .. " = " or ''
 			
-			local v_str = AutoToString(v, round_numbers, singleline_at - 1, show_number_keys, ignore_keys, lua_compatible, indents + 1, visited_tables)
+			local v_str = AutoToString(v, floating_point, singleline_at - 1, show_number_keys, ignore_keys, lua_compatible, indents + 1, visited_tables)
 			str = str .. prefix .. v_str .. ", "
 			
 			if not passedSLthreshold then
@@ -3559,14 +3559,14 @@ end
 ---A Alternative to DebugPrint that uses AutoToString(), works with tables. Returns the value
 ---@param value any
 ---@param format_output string?
----@param round_numbers number|false?
+---@param floating_point number|false?
 ---@param singleline_at number?
 ---@param show_number_keys boolean?
 ---@param ignore_keys any[]?
 ---@param lua_compatible boolean?
 ---@return any
-function AutoInspect(value, format_output, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
-	local text = AutoToString(value, round_numbers, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
+function AutoInspect(value, format_output, floating_point, singleline_at, show_number_keys, ignore_keys, lua_compatible)
+	local text = AutoToString(value, floating_point, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
 	local formatted_text = format_output and (string.match(format_output, "%%s") ~= nil and string.format(format_output, text) or format_output .. text) or text
 	local split = AutoSplit(formatted_text, '\n')
 	for i=1, #split do
@@ -3583,13 +3583,13 @@ end
 ---AutoInspect that prints to console
 ---@param value any
 ---@param singleline_at number?
----@param round_numbers number|false?
+---@param floating_point number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
 ---@param ignore_keys any[]?
 ---@return any
-function AutoInspectConsole(value, format_output, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
-	local text = AutoToString(value, round_numbers, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
+function AutoInspectConsole(value, format_output, floating_point, singleline_at, show_number_keys, ignore_keys, lua_compatible)
+	local text = AutoToString(value, floating_point, singleline_at or 3, show_number_keys, ignore_keys, lua_compatible)
 	local formatted_text = format_output and (string.match(format_output, "%%s") ~= nil and string.format(format_output, text) or format_output .. text) or text
 
 	print(formatted_text)
@@ -3602,13 +3602,14 @@ end
 ---@param value any
 ---@param name string?
 ---@param singleline_at number?
----@param round_numbers number|false?
+---@param floating_point number|false?
 ---@param show_number_keys boolean?
 ---@param lua_compatible boolean?
 ---@param ignore_keys any[]?
-function AutoInspectWatch(value, name, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible)
+function AutoInspectWatch(value, name, floating_point, singleline_at, show_number_keys, ignore_keys, lua_compatible)
 	if not name then name = 'Inspecting Line ' .. AutoGetCurrentLine(1) end
-	DebugWatch(name, AutoToString(value, round_numbers, singleline_at, show_number_keys, ignore_keys, lua_compatible))
+	DebugWatch(name, AutoToString(value, floating_point, singleline_at, show_number_keys, ignore_keys, lua_compatible))
+	return value
 end
 
 ---Prints 24 blank lines to quote on quote, "clear the console"

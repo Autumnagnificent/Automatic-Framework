@@ -1,11 +1,9 @@
--- VERSION 4.1
--- I ask that you please do not rename Automatic.lua - Thankyou
+--[[
+	VERSION 4.5
+	I ask that you do not rename Automatic.lua - Thank you
+	Documentation assumes that you are using Teardown Totally Documented's lua library for type annotations.
+]]
 
---#region Documentation
-
----Documentation Assumes that TDTD's library is in the environemnt
-
---#endregion
 --#region Shortcuts
 
 AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
@@ -849,6 +847,19 @@ function AutoQuatInverse(quat)
 	local norm = quat[1] ^ 2 + quat[2] ^ 2 + quat[3] ^ 2 + quat[4] ^ 2
 	local inverse = { -quat[1] / norm, -quat[2] / norm, -quat[3] / norm, quat[4] / norm }
 	return inverse
+end
+
+---@param quat_to_inverse quaternion
+---@param quat quaternion
+---@return quaternion
+function AutoQuatInverseRotate(quat_to_inverse, quat)
+	return QuatRotateQuat(AutoQuatInverse(quat_to_inverse), quat)
+end
+
+---@param quat quaternion
+---@param scalar number
+function AutoQuatScale(quat, scalar)
+	return QuatSlerp(Quat(), quat, scalar)
 end
 
 ---Between -a and a, picks the quaternion nearest to b
@@ -2361,6 +2372,19 @@ end
 ---@return transform
 function AutoTransformOffset(t, offset)
 	return Transform(TransformToParentPoint(t, offset), t.rot)
+end
+
+--- Rotates a transform around a given point
+---@param transform transform The original transform
+---@param point vector The point around which to rotate
+---@param rotation quaternion The rotation to apply
+---@return transform rotated_transform The rotated transform
+function AutoTransformRotateAroundPoint(transform, point, rotation)
+	local transform_relative_to_point = Transform(VecSub(transform.pos, point), transform.rot)
+	local rotated_transform = TransformToParentTransform(Transform(Vec(), rotation), transform_relative_to_point)
+	rotated_transform.pos = VecAdd(rotated_transform.pos, point)
+	
+    return rotated_transform
 end
 
 ---Equivalent to `{ GetQuatEuler(quat) }`

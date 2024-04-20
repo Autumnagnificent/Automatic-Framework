@@ -1,5 +1,5 @@
 --[[
-	VERSION 4.5
+	VERSION 4.6
 	I ask that you do not rename Automatic.lua - Thank you
 	Documentation assumes that you are using Teardown Totally Documented's lua library for type annotations.
 ]]
@@ -8,7 +8,7 @@
 
 AutoFlatSprite = LoadSprite('ui/menu/white_32.png')
 AutoPalette = {
-    vfchill = {
+	vfchill = {
 		background_dark =  { 0.28627450980392, 0.25490196078431,  0.38039215686275 },
 		background_light = { 0.41960784313725, 0.39607843137255,  0.58823529411765 },
 		wood_dark =        { 0.6,              0.33725490196078,  0.42352941176471 },
@@ -39,7 +39,7 @@ AutoPalette = {
 		blue_light =       { 0.19607843137255, 0.61176470588235,  0.78823529411765 },
 		alert_dark =       { 0.22352941176471, 0.098039215686275, 0.2              },
 		alert_light =      { 0.74901960784314, 0.21960784313725,  0.49019607843137 },
-    },
+	},
 	catppuccin = { -- macchiato
 		rosewater = { 0.95686274509804,  0.85882352941176,  0.83921568627451 },
 		flamingo =  { 0.94117647058824,  0.77647058823529,  0.77647058823529 },
@@ -147,13 +147,13 @@ end
 ---@param edge_3 number
 ---@return number
 function AutoSmoothStep3(x, edge_1, edge_2, edge_3)
-    local t
-    if x < edge_2 then
-        t = AutoSmoothStep(x, edge_1, edge_2)
-    else
-        t = 1.0 - AutoSmoothStep(x, edge_2, edge_3)
-    end
-    return t
+	local t
+	if x < edge_2 then
+		t = AutoSmoothStep(x, edge_1, edge_2)
+	else
+		t = 1.0 - AutoSmoothStep(x, edge_2, edge_3)
+	end
+	return t
 end
 
 ---Rounds a number.
@@ -211,31 +211,31 @@ function AutoClampLength(v, max)
 end
 
 function AutoLengthSmallest(...)
-    local args = {...}
-    local minAbsValue = math.abs(args[1])
+	local args = {...}
+	local minAbsValue = math.abs(args[1])
 
-    for i = 2, #args do
-        local absValue = math.abs(args[i])
-        if absValue < minAbsValue then
-            minAbsValue = absValue
-        end
-    end
+	for i = 2, #args do
+		local absValue = math.abs(args[i])
+		if absValue < minAbsValue then
+			minAbsValue = absValue
+		end
+	end
 
-    return minAbsValue
+	return minAbsValue
 end
 
 function AutoLengthLargest(...)
-    local args = {...}
-    local maxAbsValue = math.abs(args[1])
+	local args = {...}
+	local maxAbsValue = math.abs(args[1])
 
-    for i = 2, #args do
-        local absValue = math.abs(args[i])
-        if absValue > maxAbsValue then
-            maxAbsValue = absValue
-        end
-    end
+	for i = 2, #args do
+		local absValue = math.abs(args[i])
+		if absValue > maxAbsValue then
+			maxAbsValue = absValue
+		end
+	end
 
-    return maxAbsValue
+	return maxAbsValue
 end
 
 ---Wraps a value inbetween a range, Thank you iaobardar for the Optimization
@@ -485,9 +485,9 @@ function AutoVecRndSpherical(param1, param2)
 	end
 	
 	local theta = math.random() * 2 * math.pi
-    local phi = math.acos(math.random() * 2 - 1)
+	local phi = math.acos(math.random() * 2 - 1)
 
-    local v = {
+	local v = {
 		math.sin(phi) * math.cos(theta),
 		math.sin(phi) * math.sin(theta),
 		math.cos(phi)
@@ -496,22 +496,32 @@ function AutoVecRndSpherical(param1, param2)
 	return VecAdd(offset, VecScale(v, scale))
 end
 
----Return a random vector within a Hemisphere, pointing towrads the negative Z axis
+--- Return a random vector pointing towards the negative Z axis, randomized between two angles (in radians)
 ---
----Ensures even distribution within the specified angle range
+--- Ensures even distribution within the specified angle range
 ---
----@return vector
-function AutoVecRndHemi(from_dot, to_dot)
-    local phi = math.acos(AutoMap(math.random(), 0, 1, from_dot or 0, to_dot or 1))
-    local theta = math.random() * 2 * math.pi
+---@param base_vector table The base vector to randomize (optional)
+---@param from_rad number The starting angle in radians
+---@param to_rad number The ending angle in radians
+---@param force_theta number? Forces the "z" rotation
+---@return table A random vector within the specified hemisphere
+function AutoVecRndAngle(base_vector, from_rad, to_rad, force_theta)
+	local rad = math.pi - AutoMap(math.random(), 0, 1, from_rad, to_rad) / 2
+	local theta = force_theta or (math.random() * 2 * math.pi)
 
-    local v = {
-        math.sin(phi) * math.cos(theta),
-        math.sin(phi) * math.sin(theta),
-        math.cos(phi)
-    }
+	local v = {
+		math.sin(rad) * math.cos(theta),
+		math.sin(rad) * math.sin(theta),
+		math.cos(rad)
+	}
 
-    return v
+	if base_vector then
+		local quat = QuatLookAt(nil, VecNormalize(base_vector))
+		return VecScale(QuatRotateVec(quat, v), VecLength(base_vector))
+	else
+		v[3] = -v[3]
+		return v
+	end
 end
 
 
@@ -752,6 +762,41 @@ function AutoVecRotate(vec, axis, angle)
 	return QuatRotateVec(quat, vec)
 end
 
+-- Function to perform spherical interpolation between two normalized vectors
+function AutoVecSlerp(v1, v2, t)
+	-- Ensure vectors are normalized
+	v1 = VecNormalize(v1)
+	v2 = VecNormalize(v2)
+
+	-- Calculate the dot product
+	local dotProduct = VecDot(v1, v2)
+
+	-- Clamp the dot product to ensure it stays within [-1, 1]
+	dotProduct = math.max(math.min(dotProduct, 1), -1)
+
+	-- Calculate the angle between the two vectors
+	local theta = math.acos(dotProduct)
+
+	-- If the angle is zero, return either vector
+	if theta == 0 then
+		return v1
+	end
+
+	-- Interpolate
+	local sinTheta = math.sin(theta)
+	local coef1 = math.sin((1 - t) * theta) / sinTheta
+	local coef2 = math.sin(t * theta) / sinTheta
+
+	local result = {
+		v1[1] * coef1 + v2[1] * coef2,
+		v1[2] * coef1 + v2[2] * coef2,
+		v1[3] * coef1 + v2[3] * coef2
+	}
+
+	-- Normalize the result and return
+	return VecNormalize(result)
+end
+
 ---Return `v` with it's `x` value replaced by `subx`
 ---@param v vector
 ---@param subx number
@@ -785,9 +830,9 @@ end
 ---@param rescale boolean? Rescale the projected vector to be the same length as the provided vector
 ---@return vector projectedVector The projected vector.
 function AutoVecProjectOntoPlane(vector, planeNormal, rescale)
-    local dotProduct = VecDot(vector, planeNormal)
-    local projection = VecScale(planeNormal, dotProduct)
-    local projectedVector = VecSub(vector, projection)
+	local dotProduct = VecDot(vector, planeNormal)
+	local projection = VecScale(planeNormal, dotProduct)
+	local projectedVector = VecSub(vector, projection)
 	if rescale then return AutoVecRescale(projectedVector, VecLength(vector)) else return projectedVector end
 end
 
@@ -876,19 +921,19 @@ end
 ---
 --- Credit goes to Mathias, thank you!
 function AutoQuatAngleAboutAxis(q, axis)
-    local qXYZ = Vec(q[1], q[2], q[3])
-    local co = q[4]
-    local si = VecDot(axis, qXYZ) / VecDot(axis, axis)
+	local qXYZ = Vec(q[1], q[2], q[3])
+	local co = q[4]
+	local si = VecDot(axis, qXYZ) / VecDot(axis, axis)
 
-    if si == 0 then return 0 end
+	if si == 0 then return 0 end
 
-    -- eliminate double-cover
-    if co < 0 then
-        co = -co
-        si = -si
-    end
+	-- eliminate double-cover
+	if co < 0 then
+		co = -co
+		si = -si
+	end
 
-    return math.deg(2.0 * math.atan2(si, co))
+	return math.deg(2.0 * math.atan2(si, co))
 end
 
 ---Same as `QuatAxisAngle()` but takes a single vector instead of a unit vector + an angle, for convenience
@@ -1098,13 +1143,13 @@ end
 ---@param upper_bound vector
 ---@return boolean
 function AutoAABBInside(lower_bound, upper_bound, point)
-    for i = 1, 3 do
-        if point[i] < lower_bound[i] or point[i] > upper_bound[i] then
-            return false
-        end
-    end
+	for i = 1, 3 do
+		if point[i] < lower_bound[i] or point[i] > upper_bound[i] then
+			return false
+		end
+	end
 	
-    return true
+	return true
 end
 
 
@@ -1115,50 +1160,50 @@ end
 ---@param trigger_inside boolean
 ---@return { hit:boolean, intersection:vector, normal:vector, dist:number }
 function AutoRaycastAABB(lower_bound, upper_bound, start_pos, direction, trigger_inside)
-    local t1 = (lower_bound[1] - start_pos[1]) / direction[1]
-    local t2 = (upper_bound[1] - start_pos[1]) / direction[1]
+	local t1 = (lower_bound[1] - start_pos[1]) / direction[1]
+	local t2 = (upper_bound[1] - start_pos[1]) / direction[1]
 
-    local tmin = math.min(t1, t2)
-    local tmax = math.max(t1, t2)
+	local tmin = math.min(t1, t2)
+	local tmax = math.max(t1, t2)
 
-    for i = 2, 3 do
-        t1 = (lower_bound[i] - start_pos[i]) / direction[i]
-        t2 = (upper_bound[i] - start_pos[i]) / direction[i]
+	for i = 2, 3 do
+		t1 = (lower_bound[i] - start_pos[i]) / direction[i]
+		t2 = (upper_bound[i] - start_pos[i]) / direction[i]
 
-        tmin = math.max(tmin, math.min(t1, t2))
-        tmax = math.min(tmax, math.max(t1, t2))
-    end
+		tmin = math.max(tmin, math.min(t1, t2))
+		tmax = math.min(tmax, math.max(t1, t2))
+	end
 
-    local inside = tmin < 0 and tmax >= 0
+	local inside = tmin < 0 and tmax >= 0
 
-    if inside or (tmax >= tmin and tmax >= 0) then
-        local intersection
-        local normal
+	if inside or (tmax >= tmin and tmax >= 0) then
+		local intersection
+		local normal
 
-        if inside and not trigger_inside then
+		if inside and not trigger_inside then
 			return { hit = false }
-        else
-            intersection = VecAdd(start_pos, VecScale(direction, tmin))
-            normal = { 0, 0, 0 }
+		else
+			intersection = VecAdd(start_pos, VecScale(direction, tmin))
+			normal = { 0, 0, 0 }
 
-            for i = 1, 3 do
-                if intersection[i] == lower_bound[i] then
-                    normal[i] = -1
-                elseif intersection[i] == upper_bound[i] then
-                    normal[i] = 1
-                end
-            end
-        end
+			for i = 1, 3 do
+				if intersection[i] == lower_bound[i] then
+					normal[i] = -1
+				elseif intersection[i] == upper_bound[i] then
+					normal[i] = 1
+				end
+			end
+		end
 
-        return {
-            hit = true,
-            intersection = intersection,
-            normal = normal,
-            dist = tmin
-        }
-    end
+		return {
+			hit = true,
+			intersection = intersection,
+			normal = normal,
+			dist = tmin
+		}
+	end
 
-    return { hit = false }
+	return { hit = false }
 end
 
 
@@ -1543,25 +1588,25 @@ end
 --#region Sphere Functions
 
 function AutoFibonacciSphere(numPoints, sphere_origin, sphere_radius, y_multi)
-    local points = {}
-    local phi = math.pi * (3.0 - math.sqrt(5.0)) -- Golden angle in radians
+	local points = {}
+	local phi = math.pi * (3.0 - math.sqrt(5.0)) -- Golden angle in radians
 
-    for i = 0, numPoints - 1 do
-        local y = 1 - (i / (numPoints - 1)) * 2 * (y_multi or 1) -- Range from -1 to 1
-        local radiusY = math.sqrt(1 - y * y)
-        local theta = phi * i -- Golden angle increment
+	for i = 0, numPoints - 1 do
+		local y = 1 - (i / (numPoints - 1)) * 2 * (y_multi or 1) -- Range from -1 to 1
+		local radiusY = math.sqrt(1 - y * y)
+		local theta = phi * i -- Golden angle increment
 
-        local x = math.cos(theta) * radiusY
-        local z = math.sin(theta) * radiusY
+		local x = math.cos(theta) * radiusY
+		local z = math.sin(theta) * radiusY
 
-        points[i] = {
-            x * sphere_radius + sphere_origin[1],
-            y * sphere_radius + sphere_origin[2],
-            z * sphere_radius + sphere_origin[3],
+		points[i] = {
+			x * sphere_radius + sphere_origin[1],
+			y * sphere_radius + sphere_origin[2],
+			z * sphere_radius + sphere_origin[3],
 		}
-    end
+	end
 
-    return points
+	return points
 end
 
 ---@param sphere_origin vector Origin of the sphere
@@ -1569,22 +1614,22 @@ end
 ---@param quality number? Default is 1
 ---@param draw_function function? Function used for drawing. Default is `DebugLine`
 ---@vararg any draw_parameters Parameters fed into `draw_function`
-function AutoDrawSphereTangent(sphere_origin, sphere_radius, quality, draw_function, ... )
-	local camera = GetCameraTransform()
-	local camera_up = AutoTransformUp(camera)
-	local diff_to_camera = VecSub(camera.pos, sphere_origin)
+function AutoDrawSphereTangent(sphere_origin, sphere_radius, quality, force_view_transform, draw_function, ... )
+	local view = force_view_transform or GetCameraTransform()
+	local camera_up = AutoTransformUp(view)
+	local diff_to_camera = VecSub(view.pos, sphere_origin)
 	local dist = VecLength(diff_to_camera)
 	local dir = VecNormalize(diff_to_camera)
-    local cross = VecCross(camera_up, dir)
+	local cross = VecCross(camera_up, dir)
 	draw_function = draw_function or DebugLine
 	
 	local step_size = ((math.max(dist, 1) ^ 0.5) / (64 * (quality or 1)) / (math.max(sphere_radius ^ 0.5, 0.01)))* 360
 	local last_point
-    for a = 0, 360, step_size do
-        local next_point = VecAdd(sphere_origin, QuatRotateVec(QuatAxisAngle(dir, a), VecScale(cross, sphere_radius)))
+	for a = 0, 360, step_size do
+		local next_point = VecAdd(sphere_origin, QuatRotateVec(QuatAxisAngle(dir, a), VecScale(cross, sphere_radius)))
 		if last_point then draw_function(last_point, next_point, ... ) end
-        last_point = next_point
-    end
+		last_point = next_point
+	end
 
 	draw_function(last_point, VecAdd(sphere_origin, VecScale(cross, sphere_radius)), ... )
 end
@@ -1595,52 +1640,52 @@ end
 ---@param direction vector
 ---@return { hit:boolean, intersections:{ [1]:vector, [2]:vector }, normals:{ [1]:vector, [2]:vector }, dists:{ [1]:number, [2]:number } }
 function AutoRaycastSphere(sphere_origin, sphere_radius, startPos, direction)
-    local center = sphere_origin or Vec(0, 0, 0)
-    local radius = sphere_radius or 1
+	local center = sphere_origin or Vec(0, 0, 0)
+	local radius = sphere_radius or 1
 
-    local rayToSphere = VecSub(center, startPos)
-    local tca = VecDot(rayToSphere, direction)
-    local d2 = VecDot(rayToSphere, rayToSphere) - tca * tca
+	local rayToSphere = VecSub(center, startPos)
+	local tca = VecDot(rayToSphere, direction)
+	local d2 = VecDot(rayToSphere, rayToSphere) - tca * tca
 
-    if d2 > radius * radius then
-        -- No intersection with sphere
-        return { hit = false }
-    end
+	if d2 > radius * radius then
+		-- No intersection with sphere
+		return { hit = false }
+	end
 
-    local thc = math.sqrt(radius * radius - d2)
-    local t0 = tca - thc
-    local t1 = tca + thc
+	local thc = math.sqrt(radius * radius - d2)
+	local t0 = tca - thc
+	local t1 = tca + thc
 
-    local intersections = {}
-    local normals = {}
-    local dists = {}
+	local intersections = {}
+	local normals = {}
+	local dists = {}
 
-    if t0 >= 0 then
-        local intersection = VecAdd(startPos, VecScale(direction, t0))
-        local normal = VecNormalize(VecSub(intersection, center))
-        local dist = AutoVecDist(startPos, intersection)
+	if t0 >= 0 then
+		local intersection = VecAdd(startPos, VecScale(direction, t0))
+		local normal = VecNormalize(VecSub(intersection, center))
+		local dist = AutoVecDist(startPos, intersection)
 
-        table.insert(intersections, intersection)
-        table.insert(normals, normal)
-        table.insert(dists, dist)
-    end
+		table.insert(intersections, intersection)
+		table.insert(normals, normal)
+		table.insert(dists, dist)
+	end
 
-    if t1 >= 0 then
-        local intersection = VecAdd(startPos, VecScale(direction, t1))
-        local normal = VecNormalize(VecSub(intersection, center))
-        local dist = AutoVecDist(startPos, intersection)
+	if t1 >= 0 then
+		local intersection = VecAdd(startPos, VecScale(direction, t1))
+		local normal = VecNormalize(VecSub(intersection, center))
+		local dist = AutoVecDist(startPos, intersection)
 
-        table.insert(intersections, intersection)
-        table.insert(normals, normal)
-        table.insert(dists, dist)
-    end
+		table.insert(intersections, intersection)
+		table.insert(normals, normal)
+		table.insert(dists, dist)
+	end
 
-    return {
-        hit = #intersections > 0,
-        intersections = intersections,
-        normals = normals,
-        dists = dists,
-    }
+	return {
+		hit = #intersections > 0,
+		intersections = intersections,
+		normals = normals,
+		dists = dists,
+	}
 end
 
 --#endregion
@@ -2384,7 +2429,7 @@ function AutoTransformRotateAroundPoint(transform, point, rotation)
 	local rotated_transform = TransformToParentTransform(Transform(Vec(), rotation), transform_relative_to_point)
 	rotated_transform.pos = VecAdd(rotated_transform.pos, point)
 	
-    return rotated_transform
+	return rotated_transform
 end
 
 ---Equivalent to `{ GetQuatEuler(quat) }`
@@ -2687,7 +2732,7 @@ function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent
 	return AutoRaycast(pointA, diff, manualDistance or distance_between_points, radius, rejectTransparent), distance_between_points
 end
 
----AutoRaycast using the camera or player camera as the origin and direction
+---AutoRaycast using the view or player view as the origin and direction
 ---@param usePlayerCamera boolean
 ---@param maxDist number
 ---@param radius number?
@@ -2782,15 +2827,15 @@ end
 ---@param voxel_stepped_point vector
 ---@return vector
 function AutoResolveUnsteppedPoint(shape, query_origin, voxel_stepped_point)
-    local shape_world_transform = GetShapeWorldTransform(shape)
-    local relative_query_origin = TransformToLocalPoint(shape_world_transform, query_origin)
-    local relative_query_point = TransformToLocalPoint(shape_world_transform, voxel_stepped_point)
+	local shape_world_transform = GetShapeWorldTransform(shape)
+	local relative_query_origin = TransformToLocalPoint(shape_world_transform, query_origin)
+	local relative_query_point = TransformToLocalPoint(shape_world_transform, voxel_stepped_point)
 
-    local _, _, _, scale = GetShapeSize(shape)
-    local offset = AutoVecOne(scale / 2)
+	local _, _, _, scale = GetShapeSize(shape)
+	local offset = AutoVecOne(scale / 2)
 
-    local applied_offset = AutoVecClampVec(relative_query_origin, VecSub(relative_query_point, offset), VecAdd(relative_query_point, offset))
-    return TransformToParentPoint(shape_world_transform, applied_offset) -- Extrapolated
+	local applied_offset = AutoVecClampVec(relative_query_origin, VecSub(relative_query_point, offset), VecAdd(relative_query_point, offset))
+	return TransformToParentPoint(shape_world_transform, applied_offset) -- Extrapolated
 end
 
 ---@param shapes_a shape_handle[]
@@ -2859,7 +2904,7 @@ end
 
 ---Checks if a point is in the view using a transform acting as the "Camera"
 ---@param point vector
----@param from_transform transform? The Transform acting as the camera, Default is the Player's Camera
+---@param from_transform transform? The Transform acting as the view, Default is the Player's Camera
 ---@param angle number? The Angle at which the point can be seen from, Default is the Player's FOV set in the options menu
 ---@param raycastcheck boolean? Check to make sure that the point is not obscured, Default is true
 ---@return boolean seen If the point is in View
@@ -3176,7 +3221,7 @@ function AutoLiquifyShape(shape, keep_original, inherit_tags, no_bodies)
 
 	local bodies = {}
 	local shapes = {}
-                
+				
 	for z=0, shape_size[3] - 1 do
 		for y=0, shape_size[2] - 1 do
 			for x=0, shape_size[1] - 1 do
@@ -3219,43 +3264,43 @@ end
 ---@return body_handle[]
 ---@return shape_handle[]
 function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_reject_materials, pop_voxels_inherit_tags, pop_voxels_no_bodies)
-    local popped_bodies = {}
-    local popped_shapes = {}
+	local popped_bodies = {}
+	local popped_shapes = {}
 
-    local function action(voxel_position)
-        if pop_voxels then
-            local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies, pop_reject_materials)
+	local function action(voxel_position)
+		if pop_voxels then
+			local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies, pop_reject_materials)
 
-            if new_body then popped_bodies[#popped_bodies+1] = new_body end
+			if new_body then popped_bodies[#popped_bodies+1] = new_body end
 			if new_shape then popped_shapes[#popped_shapes+1] = new_shape end
-        else
-            local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
-            if material[1] == '' then return false end
+		else
+			local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
+			if material[1] == '' then return false end
 
-            SetBrush('cube', 1, 0)
-            DrawShapeLine(shape, voxel_position[1], voxel_position[2], voxel_position[3], voxel_position[1], voxel_position[2], voxel_position[3])
-        end
-    end
+			SetBrush('cube', 1, 0)
+			DrawShapeLine(shape, voxel_position[1], voxel_position[2], voxel_position[3], voxel_position[1], voxel_position[2], voxel_position[3])
+		end
+	end
 
-    local x, y, z = unpack(AutoWorldToShapeVoxelIndex(shape, world_point))
-    local inner_radius_squared = inner_radius ^ 2
-    local outer_radius_squared = outer_radius ^ 2
+	local x, y, z = unpack(AutoWorldToShapeVoxelIndex(shape, world_point))
+	local inner_radius_squared = inner_radius ^ 2
+	local outer_radius_squared = outer_radius ^ 2
 
-    for i = math.floor(x - outer_radius), math.ceil(x + outer_radius) do
-        for j = math.floor(y - outer_radius), math.ceil(y + outer_radius) do
-            for k = math.floor(z - outer_radius), math.ceil(z + outer_radius) do
-                local dx = i - x
-                local dy = j - y
-                local dz = k - z
+	for i = math.floor(x - outer_radius), math.ceil(x + outer_radius) do
+		for j = math.floor(y - outer_radius), math.ceil(y + outer_radius) do
+			for k = math.floor(z - outer_radius), math.ceil(z + outer_radius) do
+				local dx = i - x
+				local dy = j - y
+				local dz = k - z
 
-                local distanceSquared = dx * dx + dy * dy + dz * dz
+				local distanceSquared = dx * dx + dy * dy + dz * dz
 
-                if distanceSquared <= outer_radius_squared and distanceSquared >= inner_radius_squared then
-                    action({ i, j, k })
-                end
-            end
-        end
-    end
+				if distanceSquared <= outer_radius_squared and distanceSquared >= inner_radius_squared then
+					action({ i, j, k })
+				end
+			end
+		end
+	end
 
 	if pop_voxels and pop_voxels_inherit_tags then
 		local parent_body_tags = AutoGetTags(GetShapeBody(shape))
@@ -3270,14 +3315,13 @@ function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_vox
 		end
 	end
 
-    return popped_bodies, popped_shapes
+	return popped_bodies, popped_shapes
 end
 
 --#endregion
 --#region Environment
 
 ---@class environment
----@field ambience { [1]:td_path, [2]:number }
 ---@field ambient number
 ---@field ambientexponent number
 ---@field brightness number
@@ -3295,9 +3339,6 @@ end
 ---@field skyboxrot number
 ---@field skyboxtint { [1]:number, [2]:number, [3]:number }
 ---@field slippery number
----@field snowamount { [1]:number, [2]:number }
----@field snowdir { [1]:number, [2]:number, [3]:number, [4]:number }
----@field snowonground boolean
 ---@field sunbrightness number
 ---@field suncolortint { [1]:number, [2]:number, [3]:number }
 ---@field sundir { [1]:number, [2]:number, [3]:number }|'auto'|0
@@ -3315,7 +3356,6 @@ end
 ---@return environment
 function AutoGetEnvironment()
 	local params = {
-		"ambience",
 		"ambient",
 		"ambientexponent",
 		"brightness",
@@ -3333,9 +3373,6 @@ function AutoGetEnvironment()
 		"skyboxrot",
 		"skyboxtint",
 		"slippery",
-		-- "snowamount", -- SCREWS WITH THINGS IN LATEST RELEASE
-		-- "snowdir", -- SCREWS WITH THINGS IN LATEST RELEASE
-		-- "snowonground", -- SCREWS WITH THINGS IN LATEST RELEASE
 		"sunbrightness",
 		"suncolortint",
 		"sundir",
@@ -3369,7 +3406,7 @@ function AutoSetEnvironment(Environment)
 	end
 end
 
----Draws Sprites around the camera to provide the illusion of a flat background
+---Draws Sprites around the view to provide the illusion of a flat background
 ---@param r number
 ---@param g number
 ---@param b number
@@ -3407,7 +3444,6 @@ end
 ---@return environment
 function AutoFlatEnvironment(pathToDDS)
 	return {
-		ambience = { "outdoor/field.ogg", 0 },
 		ambient = { 1 },
 		ambientexponent = { 10 ^ -37.9275 },
 		brightness = { 1 },
@@ -3425,9 +3461,6 @@ function AutoFlatEnvironment(pathToDDS)
 		skyboxrot = { 0 },
 		skyboxtint = { 1, 1, 1 },
 		slippery = { 0 },
-		snowamount = { 0, 0 },
-		snowdir = { 0, 0, 1, 0 },
-		snowonground = {},
 		sunBrightness = { 0 },
 		sunColorTint = { 0, 0, 0 },
 		sunDir = { 0, 0, 0 },
@@ -3562,17 +3595,19 @@ function AutoToString(t, floating_point, singleline_at, show_number_keys, ignore
 			local k_str = false
 			if type(k) ~= "number" then
 				k_str = lua_compatible and ("['%s']"):format(tostring(k)) or tostring(k)
-            elseif show_number_keys then
+			elseif show_number_keys then
 				k_str = ("[%s]"):format(tostring(k))
 			end
 			
 			local prefix = k_str and k_str .. " = " or ''
 			
 			local v_str = AutoToString(v, floating_point, singleline_at - 1, show_number_keys, ignore_keys, lua_compatible, indents + 1, visited_tables)
-			str = str .. prefix .. v_str .. ", "
+			str = str .. prefix .. v_str
 			
 			if not passedSLthreshold then
-				str = str .. "\n"
+				str = str .. ",\n"
+			else
+				str = str .. ", "
 			end
 		end
 	end
@@ -4030,24 +4065,49 @@ end
 --#endregion
 --#region User Interface
 
----Raycasts to an imaginary plane, useful for getting a point in which UIWorldToPixel will not work
+--- Raycasts to an imaginary plane, useful for getting a point in which UIWorldToPixel will not work
 ---@param origin vector
 ---@param direction vector
 ---@param plane_distance number
 ---@param camera_fov number
 ---@return number, number
 function AutoUIRaycastPlane(origin, direction, plane_distance, camera_fov)
-    local vertical_fov_rad = math.rad(camera_fov)
-    local tan_vertical_fov_rad = math.tan(vertical_fov_rad / 2)
+	local vertical_fov_rad = math.rad(camera_fov)
+	local tan_vertical_fov_rad = math.tan(vertical_fov_rad / 2)
 
-    local intersection = {
-        direction[1] / tan_vertical_fov_rad / direction[3] - origin[1] / (plane_distance - origin[3]),
-        direction[2] / tan_vertical_fov_rad / direction[3] - origin[2] / (plane_distance - origin[3]),
-    }
+	-- Adjust the direction based on FOV
+	direction = VecNormalize(direction)
+
+	local intersection = {
+		(direction[1] / -direction[3]) / tan_vertical_fov_rad + (origin[1] / (plane_distance + origin[3])),
+		(direction[2] / -direction[3]) / tan_vertical_fov_rad + (origin[2] / (plane_distance + origin[3]))
+	}
 
 	local bounds_x = AutoUiBounds()
 
-    return -intersection[1] * (bounds_x / 2), intersection[2] * (bounds_x / 2)
+	return intersection[1] * (bounds_x / 2), -intersection[2] * (bounds_x / 2)
+end
+
+
+--- Calculates the radius in screen space of a cone based on angle, view FOV, and UI width
+---@param radians number Angle
+---@param camera_fov number Camera field of view in degrees
+---@param ui_width number Width of the UI element where the crosshair is displayed
+---@return number Radius of the cone in screen space
+function AutoUiCalculateConeRadius(radians, camera_fov, ui_width)
+	-- Calculate the tangent of half the angle
+	local tan_half_angle = math.tan(radians / 2)
+
+	-- Convert view FOV from degrees to radians
+	local vertical_fov_rad = math.rad(camera_fov)
+
+	-- Calculate the radius in world space
+	local radius_world = tan_half_angle / math.tan(vertical_fov_rad / 2)
+
+	-- Convert the world space radius to screen space using UI width
+	local radius_screen = radius_world * (ui_width / 2)
+
+	return radius_screen
 end
 
 ---UiTranslate and UiAlign to the Center
@@ -4070,7 +4130,7 @@ end
 ---@return number
 function AutoUiDistance(a, b)
 	b = b or { 0, 0 }
-    return VecLength(VecSub(Vec(a[1], a[2]), Vec(b[1], b[2])))
+	return VecLength(VecSub(Vec(a[1], a[2]), Vec(b[1], b[2])))
 end
 
 ---Draws a line between two points in screen space

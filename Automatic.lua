@@ -1,5 +1,5 @@
 --[[
-	VERSION 4.6
+	VERSION 4.8
 	I ask that you do not rename Automatic.lua - Thank you
 	Documentation assumes that you are using Teardown Totally Documented's lua library for type annotations.
 ]]

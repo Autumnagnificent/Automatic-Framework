@@ -2349,7 +2349,7 @@ function AutoVecTableLerp(a, b, t)
 	return c
 end
 
----Calls VecLerp on a table of Vectors
+---Linearly interpolates a table of numbers
 ---@param a table A table of values
 ---@param b table A table of values the same size of a
 ---@param t number

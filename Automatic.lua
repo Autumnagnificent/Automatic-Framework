@@ -1,5 +1,5 @@
 --[[
-	VERSION 4.8
+	VERSION 5.0 - This version scheme is essentially meaningless, I change it all the time.
 	I ask that you do not rename Automatic.lua - Thank you
 	Documentation assumes that you are using Teardown Totally Documented's lua library for type annotations.
 ]]
@@ -294,6 +294,20 @@ function AutoMove(a, b, t)
 	end
 	
 	return output
+end
+
+---Exponential Decay function.
+---
+---As seen in Freya Holmér's talk at Guadalindie
+---
+---https://youtu.be/LSNQuFEDOyQ
+---@param a number
+---@param b number
+---@param decay number
+---@param dt number
+---@return number
+function AutoExponentialDecay(a, b, decay, dt)
+	return b + (a - b) * math.exp(-decay * dt)
 end
 
 ---Return the Distance between the numbers `a` and `b`
@@ -2349,7 +2363,7 @@ function AutoVecTableLerp(a, b, t)
 	return c
 end
 
----Linearly interpolates a table of numbers
+---Calls VecLerp on a table of Vectors
 ---@param a table A table of values
 ---@param b table A table of values the same size of a
 ---@param t number
@@ -2382,9 +2396,9 @@ function AutoTransformLerp(a, b, t, t2)
 		t2 = t
 	end
 	return Transform(
-	VecLerp(a.pos, b.pos, t),
-	QuatSlerp(a.rot, b.rot, t2)
-)
+		VecLerp(a.pos, b.pos, t),
+		QuatSlerp(a.rot, b.rot, t2)
+	)
 end
 
 ---Equivalent to `QuatRotateVec(t.rot, Vec(0, 0, -(scale or 1)))`
@@ -2840,13 +2854,13 @@ end
 
 ---@param shapes_a shape_handle[]
 ---@param shapes_b shape_handle[]
----@return boolean
+---@return false|{ [1]:shape_handle, [2]:shape_handle }
 function AutoIsShapesTouchingShapes(shapes_a, shapes_b)
 	for i=1, #shapes_a do
 		local sa = shapes_a[i]
 		for j=1, #shapes_b do
 			local sb = shapes_b[j]
-			if sa ~= sb and IsShapeTouching(sa, sb) then return true end
+			if sa ~= sb and IsShapeTouching(sa, sb) then return { sa, sb } end
 		end
 	end
 
@@ -3322,6 +3336,7 @@ end
 --#region Environment
 
 ---@class environment
+---@field ambience { [1]:td_path, [2]:number }
 ---@field ambient number
 ---@field ambientexponent number
 ---@field brightness number
@@ -3339,6 +3354,9 @@ end
 ---@field skyboxrot number
 ---@field skyboxtint { [1]:number, [2]:number, [3]:number }
 ---@field slippery number
+---@field snowamount { [1]:number, [2]:number }
+---@field snowdir { [1]:number, [2]:number, [3]:number, [4]:number }
+---@field snowonground boolean
 ---@field sunbrightness number
 ---@field suncolortint { [1]:number, [2]:number, [3]:number }
 ---@field sundir { [1]:number, [2]:number, [3]:number }|'auto'|0
@@ -3356,6 +3374,7 @@ end
 ---@return environment
 function AutoGetEnvironment()
 	local params = {
+		"ambience",
 		"ambient",
 		"ambientexponent",
 		"brightness",
@@ -3373,6 +3392,9 @@ function AutoGetEnvironment()
 		"skyboxrot",
 		"skyboxtint",
 		"slippery",
+		-- "snowamount", -- SCREWS WITH THINGS IN LATEST RELEASE
+		-- "snowdir", -- SCREWS WITH THINGS IN LATEST RELEASE
+		-- "snowonground", -- SCREWS WITH THINGS IN LATEST RELEASE
 		"sunbrightness",
 		"suncolortint",
 		"sundir",
@@ -3444,6 +3466,7 @@ end
 ---@return environment
 function AutoFlatEnvironment(pathToDDS)
 	return {
+		ambience = { "outdoor/field.ogg", 0 },
 		ambient = { 1 },
 		ambientexponent = { 10 ^ -37.9275 },
 		brightness = { 1 },
@@ -3461,6 +3484,9 @@ function AutoFlatEnvironment(pathToDDS)
 		skyboxrot = { 0 },
 		skyboxtint = { 1, 1, 1 },
 		slippery = { 0 },
+		snowamount = { 0, 0 },
+		snowdir = { 0, 0, 1, 0 },
+		snowonground = {},
 		sunBrightness = { 0 },
 		sunColorTint = { 0, 0, 0 },
 		sunDir = { 0, 0, 0 },
@@ -3602,12 +3628,10 @@ function AutoToString(t, floating_point, singleline_at, show_number_keys, ignore
 			local prefix = k_str and k_str .. " = " or ''
 			
 			local v_str = AutoToString(v, floating_point, singleline_at - 1, show_number_keys, ignore_keys, lua_compatible, indents + 1, visited_tables)
-			str = str .. prefix .. v_str
+			str = str .. prefix .. v_str .. ", "
 			
 			if not passedSLthreshold then
-				str = str .. ",\n"
-			else
-				str = str .. ", "
+				str = str .. "\n"
 			end
 		end
 	end
@@ -4065,29 +4089,75 @@ end
 --#endregion
 --#region User Interface
 
---- Raycasts to an imaginary plane, useful for getting a point in which UIWorldToPixel will not work
+---Corrects a 0 to 1 screen-space coordinate for Teardown's barrel distortion
+---@param texture_coord { [1]:number, [2]:number }
+---@param amount number 1.0 as default 
+---@return { [1]:number, [2]:number }
+function AutoCorrectBarrelDistortion(texture_coord, amount)
+	local tc = { texture_coord[1], texture_coord[2] }
+
+	local r = math.sqrt(tc[1] * tc[1] + tc[2] * tc[2])
+	local r2 = r * (0.94 + 0.04 * r * r)
+	local norm = math.sqrt(tc[1] * tc[1] + tc[2] * tc[2])
+
+	if norm > 0 then
+		tc = {
+			tc[1] / norm * r2,
+			tc[2] / norm * r2,
+		}
+	end
+
+	return VecLerp(texture_coord, tc, -amount)
+end
+
+---@param local_point vector
+---@param camera_fov number
+---@param ui_width number
+---@param barrel_distortion number?
+---@return vector
+function AutoLocalSpaceToUiSpace(local_point, camera_fov, ui_width, barrel_distortion)
+	local rad_fov = math.rad(camera_fov)
+	local focal_length = ui_width / (2 * math.tan(rad_fov / 2))
+	local ui_space = VecScale(local_point, -focal_length / local_point[3])
+
+	ui_space[2] = -ui_space[2]
+
+	if barrel_distortion and barrel_distortion ~= 0 then
+		-- Normalize UI space coordinates to [-1, 1]
+		local half_width = ui_width / 2
+		local norm_ui_space = {
+			AutoMap(ui_space[1], -half_width, half_width, -1, 1),
+			AutoMap(ui_space[2], -half_width, half_width, -1, 1),
+		}
+		
+		-- Apply inverse barrel distortion
+		norm_ui_space = AutoCorrectBarrelDistortion(norm_ui_space, barrel_distortion)
+	
+		-- Convert normalized coordinates back to UI space
+		ui_space = {
+			AutoMap(norm_ui_space[1], -1, 1, -half_width, half_width),
+			AutoMap(norm_ui_space[2], -1, 1, -half_width, half_width),
+			ui_space[3]
+		}
+	end
+
+	return ui_space
+end
+
 ---@param origin vector
 ---@param direction vector
 ---@param plane_distance number
----@param camera_fov number
----@return number, number
-function AutoUIRaycastPlane(origin, direction, plane_distance, camera_fov)
-	local vertical_fov_rad = math.rad(camera_fov)
-	local tan_vertical_fov_rad = math.tan(vertical_fov_rad / 2)
+---@return vector UiCoordinates
+function AutoRaycastToUiPlane(origin, direction, plane_distance, camera_fov, ui_width, barrel_distortion)
+	local ui_plane = Transform(
+		Vec(0, 0, -plane_distance),
+		Quat()
+	) --[[@as plane]]
 
-	-- Adjust the direction based on FOV
-	direction = VecNormalize(direction)
+	local ray = AutoRaycastPlane(ui_plane, origin, direction)
 
-	local intersection = {
-		(direction[1] / -direction[3]) / tan_vertical_fov_rad + (origin[1] / (plane_distance + origin[3])),
-		(direction[2] / -direction[3]) / tan_vertical_fov_rad + (origin[2] / (plane_distance + origin[3]))
-	}
-
-	local bounds_x = AutoUiBounds()
-
-	return intersection[1] * (bounds_x / 2), -intersection[2] * (bounds_x / 2)
+	return AutoLocalSpaceToUiSpace(ray.intersection, camera_fov, ui_width, barrel_distortion)
 end
-
 
 --- Calculates the radius in screen space of a cone based on angle, view FOV, and UI width
 ---@param radians number Angle

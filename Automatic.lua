@@ -1,5 +1,5 @@
 --[[
-	VERSION 5.0 - This version scheme is essentially meaningless, I change it all the time.
+	VERSION 5.1 - This version scheme is essentially meaningless, I change it all the time.
 	I ask that you do not rename Automatic.lua - Thank you
 	Documentation assumes that you are using Teardown Totally Documented's lua library for type annotations.
 ]]
@@ -850,8 +850,6 @@ function AutoVecProjectOntoPlane(vector, planeNormal, rescale)
 	if rescale then return AutoVecRescale(projectedVector, VecLength(vector)) else return projectedVector end
 end
 
-
-
 ---Converts the output of VecDot with normalized vectors to an angle
 ---@param dot number
 ---@return number
@@ -1309,10 +1307,10 @@ function AutoOBB(center, rot, size)
 	}
 end
 
----Returns the corners of a Oriented Bounding Box
+---Returns the corners of a Oriented Bounding Box in a sorted table
 ---@param obb OBB
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
-function AutoGetOBBCorners(obb)
+function AutoGetOBBCornersLabeled(obb)
 	local corners = {}
 	
 	-- Calculate the eight corner points of the OBB based on the center, dimensions, and orientation
@@ -1329,12 +1327,148 @@ function AutoGetOBBCorners(obb)
 	return corners
 end
 
+---Returns the corners of a Oriented Bounding Box
+---@param obb OBB
+---@return vector[]
+function AutoGetOBBCorners(obb)
+	local size = obb.size
+	local pos = obb.pos
+	local rot = obb.rot
+
+	local hs = VecScale(size, 0.5)
+
+	-- Create the 8 corners of the OBB in local space
+	local corners = {
+		Vec( hs[1],  hs[2],  hs[3]),
+		Vec( hs[1],  hs[2], -hs[3]),
+		Vec( hs[1], -hs[2],  hs[3]),
+		Vec( hs[1], -hs[2], -hs[3]),
+		Vec(-hs[1],  hs[2],  hs[3]),
+		Vec(-hs[1],  hs[2], -hs[3]),
+		Vec(-hs[1], -hs[2],  hs[3]),
+		Vec(-hs[1], -hs[2], -hs[3])
+	}
+
+	-- Transform corners to world space
+	for i, corner in ipairs(corners) do
+		corners[i] = VecAdd(QuatRotateVec(rot, corner), pos)
+	end
+
+	return corners
+end
+
+---@param obb OBB
+---@param axis any
+---@return number
+---@return number
+function AutoProjectOBBOnAxis(obb, axis)
+	local corners = AutoGetOBBCorners(obb)
+	local minProj = VecDot(corners[1], axis)
+	local maxProj = minProj
+
+	for i = 2, #corners do
+		local proj = VecDot(corners[i], axis)
+		if proj < minProj then
+			minProj = proj
+		elseif proj > maxProj then
+			maxProj = proj
+		end
+	end
+
+	return minProj, maxProj
+end
+
+---@param obb OBB
+---@param point vector
+---@return vector
+function AutoClosestPointOnOBB(obb, point)
+	local size = obb.size
+	local pos = obb.pos
+	local rot = obb.rot
+
+	local d = VecSub(point, pos)
+	local closest = VecCopy(pos)
+
+	local axes = {
+		QuatRotateVec(rot, Vec(1, 0, 0)),
+		QuatRotateVec(rot, Vec(0, 1, 0)),
+		QuatRotateVec(rot, Vec(0, 0, 1))
+	}
+
+	for i = 1, 3 do
+		local dist = VecDot(d, axes[i])
+		if dist > size[i] * 0.5 then
+			dist = size[i] * 0.5
+		elseif dist < -size[i] * 0.5 then
+			dist = -size[i] * 0.5
+		end
+		closest = VecAdd(closest, VecScale(axes[i], dist))
+	end
+
+	return closest
+end
+
+---@param obbA OBB
+---@param obbB OBB
+---@return { overlap:boolean, point:vector, normal:vector, penetration:number }
+function AutoCalculateOBBCollision(obbA, obbB)
+	-- Get all separating axes
+	local axes = {}
+
+	-- Axes from OBB A
+	local rotA = obbA.rot
+	table.insert(axes, QuatRotateVec(rotA, Vec(1, 0, 0)))
+	table.insert(axes, QuatRotateVec(rotA, Vec(0, 1, 0)))
+	table.insert(axes, QuatRotateVec(rotA, Vec(0, 0, 1)))
+
+	-- Axes from OBB B
+	local rotB = obbB.rot
+	table.insert(axes, QuatRotateVec(rotB, Vec(1, 0, 0)))
+	table.insert(axes, QuatRotateVec(rotB, Vec(0, 1, 0)))
+	table.insert(axes, QuatRotateVec(rotB, Vec(0, 0, 1)))
+
+	-- Cross products of edges from both OBBs
+	for i = 1, 3 do
+		for j = 1, 3 do
+			table.insert(axes, VecNormalize(VecCross(axes[i], axes[j + 3])))
+		end
+	end
+
+	local collisionNormal = Vec()
+	local overlap = true
+	local minPenetration = math.huge
+
+	for _, axis in ipairs(axes) do
+		local minA, maxA = AutoProjectOBBOnAxis(obbA, axis)
+		local minB, maxB = AutoProjectOBBOnAxis(obbB, axis)
+
+		if not (maxA >= minB and maxB >= minA) then
+			overlap = false
+		end
+
+		local penetration = math.min(maxA, maxB) - math.max(minA, minB)
+		if penetration < minPenetration then
+			minPenetration = penetration
+			collisionNormal = axis
+		end
+	end
+
+	-- Find the closest points on the OBBs to the collision normal
+	closestPointA = AutoClosestPointOnOBB(obbA, obbB.pos)
+	closestPointB = AutoClosestPointOnOBB(obbB, obbA.pos)
+
+	-- Average the closest points to find the collision point
+	local collisionPoint = VecScale(VecAdd(closestPointA, closestPointB), 0.5)
+
+	return { overlap = overlap, point = collisionPoint, normal = collisionNormal, penetration = minPenetration }
+end
+
 ---Returns the planes and corners representing the faces of a Oriented Bounding Box
 ---@param obb OBB
 ---@return { z:plane, zn:plane, x:plane, xn:plane, y:plane, yn:plane }
 ---@return { xyz:table, Xyz:table, xYz:table, xyZ:table, XYz:table, XyZ:table, xYZ:table, XYZ:table }
 function AutoGetOBBFaces(obb)
-	local corners = AutoGetOBBCorners(obb)
+	local corners = AutoGetOBBCornersLabeled(obb)
 	
 	local faces = {}
 	faces.z = AutoPlane(
@@ -1375,7 +1509,7 @@ end
 ---@param obb OBB
 ---@return table<{ [1]:vector, [2]:vector }>
 function AutoOBBLines(obb)
-	local c = AutoGetOBBCorners(obb)
+	local c = AutoGetOBBCornersLabeled(obb)
 	
 	return {
 		{ c.xyz, c.Xyz },
@@ -2740,6 +2874,7 @@ end
 ---@param radius number?
 ---@param rejectTransparent boolean?
 ---@return { hit:boolean, dist:number, normal:vector, shape:shape_handle, intersection:vector, body:body_handle, dir:vector, dot:number, reflection:vector }
+---@return number distance
 function AutoRaycastTo(pointA, pointB, manualDistance, radius, rejectTransparent)
 	local diff = VecSub(pointB, pointA)
 	local distance_between_points = VecLength(diff)
@@ -2855,12 +2990,23 @@ end
 ---@param shapes_a shape_handle[]
 ---@param shapes_b shape_handle[]
 ---@return false|{ [1]:shape_handle, [2]:shape_handle }
-function AutoIsShapesTouchingShapes(shapes_a, shapes_b)
+function AutoIsShapesTouchingShapes(shapes_a, shapes_b, ignore_tag, draw_debug)
+	local p1
 	for i=1, #shapes_a do
 		local sa = shapes_a[i]
-		for j=1, #shapes_b do
-			local sb = shapes_b[j]
-			if sa ~= sb and IsShapeTouching(sa, sb) then return { sa, sb } end
+
+		if not HasTag(sa, ignore_tag) then
+			if draw_debug then p1 = AutoShapeCenter(sa) end
+
+			for j=1, #shapes_b do
+				local sb = shapes_b[j]
+
+				if not ignore_tag or not HasTag(sb, ignore_tag) then
+					if draw_debug then DebugLine(p1, AutoShapeCenter(sa), 0, 0, 0, 0.5) end
+
+					if sa ~= sb and IsShapeTouching(sa, sb) then return { sa, sb } end
+				end
+			end
 		end
 	end
 
@@ -3134,7 +3280,7 @@ function AutoWorldToShapeVoxelIndex(shape, world_point)
 	local shape_size = { GetShapeSize(shape) }
 	local shape_transform = GetShapeWorldTransform(shape)
 	local shape_pos = TransformToLocalPoint(shape_transform, world_point)
-	return AutoVecFloor(VecScale(shape_pos, 1 / shape_size[4]))
+	return AutoVecRound(VecScale(shape_pos, 1 / shape_size[4]))
 end
 
 function AutoMoveShapeToNewBody(shape, static)
@@ -3277,17 +3423,17 @@ end
 ---@param pop_voxels_no_bodies boolean
 ---@return body_handle[]
 ---@return shape_handle[]
-function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, pop_voxels, pop_reject_materials, pop_voxels_inherit_tags, pop_voxels_no_bodies)
+function AutoCarveSphere(shape, world_point, inner_radius, outer_radius, keep_original, pop_voxels, pop_reject_materials, pop_voxels_inherit_tags, pop_voxels_no_bodies)
 	local popped_bodies = {}
 	local popped_shapes = {}
 
 	local function action(voxel_position)
 		if pop_voxels then
-			local new_body, new_shape = AutoPopVoxel(shape, voxel_position, false, pop_voxels_no_bodies, pop_reject_materials)
+			local new_body, new_shape = AutoPopVoxel(shape, voxel_position, keep_original, pop_voxels_no_bodies, pop_reject_materials)
 
 			if new_body then popped_bodies[#popped_bodies+1] = new_body end
 			if new_shape then popped_shapes[#popped_shapes+1] = new_shape end
-		else
+		elseif not keep_original then
 			local material = { GetShapeMaterialAtIndex(shape, unpack(voxel_position)) }
 			if material[1] == '' then return false end
 
